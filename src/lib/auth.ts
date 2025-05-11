@@ -5,6 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { LoginSchema } from '@/lib/validators';
+import { Role } from '@prisma/client';
 
 // Define your NextAuth configuration for v4
 export const authOptions: AuthOptions = {
@@ -48,12 +49,14 @@ export const authOptions: AuthOptions = {
           }
 
           // Return user object that Auth.js expects
-          return {
+          const userToReturn = {
             id: user.id,
             name: user.name, // Assuming you have a name field, or adjust as needed
             email: user.email,
             // image: user.image, // If you have an image field
+            roles: user.roles, // Added user roles
           };
+          return userToReturn;
         } catch (error) {
           console.error("Error in authorize function:", error);
           return null; // Or throw an error
@@ -63,14 +66,33 @@ export const authOptions: AuthOptions = {
   ],
   callbacks: {
     async session({ session, token }: { session: Session; token: JWT }) {
-      if (token.id && session.user) {
-        session.user.id = token.id as string;
+      if (session.user) {
+        if (token.id) {
+          session.user.id = token.id as string;
+        }
+        if (token.roles) {
+          (session.user as any).roles = token.roles as Role[];
+        }
       }
       return session;
     },
-    async jwt({ token, user }: { token: JWT; user?: NextAuthUser }) {
-      if (user && user.id) {
+    async jwt({ token, user }: { token: JWT; user?: NextAuthUser & { roles?: Role[] } }) {
+      // Initial sign in
+      if (user) {
         token.id = user.id;
+        if (user.roles) {
+          token.roles = user.roles;
+        } else {
+          // Fallback if user object from authorize/adapter somehow doesn't have roles
+          // or for other providers in the future where user object might be different.
+          const dbUser = await db.user.findUnique({
+            where: { id: user.id },
+            select: { roles: true },
+          });
+          if (dbUser) {
+            token.roles = dbUser.roles;
+          }
+        }
       }
       return token;
     },
