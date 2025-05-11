@@ -9,6 +9,9 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import { Role, ApplicationStatus, RequestedRole } from '@prisma/client'; // Added
+import OrganizerApplicationButton from '@/components/features/OrganizerApplicationButton'; // Added
+import TalentActivationButton from '@/components/features/TalentActivationButton'; // Added
 
 // Helper component to manage client-side state for displaying updated profile data
 // This is needed because the page is a Server Component, but we want to reflect
@@ -33,7 +36,16 @@ export default async function ProfilePage() {
       email: true,
       name: true,
       bio: true,
-      // id: true, // Not strictly needed for display here but good for context
+      roles: true, // Added to fetch roles
+      roleApplications: { // Added to fetch relevant application
+        where: {
+          requestedRole: RequestedRole.ORGANIZER,
+        },
+        orderBy: {
+          createdAt: 'desc', // Get the latest application if multiple exist (though unique constraint should prevent relevant multiple)
+        },
+        take: 1,
+      },
     },
   });
 
@@ -55,11 +67,21 @@ export default async function ProfilePage() {
     );
   }
 
+  const isAdmin = user.roles.includes(Role.ADMIN);
+  const isOrganizer = user.roles.includes(Role.ORGANIZER);
+
+  let profileTitle = "Your Profile";
+  if (isAdmin) {
+    profileTitle = "Your Admin Profile";
+  } else if (isOrganizer) {
+    profileTitle = "Your Organizer Profile";
+  }
+
   return (
     <Container maxWidth="md">
       <Paper sx={{ my: { xs: 2, md: 4 }, p: { xs: 2, md: 3 } }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Your Profile
+          {profileTitle}
         </Typography>
 
         <Box sx={{ mb: 3 }}>
@@ -83,6 +105,36 @@ export default async function ProfilePage() {
           <Divider sx={{ my: 1 }} />
           <ProfileForm currentName={user.name} currentBio={user.bio} />
         </Box>
+
+        {!isAdmin && (
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Role Management
+            </Typography>
+            <Divider sx={{ my: 1 }} />
+            
+            {!isOrganizer && (
+              <Box mb={3}> {/* Add margin bottom if Talent section follows */}
+                <Typography variant="subtitle1" gutterBottom>
+                  Organizer Role
+                </Typography>
+                <OrganizerApplicationButton 
+                  currentRoles={user.roles} 
+                  existingApplicationStatus={user.roleApplications[0]?.status} 
+                />
+              </Box>
+            )}
+
+            {/* Talent section is always available for non-admins */}
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                Talent Role
+              </Typography>
+              <TalentActivationButton initialRoles={user.roles} />
+            </Box>
+          </Box>
+        )}
+
       </Paper>
     </Container>
   );
