@@ -1,11 +1,12 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "./auth"; // Assuming authOptions are exported from here
-import { db } from "./db"; // Assuming Prisma client is exported as db
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth"; // Correctly import authOptions
+import { db } from "@/lib/db"; // Ensure db is imported
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
-import { Role, RequestedRole, ApplicationStatus } from "@prisma/client"; // Added import
+import { Role, RequestedRole, ApplicationStatus, User } from "@prisma/client"; // Added import
+import { Prisma } from '@prisma/client'; // For types if needed
 
 // ... existing code ...
 
@@ -268,5 +269,121 @@ export async function deactivateTalentRole(): Promise<{
       success: false,
       error: "An unexpected error occurred while deactivating the Talent role. Please try again.",
     };
+  }
+}
+
+export async function reviewOrganizerApplication(
+  applicationId: string,
+  newStatus: typeof ApplicationStatus.APPROVED | typeof ApplicationStatus.REJECTED
+): Promise<{ success: boolean; message: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user || !(session.user as User & { roles: Role[] }).roles?.includes(Role.ADMIN)) {
+    return { success: false, message: 'Unauthorized: Admin role required.' };
+  }
+
+  try {
+    const application = await db.roleApplication.findUnique({
+      where: { id: applicationId },
+      include: { user: true },
+    });
+
+    if (!application) {
+      return { success: false, message: 'Application not found.' };
+    }
+
+    if (application.requestedRole !== RequestedRole.ORGANIZER) {
+      return { success: false, message: 'This action is only for ORGANIZER role applications.' };
+    }
+    
+    if (application.status !== ApplicationStatus.PENDING) {
+        return { success: false, message: `Application is not in PENDING state (current: ${application.status}).` };
+    }
+
+    if (newStatus === ApplicationStatus.APPROVED) {
+      await db.$transaction(async (prisma) => {
+        await prisma.user.update({
+          where: { id: application.userId },
+          data: {
+            roles: {
+              // Prisma's way to add an enum to an array if it doesn't exist
+              // This ensures the user gets the ORGANIZER role.
+              // A more robust way for arrays if order/uniqueness is complex:
+              // fetch roles, add new role, make unique, then set.
+              // For simple enum addition, push should work if the DB/Prisma handles uniqueness
+              // or if we manually ensure it. Prisma's `set` is safer for replacing the array.
+              set: [...new Set([...application.user.roles, Role.ORGANIZER])],
+            },
+          },
+        });
+        await prisma.roleApplication.update({
+          where: { id: applicationId },
+          data: { status: ApplicationStatus.APPROVED },
+        });
+      });
+      revalidatePath('/admin/dashboard'); // Or specific applications page
+      revalidatePath('/admin/applications'); // Or specific applications page
+      return { success: true, message: 'Application approved successfully.' };
+    } else if (newStatus === ApplicationStatus.REJECTED) {
+      await db.roleApplication.update({
+        where: { id: applicationId },
+        data: { status: ApplicationStatus.REJECTED },
+      });
+      revalidatePath('/admin/dashboard'); // Or specific applications page
+      revalidatePath('/admin/applications'); // Or specific applications page
+      return { success: true, message: 'Application rejected successfully.' };
+    } else {
+      // Should not happen due to TypeScript types, but good for runtime safety
+      return { success: false, message: 'Invalid status provided.' };
+    }
+  } catch (error) {
+    console.error('Error reviewing application:', error);
+    return { success: false, message: 'An error occurred while processing the application.' };
+  }
+}
+
+export async function getPendingOrganizerApplicationsAction(): Promise<{
+  success: boolean;
+  applications?: any[]; // Adjust type to be serializable, e.g., RoleApplicationWithUserClient from the page
+  error?: string;
+}> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user || !(session.user as User & { roles: Role[] }).roles?.includes(Role.ADMIN)) {
+    return { success: false, error: 'Unauthorized: Admin role required.' };
+  }
+
+  try {
+    const applications = await db.roleApplication.findMany({
+      where: {
+        status: ApplicationStatus.PENDING,
+        requestedRole: RequestedRole.ORGANIZER,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Ensure dates are stringified for client component
+    const serializableApplications = applications.map(app => ({
+      ...app,
+      createdAt: app.createdAt.toISOString(),
+      updatedAt: app.updatedAt.toISOString(), // Though not explicitly used in UI, good practice
+      user: app.user // user object is already serializable as selected
+    }));
+
+    return { success: true, applications: serializableApplications };
+  } catch (error) {
+    console.error('Error fetching pending organizer applications:', error);
+    return { success: false, error: 'Failed to fetch applications.' };
   }
 } 
