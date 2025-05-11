@@ -1,4 +1,5 @@
 import { RegistrationSchema } from './validators';
+import { LoginSchema } from './validators';
 
 describe('RegistrationSchema', () => {
   it('should validate a correct registration form', () => {
@@ -100,5 +101,53 @@ describe('RegistrationSchema', () => {
     if (!result.success) {
       expect(result.error.flatten().fieldErrors.password).toBeDefined();
     }
+  });
+});
+
+describe('LoginSchema', () => {
+  it('should validate correct login credentials', () => {
+    const result = LoginSchema.safeParse({
+      email: 'test@example.com',
+      password: 'password123',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate an incorrect email format', () => {
+    const result = LoginSchema.safeParse({
+      email: 'invalid-email',
+      password: 'password123',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.email).toContain('Invalid email address');
+    }
+  });
+
+  it('should invalidate an empty password', () => {
+    const result = LoginSchema.safeParse({
+      email: 'test@example.com',
+      password: '',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.password).toContain('Password is required');
+    }
+  });
+
+  it('should invalidate if email is not a string', () => {
+    const result = LoginSchema.safeParse({
+      email: 12345,
+      password: 'password123',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should invalidate if password is not a string', () => {
+    const result = LoginSchema.safeParse({
+      email: 'test@example.com',
+      password: 12345,
+    });
+    expect(result.success).toBe(false);
   });
 }); 

@@ -3,11 +3,16 @@ import { JWT } from 'next-auth/jwt';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { db } from '@/lib/db';
+import bcrypt from 'bcryptjs';
+import { LoginSchema } from '@/lib/validators';
 
 // Define your NextAuth configuration for v4
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(db),
-  session: { strategy: 'jwt' }, // In v4, with adapter, this is often 'database', but 'jwt' is also possible.
+  session: { strategy: 'jwt' }, // Reverted to 'jwt' for CredentialsProvider compatibility
+  pages: {
+    signIn: '/login',
+  },
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -16,10 +21,43 @@ export const authOptions: AuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (credentials?.email === 'user@example.com' && credentials?.password === 'password') {
-          return { id: '1', name: 'Test User', email: 'user@example.com' }; // image can be omitted
+        // Validate input using Zod schema
+        const validatedCredentials = LoginSchema.safeParse(credentials);
+
+        if (!validatedCredentials.success) {
+          console.error("Validation failed:", validatedCredentials.error.flatten().fieldErrors);
+          return null; // Or throw an error Auth.js can catch
         }
-        return null;
+
+        const { email, password } = validatedCredentials.data;
+
+        try {
+          const user = await db.user.findUnique({
+            where: { email },
+          });
+
+          if (!user || !user.hashedPassword) {
+            // User not found or user doesn't have a password (e.g. OAuth user)
+            return null;
+          }
+
+          const isValidPassword = await bcrypt.compare(password, user.hashedPassword);
+
+          if (!isValidPassword) {
+            return null;
+          }
+
+          // Return user object that Auth.js expects
+          return {
+            id: user.id,
+            name: user.name, // Assuming you have a name field, or adjust as needed
+            email: user.email,
+            // image: user.image, // If you have an image field
+          };
+        } catch (error) {
+          console.error("Error in authorize function:", error);
+          return null; // Or throw an error
+        }
       },
     }),
   ],
