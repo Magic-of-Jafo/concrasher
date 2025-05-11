@@ -1,5 +1,6 @@
 import { RegistrationSchema } from './validators';
 import { LoginSchema } from './validators';
+import { ProfileSchema } from './validators';
 
 describe('RegistrationSchema', () => {
   it('should validate a correct registration form', () => {
@@ -149,5 +150,86 @@ describe('LoginSchema', () => {
       password: 12345,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('ProfileSchema', () => {
+  it('should validate a correct profile', () => {
+    const result = ProfileSchema.safeParse({
+      name: 'Test User',
+      bio: 'This is a test bio.',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should allow optional fields to be omitted', () => {
+    const result = ProfileSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBeUndefined();
+      expect(result.data.bio).toBeUndefined();
+    }
+  });
+
+  it('should allow name to be explicitly undefined or null (becomes undefined)', () => {
+    let result = ProfileSchema.safeParse({ name: undefined, bio: 'A bio' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBeUndefined();
+
+    // Note: Zod typically converts null to undefined for optional strings if not explicitly .nullable()
+    result = ProfileSchema.safeParse({ name: null, bio: 'A bio' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBeUndefined();
+  });
+
+  it('should allow bio to be explicitly undefined or null (becomes undefined)', () => {
+    let result = ProfileSchema.safeParse({ bio: undefined, name: 'A name' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.bio).toBeUndefined();
+
+    result = ProfileSchema.safeParse({ bio: null, name: 'A name' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.bio).toBeUndefined();
+  });
+
+  it('should invalidate an empty name string if name field is provided', () => {
+    const result = ProfileSchema.safeParse({ name: '' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.name).toContain('Display name is required');
+    }
+  });
+
+  it('should invalidate a bio longer than 200 characters', () => {
+    const longBio = 'a'.repeat(201);
+    const result = ProfileSchema.safeParse({ bio: longBio });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.bio).toContain('Bio must be 200 characters or less');
+    }
+  });
+
+  it('should pass with a bio exactly 200 characters long', () => {
+    const bioAtMaxLength = 'a'.repeat(200);
+    const result = ProfileSchema.safeParse({ bio: bioAtMaxLength });
+    expect(result.success).toBe(true);
+  });
+
+   it('should pass if only name is provided', () => {
+    const result = ProfileSchema.safeParse({ name: 'Only Name' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe('Only Name');
+      expect(result.data.bio).toBeUndefined();
+    }
+  });
+
+  it('should pass if only bio is provided', () => {
+    const result = ProfileSchema.safeParse({ bio: 'Only Bio' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.bio).toBe('Only Bio');
+      expect(result.data.name).toBeUndefined();
+    }
   });
 }); 

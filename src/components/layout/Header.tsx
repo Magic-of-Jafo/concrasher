@@ -30,9 +30,14 @@ export default function Header() {
             </Typography>
           )}
           {isAuthenticated ? (
-            <Button color="inherit" onClick={handleLogout}>
-              Logout
-            </Button>
+            <>
+              <Button color="inherit" component={Link} href="/profile" sx={{ mr: 1 }}>
+                Profile
+              </Button>
+              <Button color="inherit" onClick={handleLogout}>
+                Logout
+              </Button>
+            </>
           ) : (
             <Button color="inherit" component={Link} href="/login">
               Login
