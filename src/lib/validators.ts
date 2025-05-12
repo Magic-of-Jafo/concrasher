@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ConventionStatus as PrismaConventionStatusEnum } from '@prisma/client';
 
 export const RegistrationSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -19,4 +20,33 @@ export const ProfileSchema = z.object({
   bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional(),
 });
 
-export type ProfileSchemaInput = z.infer<typeof ProfileSchema>; 
+export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;
+
+// Use the Prisma generated enum for ConventionStatus
+export const ConventionStatusEnum = z.nativeEnum(PrismaConventionStatusEnum);
+
+export const ConventionCreateSchema = z.object({
+  name: z.string().min(1, { message: 'Name is required' }),
+  // slug: z.string().min(1, { message: 'Slug is required' }), // Slug will be auto-generated or handled separately
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  city: z.string().min(1, { message: 'City is required' }),
+  state: z.string().min(1, { message: 'State is required' }),
+  country: z.string().min(1, { message: 'Country is required' }),
+  venueName: z.string().optional(),
+  description: z.string().optional(),
+  websiteUrl: z.string().url({ message: 'Invalid URL' }).optional().or(z.literal('')),
+  // organizerUserId: z.string().cuid({ message: 'Invalid Organizer ID' }), // Will be set from session/admin context
+  conventionSeriesId: z.string().cuid({ message: 'Invalid Series ID' }).optional(),
+  status: ConventionStatusEnum,
+  bannerImageUrl: z.string().optional().or(z.literal('')),
+  galleryImageUrls: z.array(z.string()).default([]),
+});
+
+export const ConventionUpdateSchema = ConventionCreateSchema.partial().extend({
+  // Ensure slug is optional for updates if it's being handled or already set
+  // slug: z.string().min(1, { message: 'Slug is required' }).optional(), 
+});
+
+export type ConventionCreateInput = z.infer<typeof ConventionCreateSchema>;
+export type ConventionUpdateInput = z.infer<typeof ConventionUpdateSchema>; 

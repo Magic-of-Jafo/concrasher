@@ -26,6 +26,14 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum ConventionStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  PAST
+  CANCELLED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?   // Display name
@@ -40,6 +48,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   bio           String?   // Short biography
   roleApplications RoleApplication[]
+  organizedConventions Convention[] @relation("OrganizedBy")
 }
 
 model Account {
@@ -87,4 +96,27 @@ model RoleApplication {
   updatedAt     DateTime          @updatedAt
 
   @@unique([userId, requestedRole]) // A user can only have one pending application for a specific role
+}
+
+model Convention {
+  id                 String    @id @default(cuid())
+  name               String
+  slug               String    @unique
+  startDate          DateTime
+  endDate            DateTime
+  city               String
+  state              String
+  country            String
+  venueName          String?
+  description        String?   @db.Text
+  websiteUrl         String?
+  organizerUserId    String
+  organizer          User      @relation("OrganizedBy", fields: [organizerUserId], references: [id])
+  conventionSeriesId String?
+  // ConventionSeries   ConventionSeries? @relation(fields: [conventionSeriesId], references: [id], onDelete: SetNull) // ConventionSeries model will be added later
+  status             ConventionStatus
+  bannerImageUrl     String?
+  galleryImageUrls   String[]  @default([])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 } 

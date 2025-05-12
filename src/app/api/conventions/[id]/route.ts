@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { ConventionUpdateSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { Role, Prisma } from '@prisma/client'; // Import Prisma for error types
+import prisma from '@/lib/prisma';
 
 interface RouteParams {
   params: {
@@ -26,36 +27,31 @@ async function findConventionByIdOrSlug(idOrSlug: string) {
   return convention;
 }
 
-export async function GET(req: Request, { params }: RouteParams) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
-    const user = session?.user as { id: string; roles: Role[] } | undefined;
 
-    if (!user || !user.roles?.includes(Role.ADMIN)) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    if (!session) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { id } = params;
-    let convention;
-
-    // Try fetching by ID first (assuming it might be a CUID)
-    if (id.length === 25 && id.startsWith('c')) { // Basic check for CUID like structure
-      convention = await db.convention.findUnique({ where: { id } });
-    }
-
-    // If not found by ID, or if ID doesn't look like a CUID, try by slug
-    if (!convention) {
-      convention = await db.convention.findUnique({ where: { slug: id } });
-    }
+    const convention = await prisma.convention.findUnique({
+      where: {
+        id: params.id,
+      },
+    });
 
     if (!convention) {
-      return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
+      return new NextResponse('Convention not found', { status: 404 });
     }
 
-    return NextResponse.json(convention, { status: 200 });
+    return NextResponse.json(convention);
   } catch (error) {
-    console.error(`Error fetching convention ${params.id}:`, error);
-    return NextResponse.json({ message: 'Could not fetch convention' }, { status: 500 });
+    console.error('Error fetching convention:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 

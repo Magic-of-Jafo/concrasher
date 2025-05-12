@@ -1,6 +1,7 @@
 import { RegistrationSchema } from './validators';
 import { LoginSchema } from './validators';
 import { ProfileSchema } from './validators';
+import { ConventionCreateSchema, ConventionUpdateSchema, ConventionStatusEnum } from './validators';
 
 describe('RegistrationSchema', () => {
   it('should validate a correct registration form', () => {
@@ -230,6 +231,127 @@ describe('ProfileSchema', () => {
     if (result.success) {
       expect(result.data.bio).toBe('Only Bio');
       expect(result.data.name).toBeUndefined();
+    }
+  });
+});
+
+describe('ConventionCreateSchema', () => {
+  const validData = {
+    name: 'Test Convention',
+    startDate: new Date('2025-01-01T10:00:00.000Z'),
+    endDate: new Date('2025-01-03T18:00:00.000Z'),
+    city: 'Test City',
+    state: 'TS',
+    country: 'Testland',
+    status: ConventionStatusEnum.Enum.UPCOMING,
+    // Optional fields
+    venueName: 'Test Venue',
+    description: 'A great test convention',
+    websiteUrl: 'https://example.com/test-con',
+    conventionSeriesId: 'clxkz0example000008l7aaaa0000', // example CUID
+    bannerImageUrl: 'https://example.com/banner.jpg',
+    galleryImageUrls: ['https://example.com/gallery1.jpg', 'https://example.com/gallery2.jpg'],
+  };
+
+  it('should validate correct convention creation data', () => {
+    const result = ConventionCreateSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate missing required name', () => {
+    const { name, ...data } = validData;
+    const result = ConventionCreateSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.name).toContain('Name is required');
+    }
+  });
+
+  it('should invalidate invalid startDate (not a date)', () => {
+    const result = ConventionCreateSchema.safeParse({ ...validData, startDate: 'not-a-date' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.startDate).toBeDefined();
+    }
+  });
+
+  it('should invalidate invalid status enum', () => {
+    const result = ConventionCreateSchema.safeParse({ ...validData, status: 'INVALID_STATUS' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.status).toBeDefined();
+    }
+  });
+
+  it('should accept empty string for optional websiteUrl and bannerImageUrl', () => {
+    const result = ConventionCreateSchema.safeParse({
+      ...validData,
+      websiteUrl: '',
+      bannerImageUrl: '',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.websiteUrl).toBe('');
+      expect(result.data.bannerImageUrl).toBe('');
+    }
+  });
+
+  it('should default galleryImageUrls to an empty array if not provided', () => {
+    const { galleryImageUrls, ...data } = validData;
+    const result = ConventionCreateSchema.safeParse(data);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.galleryImageUrls).toEqual([]);
+    }
+  });
+
+   it('should invalidate invalid URL in galleryImageUrls', () => {
+    const result = ConventionCreateSchema.safeParse({ ...validData, galleryImageUrls: ['invalid-url'] });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.galleryImageUrls).toBeDefined();
+    }
+  });
+
+  it('should invalidate non-cuid for conventionSeriesId', () => {
+    const result = ConventionCreateSchema.safeParse({ ...validData, conventionSeriesId: 'not-a-cuid' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.conventionSeriesId).toContain('Invalid Series ID');
+    }
+  });
+});
+
+describe('ConventionUpdateSchema', () => {
+  it('should validate partial data for update', () => {
+    const data = { name: 'Updated Convention Name' };
+    const result = ConventionUpdateSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it('should allow all fields to be optional', () => {
+    const result = ConventionUpdateSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate a specific field if provided (e.g., invalid URL for websiteUrl)', () => {
+    const result = ConventionUpdateSchema.safeParse({ websiteUrl: 'not-a-valid-url' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.websiteUrl).toContain('Invalid URL');
+    }
+  });
+
+  it('should allow valid status enum for update', () => {
+    const result = ConventionUpdateSchema.safeParse({ status: ConventionStatusEnum.Enum.PAST });
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate invalid status enum for update', () => {
+    const result = ConventionUpdateSchema.safeParse({ status: 'INVALID_STATUS_FOR_UPDATE' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.status).toBeDefined();
     }
   });
 }); 

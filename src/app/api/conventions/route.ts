@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
 import { ConventionCreateSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
+import prisma from '@/lib/prisma';
 
 // Simple slugify function (replace with a more robust one if needed, e.g., slugify library)
 function slugify(text: string): string {
@@ -24,9 +24,16 @@ export async function POST(req: Request) {
     // Explicitly type session.user to include id and roles
     const user = session?.user as { id: string; roles: Role[] } | undefined;
 
-    if (!user || !user.roles?.includes(Role.ADMIN)) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
+
+    // Check if user has either ADMIN or ORGANIZER role
+    const hasAccess = user.roles?.includes(Role.ADMIN) || user.roles?.includes(Role.ORGANIZER);
+    if (!hasAccess) {
+      return NextResponse.json({ message: 'Forbidden - Must be an admin or organizer' }, { status: 403 });
+    }
+
     const organizerUserId = user.id;
 
     const body = await req.json();
@@ -41,7 +48,7 @@ export async function POST(req: Request) {
     let slug = slugify(name);
 
     // Check for slug uniqueness
-    const existingConventionBySlug = await db.convention.findUnique({
+    const existingConventionBySlug = await prisma.convention.findUnique({
       where: { slug },
     });
 
@@ -59,7 +66,7 @@ export async function POST(req: Request) {
       organizerUserId,
     };
 
-    const newConvention = await db.convention.create({
+    const newConvention = await prisma.convention.create({
       data: conventionData,
     });
 
@@ -82,11 +89,17 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     const user = session?.user as { id: string; roles: Role[] } | undefined;
 
-    if (!user || !user.roles?.includes(Role.ADMIN)) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const conventions = await db.convention.findMany({});
+    // Check if user has either ADMIN or ORGANIZER role
+    const hasAccess = user.roles?.includes(Role.ADMIN) || user.roles?.includes(Role.ORGANIZER);
+    if (!hasAccess) {
+      return NextResponse.json({ message: 'Forbidden - Must be an admin or organizer' }, { status: 403 });
+    }
+
+    const conventions = await prisma.convention.findMany({});
 
     return NextResponse.json(conventions, { status: 200 });
   } catch (error) {

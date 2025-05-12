@@ -12,6 +12,16 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+*.spec.ts
+*.spec.tsx
+jest.setup.js
+playwright.config.ts
+
+# debug artifacts
+*-debug.png
+*.log
 
 # next.js
 /.next/

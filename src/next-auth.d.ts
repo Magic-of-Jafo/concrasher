@@ -1,5 +1,6 @@
 import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
 import { JWT, DefaultJWT } from "next-auth/jwt";
+import { Role } from "@prisma/client";
 
 declare module "next-auth" {
   /**
@@ -9,8 +10,8 @@ declare module "next-auth" {
     user: {
       /** The user's id. */
       id: string;
-      // Add other custom properties for user here, e.g. roles
-      // roles?: string[]; 
+      /** The user's roles. */
+      roles?: Role[];
     } & DefaultSession["user"]; // Keep existing DefaultSession user properties
   }
 
@@ -19,17 +20,17 @@ declare module "next-auth" {
    * or the second parameter of the `session` callback, when using a database.
    */
   interface User extends DefaultUser {
-    // Add other custom properties for user here, e.g. roles
-    // roles?: string[];
+    /** The user's roles. */
+    roles?: Role[];
   }
 }
 
 declare module "next-auth/jwt" {
   /** Returned by the `jwt` callback and `auth`, when using JWT sessions */
   interface JWT extends DefaultJWT {
-    /** OpenID ID Token */
-    // Add custom properties to JWT token here, e.g. user id, roles
-    // id?: string;
-    // roles?: string[];
+    /** The user's id. */
+    id?: string;
+    /** The user's roles. */
+    roles?: Role[];
   }
 } 

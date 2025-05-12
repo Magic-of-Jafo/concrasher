@@ -20,53 +20,62 @@
  * }
  */
 import { PrismaClient, Role } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Starting seed script...');
 
-  const adminEmail = process.env.ADMIN_EMAIL;
+  // Test users to create/update
+  const testUsers = [
+    {
+      email: 'magicjafo@gmail.com',
+      password: 'smeghead',
+      roles: [Role.ADMIN],
+    },
+    {
+      email: 'jafo@getjafo.com',
+      password: 'smeghead',
+      roles: [Role.USER],
+    },
+  ];
 
-  if (!adminEmail) {
-    console.error('Error: ADMIN_EMAIL environment variable is not set.');
-    console.log('Skipping admin role assignment.');
-    return;
-  }
-
-  console.log(`Looking for user with email: ${adminEmail} to assign ADMIN role.`);
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { email: adminEmail },
-    });
-
-    if (!user) {
-      console.warn(`Warning: User with email "${adminEmail}" not found.`);
-      console.log('No admin role assigned.');
-      return;
-    }
-
-    if (user.roles.includes(Role.ADMIN)) {
-      console.log(`User ${adminEmail} is already an ADMIN.`);
-    } else {
-      const updatedUser = await prisma.user.update({
-        where: { email: adminEmail },
-        data: {
-          roles: {
-            push: Role.ADMIN,
-          },
-        },
+  for (const userData of testUsers) {
+    try {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: userData.email },
       });
-      console.log(`Successfully assigned ADMIN role to user ${updatedUser.email}.`);
+
+      if (existingUser) {
+        console.log(`User ${userData.email} already exists.`);
+        // Update roles if needed
+        if (JSON.stringify(existingUser.roles) !== JSON.stringify(userData.roles)) {
+          await prisma.user.update({
+            where: { email: userData.email },
+            data: { roles: userData.roles },
+          });
+          console.log(`Updated roles for ${userData.email}`);
+        }
+      } else {
+        // Create new user
+        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        await prisma.user.create({
+          data: {
+            email: userData.email,
+            hashedPassword: hashedPassword,
+            roles: userData.roles,
+          },
+        });
+        console.log(`Created user ${userData.email}`);
+      }
+    } catch (error) {
+      console.error(`Error processing user ${userData.email}:`, error);
     }
-  } catch (error) {
-    console.error('Error during seeding process:', error);
-    console.log('Admin role assignment failed.');
-  } finally {
-    await prisma.$disconnect();
-    console.log('Seed script finished.');
   }
+
+  await prisma.$disconnect();
+  console.log('Seed script finished.');
 }
 
 main().catch((e) => {

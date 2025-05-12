@@ -1,158 +1,139 @@
 'use client';
 
-import React, { useState, useEffect, startTransition } from 'react';
-// import { db } from '@/lib/db'; // REMOVE THIS LINE
-import { reviewOrganizerApplication, getPendingOrganizerApplicationsAction } from '@/lib/actions'; // Added getPendingOrganizerApplicationsAction
-import { ApplicationStatus, RequestedRole } from '@prisma/client'; // Role, User, RoleApplication are not directly needed here if types are well defined for action returns
-import { Button, Container, Typography, Paper, List, ListItem, ListItemText, CircularProgress, Alert, Box, Chip } from '@mui/material';
+import { useState, useEffect } from 'react';
+import AdminGuard from '@/components/auth/AdminGuard';
+import { useSession } from 'next-auth/react';
+import { Role } from '@prisma/client';
 
-// Client-side type for applications, matching what getPendingOrganizerApplicationsAction returns
-interface RoleApplicationWithUserClient {
+interface RoleApplication {
   id: string;
   userId: string;
-  requestedRole: RequestedRole; // Assuming RequestedRole enum is available client-side or stringified
-  status: ApplicationStatus;    // Assuming ApplicationStatus enum is available client-side or stringified
-  createdAt: string; // Dates are stringified by the action
-  updatedAt: string; 
+  role: Role;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
   user: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
+    name: string;
+    email: string;
   };
 }
-
-// REMOVE placeholder getPendingOrganizerApplications function
-/*
-async function getPendingOrganizerApplications() {
-    // ... old code ...
-    return []; 
-}
-*/
 
 export default function AdminRoleApplicationsPage() {
-  const [applications, setApplications] = useState<RoleApplicationWithUserClient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: session } = useSession();
+  const [applications, setApplications] = useState<RoleApplication[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const fetchApplications = async () => {
-    setIsLoading(true);
-    setError(null);
-    setFeedback(null);
-    try {
-      const result = await getPendingOrganizerApplicationsAction();
-      if (result.success && result.applications) {
-        setApplications(result.applications as RoleApplicationWithUserClient[]); // Cast to client type
-      } else {
-        setError(result.error || 'Failed to fetch applications');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Fetch applications on component mount
   useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        const response = await fetch('/api/admin/applications');
+        if (!response.ok) throw new Error('Failed to fetch applications');
+        const data = await response.json();
+        setApplications(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchApplications();
   }, []);
 
-  const handleReview = async (applicationId: string, newStatusString: 'APPROVED' | 'REJECTED') => {
-    setFeedback(null);
-    setError(null); 
+  const handleApplication = async (applicationId: string, action: 'approve' | 'reject') => {
     try {
-      startTransition(async () => {
-        const result = await reviewOrganizerApplication(applicationId, newStatusString);
-        if (result.success) {
-          setFeedback({ type: 'success', message: result.message });
-          fetchApplications(); // Refresh the list
-        } else {
-          setFeedback({ type: 'error', message: result.message });
-          // Optionally set general error as well if feedback isn't prominent enough
-          // setError(result.message);
-        }
+      const response = await fetch(`/api/admin/applications/${applicationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
       });
+
+      if (!response.ok) throw new Error(`Failed to ${action} application`);
+
+      // Update local state
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === applicationId
+            ? { ...app, status: action === 'approve' ? 'APPROVED' : 'REJECTED' }
+            : app
+        )
+      );
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during review.';
-      setFeedback({ type: 'error', message: errorMessage });
-      // setError(errorMessage);
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  if (isLoading) {
-    return (
-      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
-
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Pending Organizer Applications
-      </Typography>
-      
-      {feedback && (
-        <Alert severity={feedback.type} sx={{ mb: 2 }} onClose={() => setFeedback(null)}>
-          {feedback.message}
-        </Alert>
-      )}
-      
-      {error && !feedback && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+    <AdminGuard>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-6">Role Applications</h1>
 
-      {applications.length === 0 && !error && (
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="subtitle1">No pending organizer applications.</Typography>
-        </Paper>
-      )}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
 
-      {applications.length > 0 && (
-        <Paper elevation={3}>
-          <List>
-            {applications.map((app) => (
-              <ListItem key={app.id} divider
-                secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 1}}>
-                    <Button 
-                      variant="contained" 
-                      color="success" 
-                      onClick={() => handleReview(app.id, 'APPROVED')} // Pass as string
-                      size="small"
-                    >
-                      Approve
-                    </Button>
-                    <Button 
-                      variant="contained" 
-                      color="error" 
-                      onClick={() => handleReview(app.id, 'REJECTED')} // Pass as string
-                      size="small"
-                    >
-                      Reject
-                    </Button>
-                  </Box>
-                }
+        {loading ? (
+          <div>Loading applications...</div>
+        ) : applications.length === 0 ? (
+          <div className="text-gray-600">No pending applications</div>
+        ) : (
+          <div data-testid="applications-list" className="grid gap-4">
+            {applications.map(application => (
+              <div
+                key={application.id}
+                className="bg-white p-6 rounded-lg shadow"
               >
-                <ListItemText 
-                  primary={`${app.user.name || 'N/A'} (${app.user.email || 'N/A'})`}
-                  secondary={
-                    <>
-                      Application ID: {app.id} <br />
-                      Applied on: {new Date(app.createdAt).toLocaleDateString()} <br />
-                      Requested Role: <Chip label={app.requestedRole} size="small" /> <br />
-                      Status: <Chip label={app.status} size="small" />
-                    </>
-                  }
-                />
-              </ListItem>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-xl font-semibold">{application.user.name}</h3>
+                    <p className="text-gray-600">{application.user.email}</p>
+                    <p className="mt-2">
+                      <span className="font-medium">Role:</span> {application.role}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>{' '}
+                      <span
+                        className={`${
+                          application.status === 'APPROVED'
+                            ? 'text-green-600'
+                            : application.status === 'REJECTED'
+                            ? 'text-red-600'
+                            : 'text-yellow-600'
+                        }`}
+                      >
+                        {application.status}
+                      </span>
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Applied on: {new Date(application.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  {application.status === 'PENDING' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApplication(application.id, 'approve')}
+                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleApplication(application.id, 'reject')}
+                        className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
-          </List>
-        </Paper>
-      )}
-    </Container>
+          </div>
+        )}
+      </div>
+    </AdminGuard>
   );
 } 

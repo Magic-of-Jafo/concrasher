@@ -38,22 +38,24 @@ export default function LoginPage() {
         redirect: false,
         email: data.email,
         password: data.password,
-        callbackUrl: '/', // Or your desired redirect path
+        callbackUrl: '/conventions/new', // Changed from /admin/applications to /conventions/new
       });
 
       if (result?.error) {
         setError(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : result.error);
-      } else if (result?.ok && result?.url) {
-        router.push(result.url); // Or router.refresh() and let middleware handle redirect if session is present
+      } else if (result?.ok) {
+        // Use replace instead of push to prevent back button from returning to login
+        router.replace(result.url || '/conventions/new');
       } else {
-        // Fallback if result is ok but no url (should not happen with redirect:false and callbackUrl)
-        router.push('/');
+        // Fallback if result is ok but no url
+        router.replace('/conventions/new');
       }
     } catch (err) {
       console.error('Login failed:', err);
       setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   return (
