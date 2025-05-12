@@ -5,6 +5,7 @@ import { ConventionCreateSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { ConventionSearchParamsSchema, buildSearchQuery, calculatePagination } from '@/lib/search';
 
 // Simple slugify function (replace with a more robust one if needed, e.g., slugify library)
 function slugify(text: string): string {
@@ -93,18 +94,50 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has either ADMIN or ORGANIZER role
-    const hasAccess = user.roles?.includes(Role.ADMIN) || user.roles?.includes(Role.ORGANIZER);
-    if (!hasAccess) {
-      return NextResponse.json({ message: 'Forbidden - Must be an admin or organizer' }, { status: 403 });
+    // Parse search parameters from URL
+    const urlSearchParams = new URL(req.url).searchParams;
+    const rawParams: Record<string, any> = {};
+    
+    // Convert searchParams to object and parse numbers
+    urlSearchParams.forEach((value, key) => {
+      if (key === 'page' || key === 'limit' || key === 'minPrice' || key === 'maxPrice') {
+        rawParams[key] = parseInt(value, 10);
+      } else if (key === 'types' || key === 'status') {
+        rawParams[key] = value.split(',');
+      } else {
+        rawParams[key] = value;
+      }
+    });
+
+    // Validate search parameters
+    const validation = ConventionSearchParamsSchema.safeParse(rawParams);
+    if (!validation.success) {
+      return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const conventions = await prisma.convention.findMany({});
+    const validatedParams = validation.data;
+    const where = buildSearchQuery(validatedParams);
 
-    return NextResponse.json(conventions, { status: 200 });
+    // Get total count for pagination
+    const total = await prisma.convention.count({ where });
+
+    // Get paginated results
+    const conventions = await prisma.convention.findMany({
+      where,
+      skip: (validatedParams.page - 1) * validatedParams.limit,
+      take: validatedParams.limit,
+      orderBy: { startDate: 'asc' },
+    });
+
+    const pagination = calculatePagination(total, validatedParams.page, validatedParams.limit);
+
+    return NextResponse.json({
+      items: conventions,
+      ...pagination,
+    }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching conventions:', error);
-    return NextResponse.json({ message: 'Could not fetch conventions' }, { status: 500 });
+    console.error('Error searching conventions:', error);
+    return NextResponse.json({ message: 'Could not search conventions' }, { status: 500 });
   }
 }
 

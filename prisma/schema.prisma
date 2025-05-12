@@ -34,6 +34,17 @@ enum ConventionStatus {
   CANCELLED
 }
 
+enum ConventionType {
+  GAMING
+  ANIME
+  COMIC
+  SCI_FI
+  FANTASY
+  HORROR
+  GENERAL
+  OTHER
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?   // Display name
@@ -115,6 +126,7 @@ model Convention {
   conventionSeriesId String?
   // ConventionSeries   ConventionSeries? @relation(fields: [conventionSeriesId], references: [id], onDelete: SetNull) // ConventionSeries model will be added later
   status             ConventionStatus
+  type               ConventionType @default(GENERAL)
   bannerImageUrl     String?
   galleryImageUrls   String[]  @default([])
   createdAt          DateTime  @default(now())
