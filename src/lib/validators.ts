@@ -27,20 +27,19 @@ export const ConventionStatusEnum = z.nativeEnum(PrismaConventionStatusEnum);
 
 export const ConventionCreateSchema = z.object({
   name: z.string().min(1, { message: 'Name is required' }),
-  // slug: z.string().min(1, { message: 'Slug is required' }), // Slug will be auto-generated or handled separately
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   city: z.string().min(1, { message: 'City is required' }),
-  state: z.string().min(1, { message: 'State is required' }),
+  stateAbbreviation: z.string().min(1, { message: 'State is required' }).optional(),
+  stateName: z.string().min(1, { message: 'State is required' }).optional(),
   country: z.string().min(1, { message: 'Country is required' }),
   venueName: z.string().optional(),
   description: z.string().optional(),
   websiteUrl: z.string().url({ message: 'Invalid URL' }).optional().or(z.literal('')),
-  // organizerUserId: z.string().cuid({ message: 'Invalid Organizer ID' }), // Will be set from session/admin context
   conventionSeriesId: z.string().cuid({ message: 'Invalid Series ID' }).optional(),
   status: ConventionStatusEnum,
   bannerImageUrl: z.string().optional().or(z.literal('')),
-  galleryImageUrls: z.array(z.string()).default([]),
+  galleryImageUrls: z.array(z.string()).optional().default([]),
 });
 
 export const ConventionUpdateSchema = ConventionCreateSchema.partial().extend({

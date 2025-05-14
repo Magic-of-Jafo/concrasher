@@ -3,20 +3,56 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getApplications, approveApplication, rejectApplication } from '@/lib/applications';
 import type { ApplicationActionRequest } from '@/types/applications';
+import prisma from '@/lib/prisma';
+import { Role } from '@prisma/client';
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.roles?.includes('ADMIN')) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    const applications = await getApplications();
+    const session = await getServerSession(authOptions);
+    console.log('Session:', JSON.stringify(session, null, 2)); // Debug log
+
+    // Check if user is logged in and is an admin
+    if (!session?.user || !session.user.roles?.includes(Role.ADMIN)) {
+      console.log('Auth check failed:', {
+        hasUser: !!session?.user,
+        roles: session?.user?.roles
+      });
+      return NextResponse.json(
+        { error: 'You must be an admin to view applications' },
+        { status: 403 }
+      );
+    }
+
+    // Get all role applications with user details
+    const applications = await prisma.roleApplication.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    console.log('Raw applications from DB:', JSON.stringify(applications, null, 2)); // Debug log
+
+    // Check if we're getting any data
+    if (applications.length === 0) {
+      console.log('No applications found in database');
+    }
+
     return NextResponse.json(applications);
+
   } catch (error) {
-    console.error('Error fetching applications:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Error fetching role applications:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch applications' },
+      { status: 500 }
+    );
   }
 }
 

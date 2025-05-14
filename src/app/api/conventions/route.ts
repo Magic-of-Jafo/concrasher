@@ -3,9 +3,14 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { ConventionCreateSchema } from '@/lib/validators';
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role, ConventionStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { ConventionSearchParamsSchema, buildSearchQuery, calculatePagination } from '@/lib/search';
+import { NextRequest } from 'next/server';
+import { db } from "@/lib/db";
+import { getStateVariations } from '@/lib/stateUtils';
+import { ConventionSearchParams } from '@/lib/search';
+import { Prisma } from '@prisma/client';
 
 // Simple slugify function (replace with a more robust one if needed, e.g., slugify library)
 function slugify(text: string): string {
@@ -85,59 +90,81 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const user = session?.user as { id: string; roles: Role[] } | undefined;
+    const searchParams = request.nextUrl.searchParams;
+    const params: ConventionSearchParams = {
+      page: Number(searchParams.get('page')) || 1,
+      limit: Number(searchParams.get('limit')) || 10,
+      query: searchParams.get('query') || '',
+      city: searchParams.get('city') || '',
+      state: searchParams.get('state') || '',
+      country: searchParams.get('country') || '',
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+      status: searchParams.get('status') || undefined,
+    };
 
-    if (!user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    const skip = (params.page - 1) * params.limit;
+    const searchQuery: Prisma.ConventionWhereInput = params.query ? {
+      OR: [
+        { name: { contains: params.query, mode: 'insensitive' as const } },
+        { city: { contains: params.query, mode: 'insensitive' as const } },
+        { stateName: { contains: params.query, mode: 'insensitive' as const } },
+        { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
+        { country: { contains: params.query, mode: 'insensitive' as const } },
+        { venueName: { contains: params.query, mode: 'insensitive' as const } },
+        { description: { contains: params.query, mode: 'insensitive' as const } },
+      ],
+    } : {};
+
+    // Add additional filters
+    if (params.city) {
+      searchQuery.city = { contains: params.city, mode: 'insensitive' as const };
     }
-
-    // Parse search parameters from URL
-    const urlSearchParams = new URL(req.url).searchParams;
-    const rawParams: Record<string, any> = {};
-    
-    // Convert searchParams to object and parse numbers
-    urlSearchParams.forEach((value, key) => {
-      if (key === 'page' || key === 'limit' || key === 'minPrice' || key === 'maxPrice') {
-        rawParams[key] = parseInt(value, 10);
-      } else if (key === 'types' || key === 'status') {
-        rawParams[key] = value.split(',');
-      } else {
-        rawParams[key] = value;
-      }
-    });
-
-    // Validate search parameters
-    const validation = ConventionSearchParamsSchema.safeParse(rawParams);
-    if (!validation.success) {
-      return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
+    if (params.state) {
+      searchQuery.OR = [
+        { stateName: { contains: params.state, mode: 'insensitive' as const } },
+        { stateAbbreviation: { contains: params.state, mode: 'insensitive' as const } },
+      ];
     }
+    if (params.country) {
+      searchQuery.country = { contains: params.country, mode: 'insensitive' as const };
+    }
+    if (params.startDate) {
+      searchQuery.startDate = { gte: new Date(params.startDate) };
+    }
+    if (params.endDate) {
+      searchQuery.endDate = { lte: new Date(params.endDate) };
+    }
+    // Handle status filter - default to ACTIVE if not specified
+    const statusParam = searchParams.get('status');
+    searchQuery.status = statusParam === 'PAST' ? 'PAST' : 'ACTIVE';
 
-    const validatedParams = validation.data;
-    const where = buildSearchQuery(validatedParams);
-
-    // Get total count for pagination
-    const total = await prisma.convention.count({ where });
-
-    // Get paginated results
-    const conventions = await prisma.convention.findMany({
-      where,
-      skip: (validatedParams.page - 1) * validatedParams.limit,
-      take: validatedParams.limit,
-      orderBy: { startDate: 'asc' },
-    });
-
-    const pagination = calculatePagination(total, validatedParams.page, validatedParams.limit);
+    const [items, total] = await Promise.all([
+      prisma.convention.findMany({
+        where: searchQuery,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: params.limit,
+      }),
+      prisma.convention.count({
+        where: searchQuery,
+      }),
+    ]);
 
     return NextResponse.json({
-      items: conventions,
-      ...pagination,
-    }, { status: 200 });
+      items,
+      total,
+      page: params.page,
+      totalPages: Math.ceil(total / params.limit),
+    });
   } catch (error) {
-    console.error('Error searching conventions:', error);
-    return NextResponse.json({ message: 'Could not search conventions' }, { status: 500 });
+    console.error('Error fetching conventions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch conventions' },
+      { status: 500 }
+    );
   }
 }
 

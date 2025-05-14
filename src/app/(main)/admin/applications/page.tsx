@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import AdminGuard from '@/components/auth/AdminGuard';
 import { useSession } from 'next-auth/react';
-import { Role } from '@prisma/client';
+import { Role, RequestedRole } from '@prisma/client';
 
 interface RoleApplication {
   id: string;
   userId: string;
-  role: Role;
+  requestedRole: RequestedRole;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string;
   user: {
@@ -18,7 +18,7 @@ interface RoleApplication {
 }
 
 export default function AdminRoleApplicationsPage() {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const [applications, setApplications] = useState<RoleApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +27,21 @@ export default function AdminRoleApplicationsPage() {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
+        console.log('Fetching applications...'); // Debug log
         const response = await fetch('/api/admin/applications');
-        if (!response.ok) throw new Error('Failed to fetch applications');
+        console.log('Response status:', response.status); // Debug log
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error response:', errorData); // Debug log
+          throw new Error(errorData.error || 'Failed to fetch applications');
+        }
+        
         const data = await response.json();
+        console.log('Fetched applications:', JSON.stringify(data, null, 2)); // Debug log
         setApplications(data);
       } catch (err) {
+        console.error('Error in fetchApplications:', err); // Debug log
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
@@ -43,23 +53,48 @@ export default function AdminRoleApplicationsPage() {
 
   const handleApplication = async (applicationId: string, action: 'approve' | 'reject') => {
     try {
+      setError(null); // Clear any previous errors
+      console.log(`Starting ${action} for application:`, applicationId);
+      
       const response = await fetch(`/api/admin/applications/${applicationId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
 
-      if (!response.ok) throw new Error(`Failed to ${action} application`);
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
 
-      // Update local state
+      if (!response.ok) {
+        console.error('Error response:', data);
+        throw new Error(data.error || `Failed to ${action} application`);
+      }
+
+      if (!data.success) {
+        console.error('Operation failed:', data);
+        throw new Error('Operation failed');
+      }
+
+      console.log('Updating UI with new application status:', data.application.status);
+      // Update local state with the returned application data
       setApplications(prev =>
         prev.map(app =>
           app.id === applicationId
-            ? { ...app, status: action === 'approve' ? 'APPROVED' : 'REJECTED' }
+            ? { ...app, status: data.application.status }
             : app
         )
       );
+
+      // If approved, trigger a session update
+      if (action === 'approve') {
+        console.log('Triggering session update');
+        // Force a session update by calling updateSession
+        await updateSession();
+        console.log('Session update triggered');
+      }
     } catch (err) {
+      console.error('Error handling application:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
@@ -91,7 +126,7 @@ export default function AdminRoleApplicationsPage() {
                     <h3 className="text-xl font-semibold">{application.user.name}</h3>
                     <p className="text-gray-600">{application.user.email}</p>
                     <p className="mt-2">
-                      <span className="font-medium">Role:</span> {application.role}
+                      <span className="font-medium">Role:</span> {application.requestedRole}
                     </p>
                     <p>
                       <span className="font-medium">Status:</span>{' '}

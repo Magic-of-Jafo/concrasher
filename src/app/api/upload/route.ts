@@ -4,13 +4,17 @@ import { authOptions } from '@/lib/auth';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
-      return new NextResponse('Unauthorized', { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const formData = await request.formData();
@@ -18,45 +22,50 @@ export async function POST(request: Request) {
 
     if (!file) {
       return NextResponse.json(
-        { message: 'No file provided' },
+        { error: 'No file provided' },
         { status: 400 }
       );
     }
 
-    // Create a unique filename to prevent collisions
-    const timestamp = Date.now();
-    const uniqueFilename = `${timestamp}-${file.name}`;
-    
-    // Ensure the uploads directory exists
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File size must be less than 5MB' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only JPEG, PNG, and GIF are allowed' },
+        { status: 400 }
+      );
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Write the file
-    const filePath = join(uploadDir, uniqueFilename);
-    await writeFile(filePath, buffer);
+    // Create unique filename
+    const uniqueId = uuidv4();
+    const extension = file.name.split('.').pop();
+    const filename = `${uniqueId}.${extension}`;
 
-    // Return the URL relative to the public directory
-    return NextResponse.json({
-      url: `/uploads/${uniqueFilename}`,
-      key: uniqueFilename,
-    });
+    // Save to public directory
+    const publicDir = join(process.cwd(), 'public', 'uploads');
+    const filepath = join(publicDir, filename);
+    await writeFile(filepath, buffer);
+
+    // Return the URL path
+    const url = `/uploads/${filename}`;
+    return NextResponse.json({ url });
   } catch (error) {
     console.error('Error uploading file:', error);
-    
-    // Provide more detailed error information
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const errorDetails = {
-      message: 'Failed to upload file',
-      details: errorMessage,
-      timestamp: new Date().toISOString(),
-    };
-
-    return NextResponse.json(errorDetails, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to upload file' },
+      { status: 500 }
+    );
   }
 }
 

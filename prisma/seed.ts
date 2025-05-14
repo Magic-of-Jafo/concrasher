@@ -20,65 +20,50 @@
  * }
  */
 import { PrismaClient, Role } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Starting seed script...');
-
-  // Test users to create/update
-  const testUsers = [
-    {
-      email: 'magicjafo@gmail.com',
-      password: 'smeghead',
-      roles: [Role.ADMIN],
-    },
-    {
-      email: 'jafo@getjafo.com',
-      password: 'smeghead',
-      roles: [Role.USER],
-    },
+  const hashedPassword = await hash('smeghead', 12);
+  
+  const users = [
+    { name: 'Test User 1', email: 'test1@example.com' },
+    { name: 'Test User 2', email: 'test2@example.com' },
+    { name: 'Test User 3', email: 'test3@example.com' },
+    { name: 'Test User 4', email: 'test4@example.com' },
+    { name: 'Test User 5', email: 'test5@example.com' },
+    { name: 'Test User 6', email: 'test6@example.com' },
+    { name: 'Test User 7', email: 'test7@example.com' },
+    { name: 'Test User 8', email: 'test8@example.com' },
+    { name: 'Test User 9', email: 'test9@example.com' },
+    { name: 'Test User 10', email: 'test10@example.com' },
   ];
 
-  for (const userData of testUsers) {
-    try {
-      const existingUser = await prisma.user.findUnique({
-        where: { email: userData.email },
-      });
+  console.log('Starting seed...');
 
-      if (existingUser) {
-        console.log(`User ${userData.email} already exists.`);
-        // Update roles if needed
-        if (JSON.stringify(existingUser.roles) !== JSON.stringify(userData.roles)) {
-          await prisma.user.update({
-            where: { email: userData.email },
-            data: { roles: userData.roles },
-          });
-          console.log(`Updated roles for ${userData.email}`);
-        }
-      } else {
-        // Create new user
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
-        await prisma.user.create({
-          data: {
-            email: userData.email,
-            hashedPassword: hashedPassword,
-            roles: userData.roles,
-          },
-        });
-        console.log(`Created user ${userData.email}`);
-      }
-    } catch (error) {
-      console.error(`Error processing user ${userData.email}:`, error);
-    }
+  for (const user of users) {
+    const createdUser = await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: {
+        name: user.name,
+        email: user.email,
+        hashedPassword,
+        roles: [Role.USER],
+      },
+    });
+    console.log(`Created user: ${createdUser.email}`);
   }
 
-  await prisma.$disconnect();
-  console.log('Seed script finished.');
+  console.log('Seed completed successfully');
 }
 
-main().catch((e) => {
-  console.error('Unhandled error in seed script:', e);
-  process.exit(1);
-}); 
+main()
+  .catch((e) => {
+    console.error('Error during seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  }); 

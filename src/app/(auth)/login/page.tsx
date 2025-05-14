@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +18,8 @@ type LoginFormInputs = z.infer<typeof LoginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams()!;
+  const callbackUrl = searchParams.get('callbackUrl') || '/conventions';
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,17 +40,17 @@ export default function LoginPage() {
         redirect: false,
         email: data.email,
         password: data.password,
-        callbackUrl: '/conventions/new', // Changed from /admin/applications to /conventions/new
+        callbackUrl,
       });
 
       if (result?.error) {
         setError(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : result.error);
       } else if (result?.ok) {
         // Use replace instead of push to prevent back button from returning to login
-        router.replace(result.url || '/conventions/new');
+        router.replace(result.url || callbackUrl);
       } else {
         // Fallback if result is ok but no url
-        router.replace('/conventions/new');
+        router.replace(callbackUrl);
       }
     } catch (err) {
       console.error('Login failed:', err);

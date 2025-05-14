@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/providers/session-provider";
+import QueryProvider from "@/components/providers/query-provider";
+import ThemeProviders from "@/components/providers/theme-provider";
+import { NotificationProvider } from "@/components/NotificationContext";
+import { ErrorHandler } from "@/components/ErrorHandler";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,8 +31,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <meta httpEquiv="x-error-message" content="" />
+      </head>
       <body className={`${robotoMono.variable} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProviders>
+          <AuthProvider>
+            <QueryProvider>
+              <NotificationProvider>
+                <ErrorHandler />
+                {children}
+              </NotificationProvider>
+            </QueryProvider>
+          </AuthProvider>
+        </ThemeProviders>
       </body>
     </html>
   );

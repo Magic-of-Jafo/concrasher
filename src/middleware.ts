@@ -52,10 +52,26 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Handle /organizer/conventions route
+  if (pathname.startsWith('/organizer/conventions')) {
+    const isUserOrganizer = token?.roles?.includes(Role.ORGANIZER);
+    if (!isUserOrganizer) {
+      // Redirect to previous page with error message
+      const referer = request.headers.get('referer') || '/';
+      const redirectUrl = new URL(referer, request.url);
+      // Add error message to URL as a temporary parameter
+      redirectUrl.searchParams.set('error', 'You do not have permission to access this page');
+      const response = NextResponse.redirect(redirectUrl);
+      return response;
+    }
+    // If user is an organizer, allow access to the page
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 
 // Configure the middleware to run on specific paths
 export const config = {
-  matcher: ['/admin/:path*', '/conventions/new'],
+  matcher: ['/admin/:path*', '/conventions/new', '/organizer/:path*'],
 }; 

@@ -13,18 +13,6 @@ import { format } from 'date-fns';
 import { ConventionStatus, ConventionType } from '@prisma/client';
 import Link from 'next/link';
 
-// Define ConventionType enum locally since it's not exported from @prisma/client
-enum ConventionType {
-  GAMING = 'GAMING',
-  ANIME = 'ANIME',
-  COMIC = 'COMIC',
-  SCI_FI = 'SCI_FI',
-  FANTASY = 'FANTASY',
-  HORROR = 'HORROR',
-  GENERAL = 'GENERAL',
-  OTHER = 'OTHER',
-}
-
 interface ConventionDetailPageProps {
   params: {
     slug: string;
@@ -54,6 +42,25 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
   const convention = await prisma.convention.findUnique({
     where: {
       slug: params.slug,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+      type: true,
+      startDate: true,
+      endDate: true,
+      city: true,
+      stateAbbreviation: true,
+      stateName: true,
+      country: true,
+      venueName: true,
+      description: true,
+      websiteUrl: true,
+      bannerImageUrl: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
@@ -120,7 +127,9 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
                   <Typography variant="body1" color="text.primary">
                     {convention.venueName}
                     <br />
-                    {convention.city}, {convention.state}
+                    {convention.city}
+                    {convention.stateAbbreviation && `, ${convention.stateAbbreviation}`}
+                    {convention.stateName && ` (${convention.stateName})`}
                     <br />
                     {convention.country}
                   </Typography>

@@ -1,6 +1,6 @@
 import { TextField, InputAdornment, IconButton } from '@mui/material';
 import { Search as SearchIcon, Clear as ClearIcon } from '@mui/icons-material';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback, useState, useEffect } from 'react';
 import { useDebounce } from '../../lib/hooks';
 
@@ -12,7 +12,8 @@ interface SearchBarProps {
 export function SearchBar({ placeholder = 'Search conventions...', className }: SearchBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchValue, setSearchValue] = useState(searchParams?.get('query') || '');
+  const pathname = usePathname();
+  const [searchValue, setSearchValue] = useState(searchParams?.get('search') || '');
   
   // Debounce search to avoid too many API calls
   const debouncedSearch = useDebounce(searchValue, 300);
@@ -24,16 +25,16 @@ export function SearchBar({ placeholder = 'Search conventions...', className }: 
     const params = new URLSearchParams(searchParams.toString());
     
     if (debouncedSearch) {
-      params.set('query', debouncedSearch);
+      params.set('search', debouncedSearch);
     } else {
-      params.delete('query');
+      params.delete('search');
     }
     
     // Reset to page 1 when search changes
     params.set('page', '1');
     
-    router.push(`/conventions?${params.toString()}`);
-  }, [debouncedSearch, router, searchParams]);
+    router.push(`${pathname}?${params.toString()}`);
+  }, [debouncedSearch, router, searchParams, pathname]);
 
   const handleClear = useCallback(() => {
     setSearchValue('');

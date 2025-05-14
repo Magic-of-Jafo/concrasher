@@ -60,6 +60,8 @@ model User {
   bio           String?   // Short biography
   roleApplications RoleApplication[]
   organizedConventions Convention[] @relation("OrganizedBy")
+  roleRequests  RoleRequest[]
+  conventionSeries ConventionSeries[]
 }
 
 model Account {
@@ -109,6 +111,19 @@ model RoleApplication {
   @@unique([userId, requestedRole]) // A user can only have one pending application for a specific role
 }
 
+model ConventionSeries {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  logoUrl       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  organizer     User      @relation(fields: [organizerUserId], references: [id])
+  organizerUserId String
+  conventions   Convention[]
+}
+
 model Convention {
   id                 String    @id @default(cuid())
   name               String
@@ -116,19 +131,39 @@ model Convention {
   startDate          DateTime
   endDate            DateTime
   city               String
-  state              String
+  stateAbbreviation  String?
+  stateName          String?
   country            String
   venueName          String?
   description        String?   @db.Text
   websiteUrl         String?
   organizerUserId    String
   organizer          User      @relation("OrganizedBy", fields: [organizerUserId], references: [id])
-  conventionSeriesId String?
-  // ConventionSeries   ConventionSeries? @relation(fields: [conventionSeriesId], references: [id], onDelete: SetNull) // ConventionSeries model will be added later
+  conventionSeriesId String?   // Made optional for migration
   status             ConventionStatus
   type               ConventionType @default(GENERAL)
   bannerImageUrl     String?
   galleryImageUrls   String[]  @default([])
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  series             ConventionSeries @relation(fields: [seriesId], references: [id])
+  seriesId           String
+}
+
+model RoleRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  requestedRole Role
+  status        RequestStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, requestedRole]) // A user can only have one pending request per role
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 } 

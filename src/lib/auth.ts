@@ -10,7 +10,7 @@ import { Role } from '@prisma/client';
 // Define your NextAuth configuration for v4
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(db),
-  session: { strategy: 'jwt' }, // Reverted to 'jwt' for CredentialsProvider compatibility
+  session: { strategy: 'jwt' },
   pages: {
     signIn: '/login',
   },
@@ -22,12 +22,10 @@ export const authOptions: AuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Validate input using Zod schema
         const validatedCredentials = LoginSchema.safeParse(credentials);
 
         if (!validatedCredentials.success) {
-          console.error("Validation failed:", validatedCredentials.error.flatten().fieldErrors);
-          return null; // Or throw an error Auth.js can catch
+          return null;
         }
 
         const { email, password } = validatedCredentials.data;
@@ -38,7 +36,6 @@ export const authOptions: AuthOptions = {
           });
 
           if (!user || !user.hashedPassword) {
-            // User not found or user doesn't have a password (e.g. OAuth user)
             return null;
           }
 
@@ -48,18 +45,14 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
-          // Return user object that Auth.js expects
-          const userToReturn = {
+          return {
             id: user.id,
-            name: user.name, // Assuming you have a name field, or adjust as needed
+            name: user.name,
             email: user.email,
-            // image: user.image, // If you have an image field
-            roles: user.roles, // Added user roles
+            roles: user.roles,
           };
-          return userToReturn;
         } catch (error) {
-          console.error("Error in authorize function:", error);
-          return null; // Or throw an error
+          return null;
         }
       },
     }),
@@ -77,14 +70,11 @@ export const authOptions: AuthOptions = {
       return session;
     },
     async jwt({ token, user }: { token: JWT; user?: NextAuthUser & { roles?: Role[] } }) {
-      // Initial sign in
       if (user) {
         token.id = user.id;
         if (user.roles) {
           token.roles = user.roles;
         } else {
-          // Fallback if user object from authorize/adapter somehow doesn't have roles
-          // or for other providers in the future where user object might be different.
           const dbUser = await db.user.findUnique({
             where: { id: user.id },
             select: { roles: true },
@@ -97,8 +87,6 @@ export const authOptions: AuthOptions = {
       return token;
     },
   },
-  // pages: { signIn: '/auth/signin' }, // Optional
-  // debug: process.env.NODE_ENV === 'development',
 };
 
 // No NextAuth() call or destructuring here for v4 in this file.

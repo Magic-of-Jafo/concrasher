@@ -1,143 +1,259 @@
-# Epic 2: Convention Listing & Discovery
+# Epic 2: Convention Listing & Discovery (Revised with Phased Enhancements)
 
-**Goal:** Enable Organizers (Users with the `ORGANIZER` role) to perform full Create, Read, Update, and Delete (CRUD) operations for convention listings using Prisma for database interactions and Next.js API Routes/Server Actions. Concurrently, provide all users (including anonymous visitors) with robust search, filtering (via Prisma queries), and detailed viewing capabilities to discover these conventions. This epic is central to the platform's value proposition of solving information fragmentation and will also implement initial features supporting the "Local-First" marketing angle (e.g., efficient filtering by location).
+**Goal:**
+*(Phase 1)* To establish basic functionality for Organizers to create, edit, and manage core convention listings, and for users to discover and view these listings.
+*(Phase 2)* To then significantly enhance and revamp convention management by implementing a comprehensive, tabbed interface for Organizers to create and edit highly detailed listings. This includes capturing extensive information across basic details, series linkage, complex pricing, venue/hotel specifics, talent associations, dynamic schedules, dealer information, media, and settings. This phase also aims to enable all users to discover and view these enriched convention details, providing Organizers with an exceptionally powerful tool and addressing the need for efficient, detailed event management.
 
 ## Story List
 
-### Story 2.1: Convention Data Model & Basic CRUD API Endpoints
-- **User Story / Goal:** Technical Story - To ensure the `Convention` data model in Prisma (as defined in `docs/data-models.md`) is complete, including all necessary attributes (name, dates, location, description, organizer, series link, status, image URLs), and implement basic API endpoints (Next.js API Routes at `/api/conventions`) for CRUD operations, initially accessible only by users with the `ADMIN` role for testing and setup.
+---
+**PHASE 1: Basic Convention Management (Assumed largely complete or in testing)**
+---
+
+### Story 2.1: (Original) Basic Convention Data Model & CRUD API
+- **User Story / Goal:** Technical Story - To define a simple `Convention` data model in Prisma for core details (name, dates, location, description) and implement basic API endpoints for CRUD operations, accessible to Organizers for their own conventions and Admins.
 - **Detailed Requirements:**
-  - Verify the `Convention` model in `prisma/schema.prisma` aligns with `docs/data-models.md`. Key fields: `name`, `startDate`, `endDate`, `city`, `state`, `country`, `venueName`, `description` (`@db.Text`), `websiteUrl`, `organizerUserId` (linking to `User`), `conventionSeriesId` (optional link to `ConventionSeries`), `status` (using a `ConventionStatus` enum: e.g., `DRAFT`, `UPCOMING`, `ACTIVE`, `PAST`, `CANCELLED`).
-  - Include fields for image URLs (e.g., `bannerImageUrl`, `galleryImageUrls: String[]`) which will store paths to files in object storage (or local FS for development). Actual file upload mechanics are part of Technical Story TS3 but URLs are stored here.
-  - Implement basic, protected Next.js API Routes (e.g., under `/api/conventions`) for:
-    - `POST /api/conventions` (Create)
-    - `GET /api/conventions` (List all - with pagination, filtering, sorting capabilities for Story 2.4)
-    * `GET /api/conventions/{id}` (Get one by ID or slug)
-    - `PUT /api/conventions/{id}` (Update by ID or slug)
-    - `DELETE /api/conventions/{id}` (Delete by ID or slug)
-  - Initial protection: Only users whose `session.user.roles` array (from Auth.js) includes `ADMIN` can access these API endpoints. Organizer access for specific actions will be refined in subsequent stories.
-  - All data interactions must use Prisma Client.
+    - Define initial `Convention` model (Prisma): Fields for `name`, `startDate`, `endDate`, `city`, `state`, `country`, `description`, `organizerUserId` (FK to User).
+    - Implement basic API endpoints (e.g., `/api/conventions`) for Create, Read (list and single), Update, Delete.
+    - API protection: Organizers manage own; Admins manage all.
 - **Acceptance Criteria (ACs):**
-  - AC1: The Prisma schema for the `Convention` model, including its relations (to `User` as organizer, optional `ConventionSeries`) and a `ConventionStatus` enum, is finalized and migrations apply successfully.
-  - AC2: An `ADMIN` user (verified by Auth.js session and `User.roles`) can successfully create a new convention listing via the `POST /api/conventions` API endpoint, with data persisted via Prisma.
-  - AC3: An `ADMIN` user can retrieve a list of all conventions (paginated) and a single convention by its ID (or slug) via the respective `GET` API endpoints, with data fetched via Prisma.
-  - AC4: An `ADMIN` user can update an existing convention listing via the `PUT /api/conventions/{id}` API endpoint, with changes persisted via Prisma.
-  - AC5: An `ADMIN` user can delete a convention listing via the `DELETE /api/conventions/{id}` API endpoint, with the record removed/marked by Prisma.
+  - AC1: Prisma schema for basic `Convention` model is defined; migrations apply.
+  - AC2: Organizer can create a new convention via API.
+  - AC3: Users can retrieve convention lists and single convention details via API.
+  - AC4: Organizer/Admin can update an existing convention via API.
+  - AC5: Organizer/Admin can delete a convention via API.
 
 ---
 
-### Story 2.2: Organizer - Create Convention Listing Form & Submission
-- **User Story / Goal:** As an Organizer (a user with the `ORGANIZER` role), I want a comprehensive form (built with React and Material UI) to create a new convention listing with all relevant details, so that I can accurately present my event to the community.
+### Story 2.2: (Original) Organizer - Create Convention Listing (Simple Form)
+- **User Story / Goal:** As an Organizer, I want a simple form to create a new convention listing with essential details, so that I can quickly get my event on the platform.
 - **Detailed Requirements:**
-  - Create a UI form accessible only to users whose Auth.js `session.user.roles` array includes `ORGANIZER`.
-  - Form fields should cover all relevant attributes defined in the `Convention` data model (name, dates, location details, description, website, banner image URL, status, optional association with a `ConventionSeries` they manage).
-  - Implement client-side validation (e.g., using React Hook Form with Zod schemas from `src/lib/validators.ts`) and server-side validation (Zod schemas in the API Route or Server Action).
-  - On submission, the form data should call the `POST /api/conventions` endpoint (or a dedicated Server Action).
-  - The `organizerUserId` should be automatically set to the ID of the logged-in Organizer (`session.user.id`).
-  - If the user selects a `ConventionSeries` they manage, the `conventionSeriesId` should be linked.
-  - Image uploads (e.g., for `bannerImageUrl`) should follow the strategy in TS3 (e.g., client gets presigned URL, uploads to object storage, server saves the final URL).
-  - Provide clear feedback on successful creation or errors.
+  - UI form for Organizers with fields matching the basic `Convention` model (name, dates, location, description).
+  - Client-side and server-side validation.
+  - Submission calls the `POST /api/conventions` endpoint. `organizerUserId` set automatically.
 - **Acceptance Criteria (ACs):**
-  - AC1: A user with the `ORGANIZER` role (verified by Auth.js session) can access the "Create Convention" form. A user without this role cannot.
-  - AC2: The form includes input fields for all necessary convention details as per the `Convention` model.
-  - AC3: Organizers receive clear, field-specific error messages for invalid or missing required fields, based on Zod validation.
-  - AC4: On successful submission, a new `Convention` record is created in the database via Prisma, correctly associated with the `organizerUserId` and, if applicable, `conventionSeriesId`. Image URLs are correctly saved.
-  - AC5: Organizer is redirected to the newly created convention's detail page or a success message is displayed.
+  - AC1: Organizer can access and submit the "Create Convention" simple form.
+  - AC2: A new basic convention record is created.
+  - AC3: Appropriate feedback/redirect on success/error.
 
 ---
 
-### Story 2.3: Public - View Convention Listing Details
-- **User Story / Goal:** As any user (anonymous or logged-in), I want to view the detailed information for a specific convention on a public-facing page, so that I can learn everything about it.
+### Story 2.3: (Original) Public - View Convention Listing Details (Simple View)
+- **User Story / Goal:** As any user, I want to view the basic details for a specific convention, so that I can learn about it.
 - **Detailed Requirements:**
-  - Create a public-facing page using Next.js dynamic routing (e.g., `/conventions/[slug]` or `/conventions/[id]`). Ensure `Convention` model has a unique `slug` field, generated from the name if using slug-based routing.
-  - Display all relevant information from the `Convention` model: name, dates, location, description, organizer's display name (from related `User` model), website link, banner image, status.
-  - If the convention is part of a `ConventionSeries`, display the series name and link to a series detail page (if such a page exists).
-  - Page should be shareable via its URL and designed for clear, readable presentation (Material UI components).
-  - Data fetched via Prisma, potentially using Server Components for SEO benefits.
+  - Public page to display basic details of a convention (name, dates, location, description).
 - **Acceptance Criteria (ACs):**
-  - AC1: Any user can navigate to a convention detail page using a direct link or from a list.
-  - AC2: All stored, public details for the `Convention` (name, date, location, description, banner image URL, status, etc.) are displayed clearly.
-  - AC3: If an organizer is associated, their `User.name` is displayed. If linked to a `ConventionSeries`, its `name` is displayed (and potentially linked).
-  - AC4: The page gracefully handles cases where a convention ID/slug is not found (e.g., shows a "404 Not Found" page).
+  - AC1: Any user can view the detail page for a convention.
+  - AC2: Basic convention details are displayed clearly.
 
 ---
 
-### Story 2.4: Public - List Conventions & Basic Filtering/Sorting
-- **User Story / Goal:** As any user, I want to see a list of all `UPCOMING` or `ACTIVE` conventions, with basic filtering (e.g., by date range, location - state/country, keywords) and sorting options, so that I can discover relevant events.
+### Story 2.4: (Original) Public - List Conventions & Basic Filtering/Sorting (Simple)
+- **User Story / Goal:** As any user, I want to see a list of conventions with basic filtering (e.g., by date) and sorting, so that I can discover events.
 - **Detailed Requirements:**
-  - Create a public-facing page (e.g., `/conventions`) that lists conventions, fetched from `GET /api/conventions` or directly via server-side data fetching with Prisma.
-  - By default, show `UPCOMING` and `ACTIVE` conventions, paginated server-side (Prisma `skip`/`take`).
-  * Filters (MVP - implemented via API query parameters and Prisma `where` clauses):
-    - Date range (start/end).
-    - Keywords in `name`/`description` (Prisma `contains` or full-text search if configured).
-    - `state`, `country`.
-    - Optionally, `ConventionSeries.name` or ID.
-  * Sorting options (MVP - implemented via API query parameters and Prisma `orderBy`):
-    - `startDate` (ascending/descending).
-    - `name` (alphabetical).
-  - Each item in the list should show key summary information (name, date, location snippet, banner image thumbnail) and link to the full detail page (Story 2.3).
-  - "Local-First" aspect: Ensure filtering by `state` and `country` is efficient and prominently available.
+  - Public page listing conventions with summary info (name, date, location snippet).
+  - Basic filters (e.g., date range).
+  - Basic sorting (e.g., start date).
 - **Acceptance Criteria (ACs):**
-  - AC1: Any user can navigate to the convention list page.
-  - AC2: A list of conventions (defaulting to upcoming/active) is displayed with summary information and links to detail pages.
-  - AC3: User can filter conventions by date range, and results are updated correctly using Prisma queries.
-  - AC4: User can sort conventions by start date and name, and the order updates correctly using Prisma queries.
-  - AC5: User can filter conventions by `state` and/or `country`, and it functions correctly using Prisma queries.
-  - AC6: Server-side pagination is implemented correctly for long lists of conventions.
+  - AC1: Any user can view the convention list page.
+  - AC2: Conventions are listed with links to their detail page.
+  - AC3: Basic filtering and sorting function correctly.
 
 ---
 
-### Story 2.5: Organizer - Edit & Update Own Convention Listing
-- **User Story / Goal:** As an Organizer, I want to edit and update the details of convention listings that I own or manage, so that I can keep the information accurate and current.
+### Story 2.5: (Original) Organizer - Edit & Update Own Convention Listing (Simple Form)
+- **User Story / Goal:** As an Organizer, I want to edit and update the details of convention listings that I own, so that I can keep the information accurate and current.
 - **Detailed Requirements:**
-  - On the convention detail page (for Organizers viewing their own/managed events) or a dedicated Organizer dashboard, provide an "Edit" option.
-  - Authorization: Access to the edit form/functionality is restricted. The logged-in user must have the `ORGANIZER` role AND either be the `Convention.organizerUserId` OR be a `MANAGER` or `PRIMARY_OWNER` of the `ConventionSeries` to which the `Convention` belongs (if applicable). Admins can also edit. This check must be performed server-side.
-  - The "Edit" option leads to a form pre-filled with the existing convention data.
-  - On submission, the form data (validated by Zod client and server-side) should call the `PUT /api/conventions/{id}` endpoint or a Server Action.
-  - Provide clear feedback on successful update or errors.
+    - On the convention detail page (for Organizers viewing their own events) or a dedicated Organizer dashboard, provide an "Edit" option.
+    - The "Edit" option leads to a form pre-filled with the existing convention data (similar to the create form from original Story 2.2).
+    - Organizers can only edit conventions where their `organizerUserId` matches the convention's `organizerUserId`.
+    - On submission, the form data should call the `PUT /api/conventions/{id}` endpoint.
+    - Provide clear feedback on successful update or errors.
 - **Acceptance Criteria (ACs):**
-  - AC1: An Organizer meeting the authorization criteria can find and access an "Edit" function for conventions they manage.
+  - AC1: An Organizer can find and access an "Edit" function for conventions they manage.
   - AC2: The edit form is pre-populated with the convention's current details.
-  - AC3: Organizer can successfully submit changes (validated by Zod), and the `Convention` record is updated in the database via Prisma.
-  - AC4: Updated information is reflected on the convention detail page.
-  - AC5: An Organizer who does not meet the authorization criteria for a specific convention cannot access its edit function or successfully submit updates.
+  - AC3: Organizer can successfully submit changes, and the convention record is updated in the database (for the simple model).
+  - AC4: Updated information is reflected on the (simple) convention detail page.
+  - AC5: An Organizer cannot edit conventions they do not own.
+
+---
+**PHASE 2: Advanced Convention Management & Rich Listings (New Revamp)**
+*(The following stories introduce the comprehensive tabbed interface and expanded data capabilities. These will replace the UIs from original 2.2 & 2.5 and require significant changes to original 2.1 & 2.3).*
+---
+
+### Story 2.6: Upgrade Convention Data Model & Core APIs for Advanced Features (NEW)
+- **User Story / Goal:** Technical Story - To significantly expand and refactor the Prisma data models (building upon the original Story 2.1 model) to support the comprehensive data requirements of the new 8-tab convention editor. This includes defining all new entities (Series, Price Tiers/Discounts, Venues/Hotels, Schedule Events with fees, Dealer links, Media, FAQs, Settings) and their complex relationships. Update/Create core API endpoints to handle CRUD operations for this rich, interconnected data structure with transactional integrity.
+- **Detailed Requirements:**
+    - Define/Revise Prisma Schemas for all entities as detailed in the "Story 2.1 (Heavily Revised)" section of the *previous comprehensive update I provided*. This includes: `ConventionSeries`, `Convention` (heavily expanded), `PriceTier`, `PriceDiscount`, `Venue`, `Hotel`, `ConventionTalentLink`, `ScheduleEvent`, `ScheduleEventFeeTier`, `ScheduleEventTalentLink`, `ScheduleEventBrandLink`, `ConventionDealerLink`, `ConventionMedia`, `ConventionFAQItem`, `ConventionSetting`.
+    - Implement/Upgrade API endpoints (building upon or replacing original Story 2.1 APIs) for managing a `Convention` and all its new related entities.
+    - Ensure APIs handle validation for all new fields, interdependencies, and provide for transactional or batched updates for consistency when saving data from the complex tabbed interface.
+- **Acceptance Criteria (ACs):**
+  - AC1: All Prisma schemas for the *advanced* convention data structure are defined, and migrations (from the basic model to the advanced model) apply successfully.
+  - AC2: API allows creation of a full advanced convention object with its related nested entities.
+  - AC3: API allows retrieval of a full advanced convention object including all its related data.
+  - AC4: API allows granular updates to specific parts of an advanced convention.
+  - AC5: API enforces all new data validation rules and maintains integrity.
+  - AC6: Organizer/Admin role permissions for these advanced CRUD operations are correctly enforced.
 
 ---
 
-### Story 2.6: Organizer - Delete Own Convention Listing
-- **User Story / Goal:** As an Organizer, I want to delete convention listings that I own or manage, so that I can remove events that are cancelled or no longer relevant.
-- **Detailed Requirements:**
-  - Provide a "Delete" option for Organizers on conventions they manage (on detail page or dashboard).
-  - Implement a confirmation step in the UI before actual deletion.
-  - Authorization: Same criteria as Story 2.5 (must be `ORGANIZER` and own/manage the convention/series, or be an `ADMIN`). Server-side check is critical.
-  - On confirmation, call the `DELETE /api/conventions/{id}` endpoint or a Server Action, which uses Prisma to delete the record.
-  - Provide clear feedback on successful deletion or errors.
+### Story 2.7: Implement Tabbed Convention Editor - Basic Info & Series Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Basic Info & Series" tab within the new convention editor to manage core details like series linkage, convention name, comprehensive date handling (including one-day & TBD options), location, descriptions, and primary images, so that the fundamental identity of my event is clearly defined.
+- **Detailed Requirements:** (As per "Tab 1: Basic Info & Series" from your detailed input / my previous full revamp Story 2.2)
+    - Convention Series selection/creation.
+    - Convention Name (for slug).
+    - Start/End Date fields with "One-Day Event" toggle & TBD/blank date logic.
+    - City/State/Country.
+    - Main/Short Description.
+    - Cover/Profile Image Uploads.
 - **Acceptance Criteria (ACs):**
-  - AC1: An Organizer meeting the authorization criteria can find a "Delete" function for conventions they manage.
-  - AC2: A confirmation prompt is displayed before deletion.
-  - AC3: Upon confirmation by an authorized user, the `Convention` record is removed from the database (or marked as deleted, e.g., by changing `status` to `CANCELLED` and soft-deleting if preferred, though hard delete is simpler for MVP unless specified otherwise).
-  - AC4: The deleted convention no longer appears in public listings or active search results (unless policy is to show cancelled events).
-  - AC5: An Organizer who does not meet the authorization criteria cannot delete the convention.
+  - AC1: Organizer can access and interact with all fields and controls in the "Basic Info & Series" tab.
+  - AC2: All data entered (series link, name, dates with TBD/one-day logic, location, descriptions, images) is correctly saved to the expanded data model via the new APIs.
+  - AC3: Form validations specific to this tab (e.g., required name, valid dates) are functional.
+  - AC4: Existing data for this tab is correctly loaded when editing a convention.
 
 ---
 
-### Story 2.7: Admin - Manage All Convention Listings (View, Edit, Delete)
-- **User Story / Goal:** As an Admin, I want to be able to view, edit, and delete any convention listing on the platform, so that I can perform moderation and correct information if necessary.
-- **Detailed Requirements:**
-  - In the Admin Dashboard (`/admin/*`), provide an interface to list all conventions (regardless of status or organizer).
-  - From this list, an Admin (user with `ADMIN` in `User.roles`, verified by Auth.js session) should be able to access edit and delete functionalities for any convention.
-  - Admin edit form should be similar to the Organizer's edit form.
-  - Admin delete should also have a confirmation step.
-  - API endpoints used by these admin functions will bypass ownership checks if the request is from an authenticated Admin.
+### Story 2.8: Implement Tabbed Convention Editor - Pricing Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Pricing" tab to define multiple Price Tiers and sophisticated date-based Price Discounts for my convention, so that I can flexibly manage my event's pricing structure.
+- **Detailed Requirements:** (As per "Tab 2: Pricing" from your detailed input / my previous full revamp Story 2.2)
+    - Dynamic Price Tiers (Label, Amount, add/remove/reorder).
+    - Dynamic Price Discounts (Cutoff Date, linked Price Tier, Discounted Amount, add/remove tiers per date, add/remove discount dates). Discounts only active after Tiers are saved.
+    - Currency display based on convention settings.
 - **Acceptance Criteria (ACs):**
-  - AC1: An Admin can view a list of all convention listings in the Admin Dashboard, with data fetched via Prisma.
-  - AC2: An Admin can access an edit form for any convention and successfully update its details via API/Server Action and Prisma.
-  - AC3: An Admin can delete any convention listing (with confirmation) via API/Server Action and Prisma.
-  - AC4: Changes (edits, deletions) made by Admin are reflected publicly as appropriate.
+  - AC1: Organizer can dynamically add, edit, reorder, and remove Price Tiers; changes are saved.
+  - AC2: Price Discounts section is correctly enabled/disabled based on Tier save state.
+  - AC3: Organizer can add multiple Discount Dates, and for each date, link multiple Price Tiers with specific discounted amounts (enforcing no duplicate tiers per discount date). All discount data is saved.
+  - AC4: All pricing data loads correctly for editing.
+
+---
+
+### Story 2.9: Implement Tabbed Convention Editor - Venue/Hotel Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Venue/Hotel" tab to provide detailed information about the primary event venue and any associated guest hotels, including addresses, contacts, images, amenities, and group rates, so attendees have comprehensive lodging and location information.
+- **Detailed Requirements:** (As per "Tab 3: Venue/Hotel" from your detailed input / my previous full revamp Story 2.2)
+    - Primary Venue details.
+    - Checkbox logic for "Guests will NOT be staying at this Venue" altering subsequent sections.
+    - Conditional Primary Hotel Information section.
+    - Dynamic addition of multiple Additional Hotels with full details.
+    - Location/Access info (Parking, Transport, Accessibility).
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can input all details for Primary Venue and save.
+  - AC2: Checkbox logic for separate Primary Hotel correctly shows/hides relevant form sections and saves data appropriately.
+  - AC3: Multiple Additional Hotels with all details can be dynamically added, edited, removed, and saved.
+  - AC4: All venue/hotel data loads correctly for editing.
+
+---
+
+### Story 2.10: Implement Tabbed Convention Editor - Talent Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Talent" tab to search for and link existing Talent profiles from the platform to my convention, so that featured performers and lecturers are showcased.
+- **Detailed Requirements:** (As per "Tab 4: Talent" from your detailed input / my previous full revamp Story 2.2)
+    - Search and link existing Talent profiles.
+    - Display linked Talent with key info.
+    - Ability to remove linked Talent.
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can search for platform Talent by name/skill and link them to the convention.
+  - AC2: Linked Talent are displayed in the tab and saved correctly.
+  - AC3: Linked Talent can be removed.
+
+---
+
+### Story 2.11: Implement Tabbed Convention Editor - Schedule Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the highly interactive "Schedule" tab to visually build my convention's schedule by creating detailed event cards, assigning types, linking talent/brands, defining locations and fees, and arranging them on a drag-and-drop timeline that supports simultaneous events, so that I can easily manage and present a complex schedule.
+- **Detailed Requirements:** (As per "Tab 5: Schedule" from your detailed input / my previous full revamp Story 2.2. This effectively incorporates & expands original Epic 3 / Story 3.2).
+    - Visual timeline/calendar.
+    - Event Card creation/editing (Name, Type with custom, Desc, Link Talent/Brands, Location from Venues/Hotels + custom room, multi-tier Extra Fees).
+    - Drag-and-drop placement, Start Time set by drop, Duration by resizing.
+    - Support for simultaneous events. Event duplication.
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can create Schedule Event cards with all specified details.
+  - AC2: Events can be dragged/dropped onto the schedule; Start Time and Duration are correctly saved to the DB.
+  - AC3: Interface correctly displays and allows management of simultaneous events.
+  - AC4: Events can be duplicated and edited. Extra fees for events are saved.
+  - AC5: Schedule data loads correctly for editing. The D&D interface is accessible (WCAG 2.2 AA).
+
+---
+
+### Story 2.12: Implement Tabbed Convention Editor - Dealers Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Dealers" tab to list businesses or individuals who will be dealers at my convention, linking them from existing User, Talent, or Brand profiles, and optionally overriding their display information for this specific event.
+- **Detailed Requirements:** (As per "Tab 6: Dealers" from your detailed input / my previous full revamp Story 2.2)
+    - Search and link User/Talent/Brand profiles as dealers.
+    - Allow Organizer overrides for dealer display name/description for this convention.
+    - List added dealers with edit/remove options.
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can search and link existing profiles (User, Talent, Brand) as dealers.
+  - AC2: Organizer-defined overrides for dealer display info are saved.
+  - AC3: List of dealers is correctly saved and displayed in the tab.
+
+---
+
+### Story 2.13: Implement Tabbed Convention Editor - Media Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Media" tab to upload multiple promotional images and add links to YouTube/Vimeo videos for my convention, so I can enhance its public listing with visual content.
+- **Detailed Requirements:** (As per "Tab 7: Media" from your detailed input / my previous full revamp Story 2.2)
+    - Multi-image upload with captions and reordering.
+    - Add multiple video links (YouTube/Vimeo) with captions.
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can upload multiple promotional images with captions; images are saved and orderable.
+  - AC2: Organizer can add multiple YouTube/Vimeo links with captions; links are saved.
+  - AC3: Media items load correctly for editing/viewing within the tab.
+
+---
+
+### Story 2.14: Implement Tabbed Convention Editor - Settings Tab (NEW)
+- **User Story / Goal:** As an Organizer, I want to use the "Settings" tab to configure convention-specific options, such as the default currency for pricing and the primary timezone for the event schedule, so these are applied correctly throughout the listing.
+- **Detailed Requirements:** (As per "Tab 8: Settings" from your detailed input / my previous full revamp Story 2.2)
+    - Select Default Currency (USD, EUR, GBP, CAD, AUD, etc.).
+    - Select Timezone.
+    - (Other settings TBD).
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can select and save the default currency for the convention.
+  - AC2: Organizer can select and save the primary timezone for the convention.
+  - AC3: These settings are correctly referenced and applied in other relevant tabs (e.g., currency in Pricing, timezone for Schedule display).
+
+---
+
+### Story 2.15: Revamp Public Convention Detail Page for Advanced Features (NEW)
+- **User Story / Goal:** As any user, I want to view a significantly enhanced and well-organized public detail page for a convention, which now showcases all the rich information provided by the Organizer via the new 8-tab editor (including detailed pricing, multiple venues/hotels, interactive schedule, full talent/dealer lists, media gallery, and FAQs), so I can get a complete understanding of the event.
+- **Detailed Requirements:** (As per "Story 2.3 Public - View Convention Listing Details (Heavily Revised)" from my previous full revamp)
+    - Display all public-facing information from the 8 tabs of the convention creation process.
+    - Sections for: Basic Info/Banner, Detailed Pricing, Venue & Hotel(s), Featured Talent, Full Schedule (interactive/readable), Dealers, Media Gallery, Convention FAQs.
+    - Ensure responsive and WCAG 2.2 AA compliant layout.
+- **Acceptance Criteria (ACs):**
+  - AC1: All relevant published data from the advanced convention model is accurately and clearly displayed.
+  - AC2: Specific display logic for dates (TBD), pricing (active discounts, currency), multiple venues/hotels, schedule (simultaneous events, fees), media gallery functions correctly.
+  - AC3: The page is responsive and meets WCAG 2.2 AA.
+
+---
+
+### Story 2.16: Organizer - Delete Own Convention Listing (Renumbered from original 2.6)
+- **User Story / Goal:** As an Organizer, I want to delete convention listings that I own (and all their associated advanced/detailed data), so that I can remove events that are cancelled or no longer relevant.
+- **Detailed Requirements:** (Content same as original Story 2.5 / renumbered 2.6, but deletion now implies removing significantly more related data).
+    - Confirmation step. Organizer can only delete own.
+    - API call must now cascade delete the `Convention` and ALL its associated advanced data from the new, complex schema (PriceTiers, Discounts, Venues, Hotels, ScheduleEvents, Media, FAQs, Settings, Links, etc.).
+- **Acceptance Criteria (ACs):**
+  - AC1: Organizer can initiate deletion for their conventions.
+  - AC2: Confirmation prompt shown.
+  - AC3: Upon confirmation, the `Convention` record and ALL its dependent advanced data are permanently removed.
+  - AC4: Deleted convention no longer appears publicly.
+  - AC5: Organizer cannot delete unowned conventions.
+
+---
+
+### Story 2.17: Admin - Manage All Convention Listings (View, Edit, Delete) (Renumbered from original 2.7)
+- **User Story / Goal:** As an Admin, I want to be able to view, edit (using the full new 8-tabbed interface), and delete any convention listing on the platform, so that I can perform moderation, correct information, or manage listings.
+- **Detailed Requirements:** (Content largely same as original Story 2.6 / renumbered 2.7, but Admin Edit now uses the new tabbed interface).
+    - Admin Dashboard lists all conventions.
+    - Admin Edit function opens the selected convention in the full 8-tab interface (as defined in Stories 2.7-2.14).
+    - Admin Delete function with confirmation, removes all associated advanced data.
+- **Acceptance Criteria (ACs):**
+  - AC1: Admin can view a list of all conventions.
+  - AC2: Admin can access the full 8-tab edit interface for any convention and update its details.
+  - AC3: Admin can delete any convention listing (with confirmation), and all its advanced data is removed.
+  - AC4: Admin changes are reflected publicly/system-wide.
 
 ## Change Log
 
-| Change        | Date       | Version | Description                                                                      | Author          |
-| ------------- | ---------- | ------- | -------------------------------------------------------------------------------- | --------------- |
-| Initial Draft | 2025-05-09 | 0.1     | First draft of Epic 2 stories                                                      | Product Manager AI |
-| Revision      | 2025-05-09 | 0.2     | Integrated architectural decisions (Prisma, Next.js API Routes/Server Actions, Zod, Auth.js, role checks, ConventionSeries link), refined technical details in requirements and ACs. | Architect Agent |
+| Change        | Date       | Version | Description                                                                                                                                                                                                                                                             | Author             |
+|---------------|------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| Initial Draft | 2025-05-09 | 0.1     | Basic stories for simple convention CRUD (2.1-2.7).                                                                                                                                                                                                                       | Product Manager AI |
+| Major Revision| 2025-05-13 | 0.2     | Previous full revamp of Epic 2 (introducing tabbed interface from 2.2). Superseded by version 0.3.                                                                                                                                                                 | User & PM AI       |
+| Phased Revamp | 2025-05-13 | 0.3     | Restructured Epic to preserve original simple stories 2.1-2.5 (Phase 1). Introduced new stories 2.6-2.15 (Phase 2) for comprehensive 8-tab convention editor and expanded data model, replacing UI of original 2.2 & 2.5 and overhauling 2.1 & 2.3. Renumbered original 2.6 & 2.7. | User & PM AI       |
