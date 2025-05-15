@@ -1,136 +1,145 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Box, Container, Paper, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
-import { Convention } from '@prisma/client';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import Link from 'next/link';
+import { Suspense, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useQuery } from '@tanstack/react-query';
+import { Convention, Role } from "@prisma/client";
+import ConventionList from "./ConventionList";
+import {
+  Box,
+  Typography,
+  ToggleButtonGroup,
+  ToggleButton,
+  CircularProgress,
+  Alert as MuiAlert,
+  Button,
+} from "@mui/material";
+import AddIcon from '@mui/icons-material/Add';
+
+// API fetching function for useQuery
+const fetchAllConventionsAPI = async () => {
+  const response = await fetch("/api/organizer/conventions/all-conventions");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to fetch conventions: ${response.statusText}`);
+  }
+  const data = await response.json();
+  return data.conventions || [];
+};
 
 export default function OrganizerConventionsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [conventions, setConventions] = useState<Convention[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const { data: session, status } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
+  const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
 
-    // Check if user is an organizer
-    if (status === 'authenticated' && !session?.user?.roles?.includes('ORGANIZER')) {
-      router.push('/');
-      return;
-    }
+  // Use React Query to fetch conventions
+  const {
+    data: allConventions = [],
+    isLoading: isLoadingConventions,
+    error: fetchConventionsError,
+    refetch: refetchConventions,
+  } = useQuery<Convention[], Error>({
+    queryKey: ['conventions', 'all'],
+    queryFn: fetchAllConventionsAPI,
+    enabled: sessionStatus === "authenticated",
+  });
 
-    const fetchConventions = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch('/api/organizer/conventions', {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          if (response.status === 403) {
-            setError(errorData.error || 'You do not have permission to view this page');
-          } else {
-            throw new Error(errorData.error || `Failed to fetch conventions: ${response.status}`);
-          }
-          return;
-        }
-        
-        const data: Convention[] = await response.json();
-        setConventions(data);
-      } catch (error) {
-        console.error('Error fetching conventions:', error);
-        setError(error instanceof Error ? error.message : 'Failed to fetch conventions');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status === 'authenticated') {
-      fetchConventions();
-    }
-  }, [status, router, session?.user?.roles]);
-
-  if (status === 'loading' || isLoading) {
+  // Redirects based on session status
+  if (sessionStatus === "unauthenticated") {
+    router.push("/api/auth/signin");
     return (
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Typography>Loading...</Typography>
-      </Container>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Typography>Redirecting to login...</Typography>
+      </Box>
+    ); 
+  }
+  
+  const userRoles = (session?.user as { roles?: Role[] })?.roles || [];
+  const isActualAdmin = userRoles.includes(Role.ADMIN);
+  const isOrganizer = userRoles.includes(Role.ORGANIZER);
+
+  if (sessionStatus === "authenticated" && !isActualAdmin && !isOrganizer) {
+    router.push("/unauthorized");
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Typography>Unauthorized. Redirecting...</Typography>
+      </Box>
     );
   }
 
+  const displayedConventions = useMemo(() => {
+    if (viewMode === "active") {
+      return allConventions.filter(c => c.deletedAt === null);
+    }
+    return allConventions.filter(c => c.deletedAt !== null);
+  }, [allConventions, viewMode]);
+
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newViewMode: "active" | "deleted" | null,
+  ) => {
+    if (newViewMode !== null) {
+      setViewMode(newViewMode);
+    }
+  };
+
+  // Combined loading state for session and initial data query
+  if (sessionStatus === "loading" || (sessionStatus === "authenticated" && isLoadingConventions && !fetchConventionsError)) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 3, 
-          bgcolor: 'background.paper',
-          minHeight: '100vh'
-        }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            My Conventions
-          </Typography>
-          <Button
-            component={Link}
-            href="/organizer/conventions/new"
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" sx={{ mb: 0 }}>
+          Manage Conventions ({viewMode === "deleted" ? "Deleted" : "Active"})
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button 
             variant="contained"
-            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => router.push('/organizer/conventions/new')}
           >
             Create Convention
           </Button>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleViewModeChange}
+            aria-label="convention view toggle"
+          >
+            <ToggleButton value="active" aria-label="active conventions">
+              Active
+            </ToggleButton>
+            <ToggleButton value="deleted" aria-label="deleted conventions">
+              Deleted
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
+      </Box>
 
-        {error ? (
-          <Box sx={{ color: 'error.main', p: 2 }}>
-            Error: {error}
-          </Box>
-        ) : (
-          <TableContainer component={Paper} elevation={1}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Start Date</TableCell>
-                  <TableCell>End Date</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {conventions.map((convention) => (
-                  <TableRow key={convention.id}>
-                    <TableCell>{convention.name}</TableCell>
-                    <TableCell>{format(new Date(convention.startDate), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>{format(new Date(convention.endDate), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>{convention.status}</TableCell>
-                  </TableRow>
-                ))}
-                {conventions.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center">
-                      No conventions found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
-    </Container>
+      {fetchConventionsError && (
+        <MuiAlert severity="error" sx={{ mb: 2 }}>
+          {fetchConventionsError.message}
+        </MuiAlert>
+      )}
+      
+      {sessionStatus === "authenticated" && !isLoadingConventions && (
+        <Suspense fallback={<Typography>Loading conventions list...</Typography>}>
+          <ConventionList 
+            conventions={displayedConventions} 
+            isAdmin={isActualAdmin} 
+            viewMode={viewMode} 
+            onActionComplete={refetchConventions}
+          />
+        </Suspense>
+      )}
+    </Box>
   );
 } 

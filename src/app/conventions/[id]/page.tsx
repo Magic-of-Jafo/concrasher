@@ -15,33 +15,33 @@ import Link from 'next/link';
 
 interface ConventionDetailPageProps {
   params: {
-    slug: string;
+    id: string;
   };
 }
 
 const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary' | 'error' | 'info'> = {
-  DRAFT: 'default',
-  UPCOMING: 'info',
-  ACTIVE: 'primary',
-  PAST: 'secondary',
-  CANCELLED: 'error',
+  [ConventionStatus.DRAFT]: 'default',
+  [ConventionStatus.PUBLISHED]: 'primary',
+  [ConventionStatus.PAST]: 'secondary',
+  [ConventionStatus.CANCELLED]: 'error',
 };
 
 const typeColors: Record<ConventionType, 'default' | 'primary' | 'secondary' | 'error' | 'info'> = {
-  GAMING: 'primary',
-  ANIME: 'secondary',
-  COMIC: 'info',
-  SCI_FI: 'default',
-  FANTASY: 'primary',
-  HORROR: 'error',
-  GENERAL: 'default',
-  OTHER: 'default',
+  [ConventionType.GAMING]: 'primary',
+  [ConventionType.ANIME]: 'secondary',
+  [ConventionType.COMIC]: 'info',
+  [ConventionType.SCI_FI]: 'default',
+  [ConventionType.FANTASY]: 'primary',
+  [ConventionType.HORROR]: 'error',
+  [ConventionType.GENERAL]: 'default',
+  [ConventionType.OTHER]: 'default',
 };
 
 export default async function ConventionDetailPage({ params }: ConventionDetailPageProps) {
   const convention = await prisma.convention.findUnique({
     where: {
-      slug: params.slug,
+      slug: params.id,
+      deletedAt: null,
     },
     select: {
       id: true,
@@ -66,6 +66,29 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
 
   if (!convention) {
     notFound();
+  }
+
+  let registrationMessage = 'Registration status will be announced soon.';
+  let showRegisterButton = false;
+
+  if (convention.status === ConventionStatus.PUBLISHED) {
+    const now = new Date();
+    const startDate = new Date(convention.startDate);
+    const endDate = new Date(convention.endDate);
+    if (now >= startDate && now <= endDate) {
+      registrationMessage = 'Registration is currently open for this convention.';
+      showRegisterButton = true;
+    } else if (now < startDate) {
+      registrationMessage = 'Registration will open soon. Check back later for updates.';
+    } else {
+      registrationMessage = 'This convention has recently concluded.';
+    }
+  } else if (convention.status === ConventionStatus.PAST) {
+    registrationMessage = 'This convention has ended.';
+  } else if (convention.status === ConventionStatus.CANCELLED) {
+    registrationMessage = 'This convention has been cancelled.';
+  } else if (convention.status === ConventionStatus.DRAFT) {
+    registrationMessage = 'Details for this convention are being drafted.';
   }
 
   return (
@@ -116,8 +139,22 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
                     Date
                   </Typography>
                   <Typography variant="body1" color="text.primary">
-                    {format(new Date(convention.startDate), 'MMMM d, yyyy')} -{' '}
-                    {format(new Date(convention.endDate), 'MMMM d, yyyy')}
+                    {(() => {
+                      const startDateObj = new Date(convention.startDate);
+                      const endDateObj = new Date(convention.endDate);
+                      const formattedStartDate = format(startDateObj, 'MMMM d, yyyy');
+
+                      if (
+                        startDateObj.getFullYear() === endDateObj.getFullYear() &&
+                        startDateObj.getMonth() === endDateObj.getMonth() &&
+                        startDateObj.getDate() === endDateObj.getDate()
+                      ) {
+                        return formattedStartDate; // Display only start date if same
+                      } else {
+                        const formattedEndDate = format(endDateObj, 'MMMM d, yyyy');
+                        return `${formattedStartDate} - ${formattedEndDate}`;
+                      }
+                    })()}
                   </Typography>
                 </Box>
                 <Box sx={{ flex: 1 }}>
@@ -156,19 +193,9 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
                 Registration
               </Typography>
               <Typography variant="body1" paragraph color="text.primary">
-                {convention.status === 'ACTIVE' ? (
-                  'Registration is currently open for this convention.'
-                ) : convention.status === 'UPCOMING' ? (
-                  'Registration will open soon. Check back later for updates.'
-                ) : convention.status === 'PAST' ? (
-                  'This convention has ended.'
-                ) : convention.status === 'CANCELLED' ? (
-                  'This convention has been cancelled.'
-                ) : (
-                  'Registration status will be announced soon.'
-                )}
+                {registrationMessage}
               </Typography>
-              {convention.status === 'ACTIVE' && (
+              {showRegisterButton && (
                 <Button
                   variant="contained"
                   color="primary"

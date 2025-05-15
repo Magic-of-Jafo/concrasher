@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import {
   Box,
@@ -40,6 +42,8 @@ export default function BulkActions({
       action: "delete" | "status";
       status?: ConventionStatus;
     }) => {
+      // API route for bulk actions might need review if it was /api/conventions/
+      // Assuming it's general enough or already correct.
       const response = await fetch("/api/conventions/bulk", {
         method: "POST",
         headers: {
@@ -58,10 +62,17 @@ export default function BulkActions({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conventions"] });
+      queryClient.invalidateQueries({ queryKey: ["deletedConventions"] }); // Refresh both views
       setDeleteDialogOpen(false);
       setStatusDialogOpen(false);
       onActionComplete();
+      // router.refresh() might be needed if global state changes aren't picked up by query invalidation alone
     },
+    onError: (error) => {
+      // Add error handling, e.g., snackbar
+      console.error("Bulk action failed:", error);
+      // Potentially show a snackbar message to the user
+    }
   });
 
   const handleBulkDelete = () => {
@@ -85,7 +96,7 @@ export default function BulkActions({
           onClick={() => setDeleteDialogOpen(true)}
           disabled={bulkActionMutation.isPending}
         >
-          Delete Selected
+          Delete Selected (Trash)
         </Button>
         <Button
           variant="outlined"
@@ -104,11 +115,11 @@ export default function BulkActions({
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
       >
-        <DialogTitle>Delete Conventions</DialogTitle>
+        <DialogTitle>Move Selected to Trash?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete {selectedIds.length} selected
-            convention(s)? This action cannot be undone.
+            Are you sure you want to move {selectedIds.length} selected
+            convention(s) to the trash? They can be restored later.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -118,7 +129,7 @@ export default function BulkActions({
             color="error"
             disabled={bulkActionMutation.isPending}
           >
-            Delete
+            Move to Trash
           </Button>
         </DialogActions>
       </Dialog>

@@ -23,11 +23,13 @@ interface ConventionSeries {
 }
 
 interface ConventionSeriesSelectorProps {
+  initialSeriesId?: string | null;
   onSeriesSelect: (seriesId: string | null) => void;
   onNewSeriesCreate: (series: Omit<ConventionSeries, 'id'>) => void;
 }
 
 export default function ConventionSeriesSelector({ 
+  initialSeriesId,
   onSeriesSelect, 
   onNewSeriesCreate 
 }: ConventionSeriesSelectorProps) {
@@ -47,14 +49,24 @@ export default function ConventionSeriesSelector({
   // Fetch user's series
   useEffect(() => {
     const fetchSeries = async () => {
+      setLoading(true); 
       try {
         const response = await fetch('/api/organizer/series');
         if (!response.ok) throw new Error('Failed to fetch series');
         const data = await response.json();
         setSeries(data.series);
-        if (data.series.length > 0) {
-          setSelectedSeries(data.series[0].id);
-          onSeriesSelect(data.series[0].id);
+
+        // Prioritize initialSeriesId for the FIRST load if selectedSeries isn't already set by user action or a previous run.
+        if (initialSeriesId && !selectedSeries && data.series.some((s: ConventionSeries) => s.id === initialSeriesId)) {
+            setSelectedSeries(initialSeriesId);
+            // No need to call onSeriesSelect here if it's just reflecting an initial prop.
+            // The parent (ConventionForm) already knows this seriesId.
+            // onSeriesSelect will be called by handleSeriesChange if the user manually changes it.
+        } else if (data.series.length > 0 && !selectedSeries && !isCreatingNew) {
+          // Fallback: if no valid initialSeriesId and nothing selected, select first in list.
+          const firstSeriesId = data.series[0].id;
+          setSelectedSeries(firstSeriesId); 
+          onSeriesSelect(firstSeriesId); // Notify parent for create mode default selection   
         }
       } catch (error) {
         console.error('Error fetching series:', error);
@@ -66,7 +78,7 @@ export default function ConventionSeriesSelector({
     if (session?.user) {
       fetchSeries();
     }
-  }, [session, onSeriesSelect]);
+  }, [session, initialSeriesId, isCreatingNew, onSeriesSelect]); // Removed selectedSeries, added initialSeriesId properly
 
   // Handle series selection
   const handleSeriesChange = (event: any) => {

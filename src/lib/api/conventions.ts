@@ -1,7 +1,14 @@
 import { Convention } from '@prisma/client';
 import { ConventionSearchParams } from '../search';
 
-export async function getConventions(params: ConventionSearchParams): Promise<Convention[]> {
+interface PaginatedResponse {
+  items: Convention[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export async function getConventions(params: ConventionSearchParams): Promise<PaginatedResponse> {
   const searchParams = new URLSearchParams();
   
   if (params.query) searchParams.set('query', params.query);
@@ -23,6 +30,5 @@ export async function getConventions(params: ConventionSearchParams): Promise<Co
     throw new Error('Failed to fetch conventions');
   }
 
-  const data = await response.json();
-  return data.items;
+  return response.json();
 } 

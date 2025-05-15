@@ -22,14 +22,13 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [status, setStatus] = useState<ConventionStatus>(
-    (currentSearchParams.get('status') as ConventionStatus) || 'ACTIVE'
+    (currentSearchParams.get('status') as ConventionStatus) || 'PUBLISHED'
   );
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Convert search params to ConventionSearchParams using useMemo to prevent unnecessary recalculations
   const params = useMemo(() => ({
-    page: Number(currentSearchParams.get('page')) || 1,
     limit: Number(currentSearchParams.get('limit')) || 10,
     query: currentSearchParams.get('query') || '',
     city: currentSearchParams.get('city') || '',
@@ -52,8 +51,6 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
     });
     // Always include status
     params.set('status', status);
-    // Reset to first page when filters change
-    params.set('page', '1');
     // Update URL
     router.push(`/conventions?${params.toString()}`);
     if (isMobile) setDrawerOpen(false); // Close drawer on mobile after applying filters
@@ -63,14 +60,13 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
   const handleStatusChange = (_event: React.MouseEvent<HTMLElement>, newStatus: ConventionStatus | null) => {
     if (newStatus) {
       setStatus(newStatus);
-      // Update URL with new status and reset page
+      // Update URL with new status
       const params = new URLSearchParams(currentSearchParams.toString());
       if (newStatus === 'PAST') {
         params.set('status', newStatus);
       } else {
         params.delete('status');
       }
-      params.set('page', '1');
       router.push(`/conventions?${params.toString()}`);
     }
   };
@@ -81,9 +77,9 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
     let timeoutId: NodeJS.Timeout;
     const fetchConventions = async () => {
       try {
-        const data = await getConventions(params);
+        const response = await getConventions(params);
         if (isMounted) {
-          setConventions(data);
+          setConventions(response.items);
           setIsInitialLoading(false);
         }
       } catch (error) {
@@ -126,7 +122,7 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
             size="small"
             sx={{ ml: 2 }}
           >
-            <ToggleButton value="ACTIVE" aria-label="Active">Active</ToggleButton>
+            <ToggleButton value="PUBLISHED" aria-label="Active">Active</ToggleButton>
             <ToggleButton value="PAST" aria-label="Past">Past</ToggleButton>
           </ToggleButtonGroup>
         </Box>
@@ -167,6 +163,10 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
         {isInitialLoading ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography>Loading...</Typography>
+          </Box>
+        ) : conventions.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography>No conventions found</Typography>
           </Box>
         ) : (
           <ConventionGrid conventions={conventions} />

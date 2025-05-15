@@ -1,46 +1,41 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { ConventionStatus } from '@prisma/client';
 
-export async function DELETE(
-  request: NextRequest,
+export async function GET(
+  request: Request,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
-    // First check if the convention exists and belongs to the user
-    const convention = await db.convention.findUnique({
+    const { id } = params;
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID (slug) is required' }, { status: 400 });
+    }
+
+    const convention = await prisma.convention.findUnique({
       where: {
-        id: params.id,
-        organizerUserId: session.user.id,
+        slug: id,
+        deletedAt: null,
+        status: {
+          in: [ConventionStatus.PUBLISHED, ConventionStatus.PAST]
+        }
       },
+      include: { 
+        series: true, 
+      }
     });
 
     if (!convention) {
-      return NextResponse.json(
-        { error: "Convention not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Convention not found or not publicly available' }, { status: 404 });
     }
 
-    // Delete the convention
-    await db.convention.delete({
-      where: {
-        id: params.id,
-      },
-    });
+    return NextResponse.json(convention);
 
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting convention:", error);
+    console.error(`Error fetching convention by slug (param named id: ${params.id}):`, error);
     return NextResponse.json(
-      { error: "Failed to delete convention" },
+      { error: 'Failed to fetch convention' },
       { status: 500 }
     );
   }

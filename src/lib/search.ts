@@ -12,7 +12,7 @@ export const ConventionSearchParamsSchema = z.object({
   status: z.array(z.nativeEnum(ConventionStatus)).optional(),
   minPrice: z.number().optional(),
   maxPrice: z.number().optional(),
-  page: z.number().min(1).default(1),
+  page: z.number().min(1).optional(),
   limit: z.number().min(1).max(100).default(10),
 });
 

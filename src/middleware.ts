@@ -1,77 +1,49 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { Role } from '@prisma/client';
+import { NextRequestWithAuth } from 'next-auth/middleware';
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const secret = process.env.NEXTAUTH_SECRET;
+export default async function middleware(request: NextRequestWithAuth) {
+  const token = await getToken({ req: request });
+  const isAuth = !!token;
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login');
 
-  if (!secret) {
-    console.error('NEXTAUTH_SECRET is not set. Middleware cannot validate token.');
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const token = await getToken({ req: request, secret });
-  console.log('Middleware - Token:', token); // Debug log
-
-  // If no token, redirect to login
-  if (!token) {
-    console.log('Middleware - No token found, redirecting to login'); // Debug log
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Check if user is admin - if yes, allow access to everything
-  const isUserAdmin = token?.roles?.includes(Role.ADMIN);
-  console.log('Middleware - Is user admin?', isUserAdmin); // Debug log
-  console.log('Middleware - User roles:', token?.roles); // Debug log
-
-  if (isUserAdmin) {
-    console.log('Middleware - Admin access granted to:', pathname); // Debug log
-    return NextResponse.next();
-  }
-
-  // For non-admin users, check specific route permissions
-  if (pathname.startsWith('/admin')) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    console.log(`Redirecting non-admin user from ${pathname} to ${loginUrl.toString()}`);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (pathname.startsWith('/conventions/new')) {
-    const isUserOrganizer = token?.roles?.includes(Role.ORGANIZER);
-    if (!isUserOrganizer) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      console.log(`Redirecting non-organizer user from ${pathname} to ${loginUrl.toString()}`);
-      return NextResponse.redirect(loginUrl);
+  if (isAuthPage) {
+    if (isAuth) {
+      return NextResponse.redirect(new URL('/organizer/conventions', request.url));
     }
+    return null;
   }
 
-  // Handle /organizer/conventions route
-  if (pathname.startsWith('/organizer/conventions')) {
-    const isUserOrganizer = token?.roles?.includes(Role.ORGANIZER);
-    if (!isUserOrganizer) {
-      // Redirect to previous page with error message
-      const referer = request.headers.get('referer') || '/';
-      const redirectUrl = new URL(referer, request.url);
-      // Add error message to URL as a temporary parameter
-      redirectUrl.searchParams.set('error', 'You do not have permission to access this page');
-      const response = NextResponse.redirect(redirectUrl);
-      return response;
+  if (!isAuth) {
+    let from = request.nextUrl.pathname;
+    if (request.nextUrl.search) {
+      from += request.nextUrl.search;
     }
-    // If user is an organizer, allow access to the page
-    return NextResponse.next();
+
+    return NextResponse.redirect(
+      new URL(`/login?from=${encodeURIComponent(from)}`, request.url)
+    );
+  }
+
+  // Role-based access control
+  const userRoles = token.roles as string[] || [];
+  const isOrganizer = userRoles.includes('ORGANIZER');
+  const isAdmin = userRoles.includes('ADMIN');
+
+  // Protect convention management routes - now only /organizer/conventions and its subpaths
+  if (request.nextUrl.pathname.startsWith('/organizer/conventions')) {
+    if (!isOrganizer && !isAdmin) {
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
+    }
   }
 
   return NextResponse.next();
 }
 
-// Configure the middleware to run on specific paths
 export const config = {
-  matcher: ['/admin/:path*', '/conventions/new', '/organizer/:path*'],
+  matcher: [
+    // '/conventions/manage/:path*', // Removed old path
+    '/organizer/conventions/:path*',
+    '/login',
+  ],
 }; 

@@ -12,6 +12,8 @@ import { getStateVariations } from '@/lib/stateUtils';
 import { ConventionSearchParams } from '@/lib/search';
 import { Prisma } from '@prisma/client';
 
+type ConventionStatus = 'PUBLISHED' | 'PAST' | 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'CANCELLED';
+
 // Simple slugify function (replace with a more robust one if needed, e.g., slugify library)
 function slugify(text: string): string {
   return text
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
       country: searchParams.get('country') || '',
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
-      status: searchParams.get('status') || undefined,
+      status: searchParams.get('status') ? [searchParams.get('status') as ConventionStatus] : undefined,
     };
 
     const skip = (params.page - 1) * params.limit;
@@ -137,9 +139,18 @@ export async function GET(request: NextRequest) {
     if (params.endDate) {
       searchQuery.endDate = { lte: new Date(params.endDate) };
     }
-    // Handle status filter - default to ACTIVE if not specified
+
+    // Handle status filter - default to showing PUBLISHED conventions
     const statusParam = searchParams.get('status');
-    searchQuery.status = statusParam === 'PAST' ? 'PAST' : 'ACTIVE';
+    if (statusParam === 'PAST') {
+      searchQuery.status = ConventionStatus.PAST;
+    } else {
+      // For active view, show PUBLISHED conventions
+      searchQuery.status = ConventionStatus.PUBLISHED;
+    }
+
+    // Always filter out soft-deleted conventions for public view
+    searchQuery.deletedAt = null;
 
     const [items, total] = await Promise.all([
       prisma.convention.findMany({

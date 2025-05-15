@@ -1,0 +1,1 @@
+UPDATE "Convention" SET status = 'PUBLISHED' WHERE status IN ('UPCOMING', 'ACTIVE'); 

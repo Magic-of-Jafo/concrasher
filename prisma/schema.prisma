@@ -28,8 +28,7 @@ enum ApplicationStatus {
 
 enum ConventionStatus {
   DRAFT
-  UPCOMING
-  ACTIVE
+  PUBLISHED
   PAST
   CANCELLED
 }
@@ -53,15 +52,16 @@ model User {
   image         String?
   hashedPassword String? // Added based on Story 1.2 needs, useful to define early for Auth.js
   roles         Role[]    @default([USER])
+  resetToken    String?   @unique
+  resetTokenExpiry DateTime?
   accounts      Account[]
   sessions      Session[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   bio           String?   // Short biography
   roleApplications RoleApplication[]
-  organizedConventions Convention[] @relation("OrganizedBy")
-  roleRequests  RoleRequest[]
   conventionSeries ConventionSeries[]
+  roleRequests  RoleRequest[]
 }
 
 model Account {
@@ -137,15 +137,13 @@ model Convention {
   venueName          String?
   description        String?   @db.Text
   websiteUrl         String?
-  organizerUserId    String
-  organizer          User      @relation("OrganizedBy", fields: [organizerUserId], references: [id])
-  conventionSeriesId String?   // Made optional for migration
   status             ConventionStatus
   type               ConventionType @default(GENERAL)
   bannerImageUrl     String?
   galleryImageUrls   String[]  @default([])
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
   series             ConventionSeries @relation(fields: [seriesId], references: [id])
   seriesId           String
 }
