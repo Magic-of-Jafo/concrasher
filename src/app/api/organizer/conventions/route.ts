@@ -6,7 +6,7 @@ import { Role, ConventionStatus, Convention, ConventionSeries } from '@prisma/cl
 
 // Define an extended Convention type that includes the series for responses
 type ConventionWithSeries = Convention & {
-  series?: ConventionSeries;
+  series?: ConventionSeries | null;
 };
 
 export async function GET() {
@@ -122,33 +122,60 @@ export async function POST(request: Request) {
       slug,
       startDate,
       endDate,
-      description,
+      isOneDayEvent,
+      isTBD,
+      descriptionShort,
+      descriptionMain,
       websiteUrl,
       venueName,
       city,
       stateAbbreviation,
       stateName,
       country,
-      type,
       seriesId,
     } = body;
 
-    // Basic validation for required fields
-    if (!name || !slug || !startDate || !endDate || !city || !country || !type || !seriesId) {
+    // Basic validation for required fields from BasicInfoFormData
+    // Note: descriptionShort, descriptionMain, venueName, websiteUrl are optional
+    if (!name || !slug || !city || !country || !seriesId) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: name, slug, city, country, seriesId are required.' },
         { status: 400 }
       );
     }
-    
-    // Validate date sequence
-    if (new Date(startDate) >= new Date(endDate)) {
-        return NextResponse.json(
-            { error: 'Start date must be before end date' },
-            { status: 400 }
-        );
-    }
 
+    // Date handling and conditional validation
+    let finalStartDate: Date | null = startDate ? new Date(startDate) : null;
+    let finalEndDate: Date | null = endDate ? new Date(endDate) : null;
+
+    if (!isTBD) {
+      // If not TBD, then startDate and endDate from body are expected to be valid dates.
+      if (!finalStartDate || !finalEndDate) {
+        return NextResponse.json(
+          { error: 'startDate and endDate are required and must be valid dates if isTBD is false.' },
+          { status: 400 }
+        );
+      }
+
+      // Perform date sequence validation only if not TBD
+      if (finalStartDate >= finalEndDate && !isOneDayEvent) {
+        return NextResponse.json(
+          { error: 'Start date must be before end date for multi-day events.' },
+          { status: 400 }
+        );
+      }
+      if (isOneDayEvent && finalStartDate.getTime() !== finalEndDate.getTime()) {
+         return NextResponse.json(
+          { error: 'For one-day events, start and end dates must be the same.' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // If isTBD is true, client should have already set isOneDayEvent to false.
+      // We ensure it here for data integrity if client didn't.
+      // Dates sent by client (even if TBD) are preserved in finalStartDate/finalEndDate for DB storage.
+    }
+    
     // Verify seriesId ownership if user is not an admin
     if (!session.user.roles.includes(Role.ADMIN)) {
       const series = await prisma.conventionSeries.findFirst({
@@ -165,25 +192,32 @@ export async function POST(request: Request) {
       }
     }
 
-    const newConvention = await prisma.convention.create({
-      data: {
+    const newConventionData: any = {
         name,
         slug,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        description,
+        startDate: finalStartDate, // Will be null if body's startDate was null, or actual date
+        endDate: finalEndDate,   // Will be null if body's endDate was null, or actual date
+        isOneDayEvent: isTBD ? false : isOneDayEvent, // If TBD, it cannot be a one-day event
+        isTBD,
+        descriptionShort: descriptionShort,
+        descriptionMain: descriptionMain, 
         websiteUrl,
         venueName,
         city,
         stateAbbreviation,
         stateName,
         country,
-        type,
         seriesId,
-        status: ConventionStatus.DRAFT, // Default to DRAFT status
-      },
+        status: ConventionStatus.DRAFT, 
+      };
+      
+    // Ensure optional fields are not set to undefined if they are missing in body, prisma handles missing fields as undefined by default
+    // For example, if websiteUrl is not in body, newConventionData.websiteUrl will be undefined, which is fine.
+
+    const newConvention = await prisma.convention.create({
+      data: newConventionData,
       include: {
-        series: true, // Include series information in the response
+        series: true, 
       },
     });
 
@@ -191,14 +225,19 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error creating convention:', error);
-    // Check for Prisma specific errors, e.g., unique constraint violation for slug
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
-        // Assuming 'slug' is the field causing the unique constraint violation
-        // You might need to check error.meta.target to be sure
-        return NextResponse.json(
-            { error: 'A convention with this slug already exists.' },
-            { status: 409 } // Conflict
-        );
+    if (error instanceof Error && 'code' in error && (error as any).code === 'P2002') {
+        // Check for unique constraint on slug. Adjust if other fields are unique.
+        const target = (error as any).meta?.target;
+        if (target && target.includes('slug')) {
+            return NextResponse.json(
+                { error: 'A convention with this slug already exists.' },
+                { status: 409 } 
+            );
+        }
+         return NextResponse.json(
+                { error: 'A unique constraint violation occurred.' },
+                { status: 409 } 
+            );
     }
     return NextResponse.json(
       { error: 'Failed to create convention' },

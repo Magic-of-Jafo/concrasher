@@ -1,7 +1,9 @@
 import { RegistrationSchema } from './validators';
 import { LoginSchema } from './validators';
 import { ProfileSchema } from './validators';
-import { ConventionCreateSchema, ConventionUpdateSchema, ConventionStatusEnum } from './validators';
+import { ConventionCreateSchema, ConventionUpdateSchema } from './validators';
+import { BasicInfoFormSchema, type BasicInfoFormData } from './validators';
+import { ConventionStatus } from '@prisma/client';
 
 describe('RegistrationSchema', () => {
   it('should validate a correct registration form', () => {
@@ -243,7 +245,7 @@ describe('ConventionCreateSchema', () => {
     city: 'Test City',
     state: 'TS',
     country: 'Testland',
-    status: ConventionStatusEnum.Enum.UPCOMING,
+    status: ConventionStatus.DRAFT,
     // Optional fields
     venueName: 'Test Venue',
     description: 'A great test convention',
@@ -343,7 +345,7 @@ describe('ConventionUpdateSchema', () => {
   });
 
   it('should allow valid status enum for update', () => {
-    const result = ConventionUpdateSchema.safeParse({ status: ConventionStatusEnum.Enum.PAST });
+    const result = ConventionUpdateSchema.safeParse({ status: ConventionStatus.PUBLISHED });
     expect(result.success).toBe(true);
   });
 
@@ -354,4 +356,123 @@ describe('ConventionUpdateSchema', () => {
       expect(result.error.flatten().fieldErrors.status).toBeDefined();
     }
   });
-}); 
+});
+
+describe('BasicInfoFormSchema', () => {
+  const getValidData = (overrides: Partial<BasicInfoFormData> = {}): BasicInfoFormData => ({
+    name: 'Test Convention',
+    slug: 'test-convention',
+    startDate: new Date('2025-01-01'),
+    endDate: new Date('2025-01-02'),
+    isOneDayEvent: false,
+    isTBD: false,
+    city: 'Test City',
+    stateName: 'California',
+    stateAbbreviation: 'CA',
+    country: 'United States',
+    descriptionShort: 'Short desc',
+    descriptionMain: 'Main desc',
+    seriesId: 'clxxxxxxx',
+    newSeriesName: '',
+    ...overrides,
+  });
+
+  it('should validate correct basic info data', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData());
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate if name is missing', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ name: '' }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.name).toContain('Convention name is required');
+  });
+
+  it('should invalidate if slug is missing', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ slug: '' }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.slug).toContain('Slug is required');
+  });
+
+  // --- Date Validations ---
+  it('should validate if dates are TBD (startDate and endDate can be null)', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ isTBD: true, startDate: null, endDate: null }));
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate if not TBD and startDate is null', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ isTBD: false, startDate: null }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.startDate).toContain('Start date is required unless dates are TBD');
+  });
+
+  it('should validate if one-day event and endDate is null (and not TBD)', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ 
+      isTBD: false, 
+      isOneDayEvent: true, 
+      startDate: new Date(), 
+      endDate: null 
+    }));
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate if not TBD, not one-day, and endDate is null', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ 
+      isTBD: false, 
+      isOneDayEvent: false, 
+      startDate: new Date(), 
+      endDate: null 
+    }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.endDate).toContain('End date is required for multi-day events');
+  });
+
+  // --- Location Validations ---
+  it('should validate if country is not US and state fields are empty', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ country: 'Canada', stateName: '', stateAbbreviation: '' }));
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate if country is US and stateName is empty', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ country: 'United States', stateName: '' }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.stateName).toContain('State is required for US locations');
+  });
+
+  it('should validate if country is US and stateName is a valid full state name', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ country: 'United States', stateName: 'Florida', stateAbbreviation: 'FL' }));
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate if country is US and stateName is a valid state abbreviation', () => {
+    // Schema checks stateName against full names and abbreviations
+    const result = BasicInfoFormSchema.safeParse(getValidData({ country: 'United States', stateName: 'FL', stateAbbreviation: 'FL' }));
+    expect(result.success).toBe(true);
+  });
+
+  it('should invalidate if country is US and stateName is invalid', () => {
+    const result = BasicInfoFormSchema.safeParse(getValidData({ country: 'United States', stateName: 'InvalidState' }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.stateName).toContain('Invalid US state name or abbreviation');
+  });
+  
+  it('should allow optional fields (city, descriptions, seriesId, newSeriesName) to be empty/undefined', () => {
+    const data = getValidData({
+      city: '',
+      descriptionShort: '',
+      descriptionMain: '',
+      seriesId: '',
+      newSeriesName: '',
+      stateName: 'California', // keep valid state for US
+      stateAbbreviation: 'CA'
+    });
+    const result = BasicInfoFormSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+});
+
+// Make sure to export type if it's defined in this file and used elsewhere, though it's likely in validators.ts
+// export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>; // Already in validators.ts
+
+// export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>; 

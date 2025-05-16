@@ -4,7 +4,6 @@ import { Suspense, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useQuery } from '@tanstack/react-query';
-import { Convention, Role } from "@prisma/client";
 import ConventionList from "./ConventionList";
 import {
   Box,
@@ -16,6 +15,36 @@ import {
   Button,
 } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
+
+// Define Role enum locally since we know the values
+enum Role {
+  USER = 'USER',
+  ORGANIZER = 'ORGANIZER',
+  TALENT = 'TALENT',
+  ADMIN = 'ADMIN'
+}
+
+// Define Convention type locally
+interface Convention {
+  id: string;
+  name: string;
+  slug: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  isOneDayEvent: boolean;
+  isTBD: boolean;
+  city: string;
+  state: string;
+  country: string;
+  descriptionShort: string | null;
+  descriptionMain: string | null;
+  coverImageUrl: string | null;
+  profileImageUrl: string | null;
+  seriesId: string | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // API fetching function for useQuery
 const fetchAllConventionsAPI = async () => {

@@ -101,50 +101,109 @@ export async function PUT(
       name, 
       slug,
       description, 
-      startDate, 
-      endDate, 
+      startDate: rawStartDate,
+      endDate: rawEndDate,
       city,
       stateAbbreviation,
       stateName,
       country,
       venueName,
       status,
-      seriesId
+      seriesId,
+      descriptionShort,
+      descriptionMain,
+      isOneDayEvent,
+      isTBD
     } = body;
 
-    // Validate required fields
-    if (!name || !slug || !startDate || !endDate || !status || !city || !country || !seriesId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    let finalStartDate: Date | null = null;
+    let finalEndDate: Date | null = null;
+    let finalIsOneDayEvent = isOneDayEvent;
+
+    // Date handling logic (isTBD, rawStartDate, rawEndDate validation)
+    if (isTBD) {
+      finalStartDate = rawStartDate ? new Date(rawStartDate) : null;
+      finalEndDate = rawEndDate ? new Date(rawEndDate) : null;
+      if (finalStartDate && isNaN(finalStartDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid start date format when TBD' }, { status: 400 });
+      }
+      if (finalEndDate && isNaN(finalEndDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid end date format when TBD' }, { status: 400 });
+      }
+      if (finalStartDate && finalEndDate && finalStartDate > finalEndDate) {
+         return NextResponse.json({ error: 'Start date must be before end date, even if TBD' }, { status: 400 });
+      }
+      finalIsOneDayEvent = false;
+    } else {
+      if (!rawStartDate || !rawEndDate) {
+        return NextResponse.json(
+          { error: 'Start date and end date are required when not TBD' },
+          { status: 400 }
+        );
+      }
+      finalStartDate = new Date(rawStartDate);
+      finalEndDate = new Date(rawEndDate);
+
+      if (isNaN(finalStartDate.getTime()) || isNaN(finalEndDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format' },
+          { status: 400 }
+        );
+      }
+      if (finalStartDate > finalEndDate) {
+        return NextResponse.json(
+          { error: 'Start date must be before end date' },
+          { status: 400 }
+        );
+      }
+      if (finalIsOneDayEvent) {
+        finalEndDate = finalStartDate;
+      }
     }
 
-    // Validate dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return NextResponse.json(
-        { error: 'Invalid date format' },
-        { status: 400 }
-      );
+    // --- New Validation Logic ---
+    if (!seriesId) { // seriesId is always critical for linking to an organizer
+      return NextResponse.json({ error: 'Series ID is required for an update.' }, { status: 400 });
     }
 
-    if (start > end) {
-      return NextResponse.json(
-        { error: 'Start date must be before end date' },
-        { status: 400 }
-      );
+    // Validate 'name' if provided in the body
+    if (body.hasOwnProperty('name')) {
+      if (typeof name !== 'string' || name.trim() === '') {
+        return NextResponse.json({ error: 'Convention name, if provided, cannot be empty.' }, { status: 400 });
+      }
+    } else {
+      // If name is not in the body, this implies an update where name is not being changed.
+      // This is acceptable for a PUT if other fields are being updated.
+      // However, BasicInfoTab should always send it. If it's missing, it might be an issue with client data.
+      // For now, we allow PUT if name is not in body, Prisma won't update it.
     }
 
-    // Validate status
-    const validStatuses = ['DRAFT', 'PUBLISHED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid status' },
-        { status: 400 }
-      );
+    // Validate 'slug' if provided in the body
+    if (body.hasOwnProperty('slug')) {
+      if (typeof slug !== 'string' || slug.trim() === '') {
+        return NextResponse.json({ error: 'Convention slug, if provided, cannot be empty.' }, { status: 400 });
+      }
+      // Basic slug format validation (already in Zod, but a light check here is fine)
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+        return NextResponse.json(
+            { error: 'Invalid slug format. Slug must be lowercase alphanumeric with hyphens and no spaces.' },
+            { status: 400 }
+        );
+      }
     }
+    // Similar logic for slug as for name: if not in body, Prisma won't update it.
+
+    // Validate 'status' ONLY IF IT IS PROVIDED in the request body.
+    if (body.hasOwnProperty('status')) {
+      const validStatuses = Object.values(ConventionStatus); // Use Prisma enum values
+      if (typeof status !== 'string' || !validStatuses.includes(status as ConventionStatus)) {
+        return NextResponse.json(
+          { error: `Invalid status value provided. Must be one of: ${validStatuses.join(', ')}.` },
+          { status: 400 }
+        );
+      }
+    }
+    // --- End of New Validation Logic ---
 
     // Ensure convention is not soft-deleted before update, or handle as needed
     const existingConvention = await prisma.convention.findFirst({
@@ -172,19 +231,10 @@ export async function PUT(
       }
     }
     
-    // Basic slug format validation (already in Zod, but a light check here is fine)
-    if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-        return NextResponse.json(
-            { error: 'Invalid slug format. Slug must be lowercase alphanumeric with hyphens and no spaces.' },
-            { status: 400 }
-        );
-    }
-
     const updatedConventionData: any = {
       name,
-      description,
-      startDate: start,
-      endDate: end,
+      startDate: finalStartDate,
+      endDate: finalEndDate,
       city,
       stateAbbreviation,
       stateName,
@@ -192,13 +242,14 @@ export async function PUT(
       venueName,
       status,
       seriesId,
+      descriptionShort,
+      descriptionMain,
+      isOneDayEvent: finalIsOneDayEvent,
+      isTBD,
+      ...(slug && slug !== existingConvention.slug && { slug }),
     };
 
-    if (slug) {
-      updatedConventionData.slug = slug;
-    }
-
-    const convention = await prisma.convention.update({
+    const updatedConvention = await prisma.convention.update({
       where: {
         id: params.id,
       },
@@ -206,14 +257,14 @@ export async function PUT(
     });
 
     // After successfully updating the convention, update its series' updatedAt timestamp
-    if (convention && convention.seriesId) {
+    if (updatedConvention && updatedConvention.seriesId) {
       await prisma.conventionSeries.update({
-        where: { id: convention.seriesId },
+        where: { id: updatedConvention.seriesId },
         data: { updatedAt: new Date() },
       });
     }
 
-    return NextResponse.json(convention);
+    return NextResponse.json(updatedConvention);
   } catch (error) {
     console.error('Error updating convention:', error);
     return NextResponse.json(

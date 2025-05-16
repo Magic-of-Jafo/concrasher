@@ -80,6 +80,7 @@ const getColumns = (viewMode?: "active" | "deleted", onActionComplete?: () => vo
         currentStatus={params.row.status}
         deletedAt={params.row.deletedAt}
         onActionComplete={onActionComplete}
+        slug={params.row.slug}
       />
     ),
   },

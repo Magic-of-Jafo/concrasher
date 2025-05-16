@@ -191,10 +191,18 @@
 - **Detailed Requirements:** (As per "Tab 7: Media" from your detailed input / my previous full revamp Story 2.2)
     - Multi-image upload with captions and reordering.
     - Add multiple video links (YouTube/Vimeo) with captions.
+    - Deferred from Story 2.7:
+      - Image upload functionality for cover and profile images
+      - ImageUploader component implementation
+      - File input, preview, and validation
+      - Upload progress and error handling
+      - Integration with object storage
+      - Image URL management in convention data
 - **Acceptance Criteria (ACs):**
   - AC1: Organizer can upload multiple promotional images with captions; images are saved and orderable.
   - AC2: Organizer can add multiple YouTube/Vimeo links with captions; links are saved.
   - AC3: Media items load correctly for editing/viewing within the tab.
+  - AC4: Cover and profile image upload functionality works as specified in Story 2.7.
 
 ---
 

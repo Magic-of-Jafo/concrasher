@@ -25,6 +25,7 @@ import {
   MoreVert as MoreIcon,
   Publish as PublishIcon,
   RestoreFromTrash as RestoreIcon,
+  Visibility as ViewIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ interface ConventionActionsProps {
   currentStatus: ConventionStatus;
   deletedAt?: Date | null;
   onActionComplete?: () => void;
+  slug: string;
 }
 
 export default function ConventionActions({
@@ -44,6 +46,7 @@ export default function ConventionActions({
   currentStatus,
   deletedAt,
   onActionComplete,
+  slug,
 }: ConventionActionsProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -257,6 +260,11 @@ export default function ConventionActions({
     restoreMutation.mutate();
   };
 
+  const handleView = () => {
+    handleMenuClose();
+    router.push(`/conventions/${slug}`);
+  };
+
   return (
     <>
       <IconButton
@@ -281,6 +289,12 @@ export default function ConventionActions({
           </MenuItem>
         ) : (
           [
+            <MenuItem key="view" onClick={handleView}>
+              <ListItemIcon>
+                <ViewIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>View</ListItemText>
+            </MenuItem>,
             <MenuItem key="edit" onClick={handleEdit}>
               <ListItemIcon>
                 <EditIcon fontSize="small" />

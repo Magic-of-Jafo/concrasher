@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Card, CardContent, useTheme, useMediaQuery } from "@mui/material";
+import { Box, Typography, Card, CardContent, useTheme, useMediaQuery, Skeleton } from "@mui/material";
 import { Convention } from "@prisma/client";
 import { useRouter } from "next/navigation";
 
@@ -33,6 +33,22 @@ export default function ConventionGrid({
     return diffDays;
   };
 
+  if (loading) {
+    return (
+      <Box sx={{ width: '100%' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {[...Array(3)].map((_, index) => (
+            <Card key={index}>
+              <CardContent>
+                <Skeleton variant="rectangular" width={'100%'} height={118} />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
   if (!conventions || conventions.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -47,10 +63,21 @@ export default function ConventionGrid({
     <Box sx={{ width: '100%' }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {conventions.map((convention) => {
-          const days = getDaysUntilStart(convention.startDate);
-          const daysText = days === 1 ? "1 Day" : `${days} Days`;
+          let daysText = "Date TBD";
+          if (convention.startDate) {
+            const days = getDaysUntilStart(new Date(convention.startDate)); // Ensure it's a Date object
+            if (days < 0) {
+              daysText = "Event Started";
+            } else if (days === 0) {
+              daysText = "Today";
+            } else if (days === 1) {
+              daysText = "1 Day";
+            } else {
+              daysText = `${days} Days`;
+            }
+          }
           const city = convention.city || '';
-          const state = convention.state || '';
+          const state = convention.stateAbbreviation || '';
           const country = convention.country || '';
           const location = country === 'United States' || country === 'USA' || country === 'US'
             ? (state ? `${city}, ${state}` : city)

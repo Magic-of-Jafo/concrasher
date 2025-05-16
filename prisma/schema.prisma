@@ -33,17 +33,6 @@ enum ConventionStatus {
   CANCELLED
 }
 
-enum ConventionType {
-  GAMING
-  ANIME
-  COMIC
-  SCI_FI
-  FANTASY
-  HORROR
-  GENERAL
-  OTHER
-}
-
 model User {
   id            String    @id @default(cuid())
   name          String?   // Display name
@@ -61,7 +50,6 @@ model User {
   bio           String?   // Short biography
   roleApplications RoleApplication[]
   conventionSeries ConventionSeries[]
-  roleRequests  RoleRequest[]
 }
 
 model Account {
@@ -128,40 +116,25 @@ model Convention {
   id                 String    @id @default(cuid())
   name               String
   slug               String    @unique
-  startDate          DateTime
-  endDate            DateTime
+  startDate          DateTime? // Optional to support TBD
+  endDate            DateTime? // Optional to support TBD
+  isOneDayEvent      Boolean   @default(false)
+  isTBD              Boolean   @default(false)
   city               String
-  stateAbbreviation  String?
-  stateName          String?
+  stateAbbreviation  String?   // RESTORED
+  stateName          String?   // RESTORED
   country            String
   venueName          String?
-  description        String?   @db.Text
+  descriptionShort   String?   // New field
+  descriptionMain    String?   @db.Text // Renamed from description
   websiteUrl         String?
   status             ConventionStatus
-  type               ConventionType @default(GENERAL)
-  bannerImageUrl     String?
+  coverImageUrl      String?   // Renamed from bannerImageUrl
+  profileImageUrl    String?   // New field
   galleryImageUrls   String[]  @default([])
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   deletedAt          DateTime?
-  series             ConventionSeries @relation(fields: [seriesId], references: [id])
-  seriesId           String
-}
-
-model RoleRequest {
-  id            String    @id @default(cuid())
-  userId        String
-  requestedRole Role
-  status        RequestStatus @default(PENDING)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  user          User      @relation(fields: [userId], references: [id])
-
-  @@unique([userId, requestedRole]) // A user can only have one pending request per role
-}
-
-enum RequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  series             ConventionSeries? @relation(fields: [seriesId], references: [id]) // Optional series
+  seriesId           String? // Optional seriesId
 } 
