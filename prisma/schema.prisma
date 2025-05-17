@@ -1,12 +1,146 @@
-// From docs/data-models.md (essential parts for Auth.js and basic user)
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
+model User {
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  emailVerified    DateTime?
+  image            String?
+  hashedPassword   String?
+  roles            Role[]             @default([USER])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  bio              String?
+  resetToken       String?            @unique
+  resetTokenExpiry DateTime?
+  accounts         Account[]
+  conventionSeries ConventionSeries[]
+  roleApplications RoleApplication[]
+  sessions         Session[]
+  timezone         String?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model RoleApplication {
+  id            String            @id @default(cuid())
+  userId        String
+  requestedRole RequestedRole
+  status        ApplicationStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, requestedRole])
+}
+
+model ConventionSeries {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organizerUserId String
+  logoUrl         String?
+  slug            String       @unique
+  conventions     Convention[]
+  organizer       User         @relation(fields: [organizerUserId], references: [id])
+}
+
+model PriceTier {
+  id            String         @id @default(cuid())
+  conventionId  String
+  label         String
+  amount        Decimal
+  order         Int
+  convention    Convention     @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  priceDiscounts PriceDiscount[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model PriceDiscount {
+  id              String    @id @default(cuid())
+  conventionId    String
+  cutoffDate      DateTime
+  priceTierId     String
+  discountedAmount Decimal
+  convention      Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  priceTier       PriceTier  @relation(fields: [priceTierId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([conventionId, priceTierId, cutoffDate])
+}
+
+model Convention {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  startDate         DateTime?
+  endDate           DateTime?
+  city              String
+  country           String
+  venueName         String?
+  websiteUrl        String?
+  status            ConventionStatus
+  galleryImageUrls  String[]          @default([])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  stateAbbreviation String?
+  stateName         String?
+  seriesId          String
+  deletedAt         DateTime?
+  coverImageUrl     String?
+  descriptionMain   String?
+  descriptionShort  String?
+  isOneDayEvent     Boolean           @default(false)
+  isTBD             Boolean           @default(false)
+  profileImageUrl   String?
+  series            ConventionSeries @relation(fields: [seriesId], references: [id])
+  priceTiers        PriceTier[]
+  priceDiscounts    PriceDiscount[]
+  timezone          String?
 }
 
 enum Role {
@@ -32,109 +166,3 @@ enum ConventionStatus {
   PAST
   CANCELLED
 }
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?   // Display name
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  hashedPassword String? // Added based on Story 1.2 needs, useful to define early for Auth.js
-  roles         Role[]    @default([USER])
-  resetToken    String?   @unique
-  resetTokenExpiry DateTime?
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  bio           String?   // Short biography
-  roleApplications RoleApplication[]
-  conventionSeries ConventionSeries[]
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-  @@unique([identifier, token])
-}
-
-model RoleApplication {
-  id            String            @id @default(cuid())
-  userId        String
-  requestedRole RequestedRole
-  status        ApplicationStatus @default(PENDING)
-  // message     String? // Optional: for application notes or rejection reasons
-
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-
-  @@unique([userId, requestedRole]) // A user can only have one pending application for a specific role
-}
-
-model ConventionSeries {
-  id            String    @id @default(cuid())
-  name          String
-  slug          String    @unique
-  description   String?
-  logoUrl       String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  organizer     User      @relation(fields: [organizerUserId], references: [id])
-  organizerUserId String
-  conventions   Convention[]
-}
-
-model Convention {
-  id                 String    @id @default(cuid())
-  name               String
-  slug               String    @unique
-  startDate          DateTime? // Optional to support TBD
-  endDate            DateTime? // Optional to support TBD
-  isOneDayEvent      Boolean   @default(false)
-  isTBD              Boolean   @default(false)
-  city               String
-  stateAbbreviation  String?   // RESTORED
-  stateName          String?   // RESTORED
-  country            String
-  venueName          String?
-  descriptionShort   String?   // New field
-  descriptionMain    String?   @db.Text // Renamed from description
-  websiteUrl         String?
-  status             ConventionStatus
-  coverImageUrl      String?   // Renamed from bannerImageUrl
-  profileImageUrl    String?   // New field
-  galleryImageUrls   String[]  @default([])
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
-  series             ConventionSeries? @relation(fields: [seriesId], references: [id]) // Optional series
-  seriesId           String? // Optional seriesId
-} 

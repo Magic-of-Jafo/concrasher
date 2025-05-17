@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Tab, Box, Button, CircularProgress } from '@mui/material';
 import { BasicInfoTab } from './BasicInfoTab';
-import { type BasicInfoFormData, BasicInfoFormSchema } from '@/lib/validators';
+import { type BasicInfoFormData } from '@/lib/validators';
+import { PricingTab } from './PricingTab';
+import { type PricingTabData, type PriceTier, type PriceDiscount } from '@/lib/validators';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -31,7 +33,7 @@ function allyProps(index: number) {
   };
 }
 
-const initialFormData: BasicInfoFormData = {
+const initialBasicFormData: BasicInfoFormData = {
   name: '',
   slug: '',
   startDate: null,
@@ -48,12 +50,18 @@ const initialFormData: BasicInfoFormData = {
   newSeriesName: '',
 };
 
+interface ConventionDataForEditor extends BasicInfoFormData {
+  id?: string;
+  priceTiers?: PriceTier[];
+  priceDiscounts?: PriceDiscount[];
+}
+
 interface ConventionEditorTabsProps {
-  initialConventionData?: Partial<BasicInfoFormData>; // For editing
+  initialConventionData?: Partial<ConventionDataForEditor>;
   isEditing: boolean;
-  onSave: (data: BasicInfoFormData) => Promise<void>; // Function to call on save
+  onSave: (data: Partial<ConventionDataForEditor>) => Promise<void>;
   isSaving: boolean;
-  onCancel: () => void; // New prop for cancel action
+  onCancel: () => void;
 }
 
 const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
@@ -61,40 +69,90 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   isEditing,
   onSave,
   isSaving,
-  onCancel, // Destructure new prop
+  onCancel,
 }) => {
+  console.log('[ConventionEditorTabs] Received initialConventionData:', initialConventionData);
   const [activeTab, setActiveTab] = useState(0);
-  const [conventionDataState, setConventionDataState] =
-    useState<BasicInfoFormData>({
-      ...initialFormData,
-      ...(initialConventionData || {}),
+
+  const localStorageKey = 'conventionEditorActiveTab';
+
+  // Effect to load and set active tab from localStorage on initial mount (client-side)
+  useEffect(() => {
+    const storedTab = localStorage.getItem(localStorageKey);
+    if (storedTab) {
+      const tabIndex = parseInt(storedTab, 10);
+      // Assuming 2 tabs (0 and 1). Validate against the actual number of tabs if it can change.
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 1) { 
+        setActiveTab(tabIndex);
+        console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
+      }
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  const [basicInfoData, setBasicInfoData] =
+    useState<BasicInfoFormData>(() => {
+      const { priceTiers, priceDiscounts, id, ...basicDataFromInitial } = initialConventionData || {};
+      return {
+        ...initialBasicFormData,
+        ...basicDataFromInitial,
+      };
     });
 
+  const [pricingTabData, setPricingTabData] = useState<PricingTabData>(() => ({
+    priceTiers: initialConventionData?.priceTiers || [],
+    priceDiscounts: initialConventionData?.priceDiscounts || [],
+  }));
+  
+  const conventionId = initialConventionData?.id;
+  console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
+
   useEffect(() => {
-    // If initialData is provided (editing), update state
     if (initialConventionData) {
-      setConventionDataState(prev => ({ ...prev, ...initialConventionData }));
+      const { priceTiers, priceDiscounts, id, ...basicDataFromInitial } = initialConventionData;
+      setBasicInfoData(prev => ({ ...initialBasicFormData, ...prev, ...basicDataFromInitial }));
+      setPricingTabData({
+        priceTiers: initialConventionData.priceTiers || [],
+        priceDiscounts: initialConventionData.priceDiscounts || [],
+      });
+    } else {
+      setBasicInfoData(initialBasicFormData);
+      setPricingTabData({ priceTiers: [], priceDiscounts: [] });
     }
   }, [initialConventionData]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+    try {
+      localStorage.setItem(localStorageKey, newValue.toString());
+      console.log(`[ConventionEditorTabs] Saved active tab ${newValue} to localStorage.`);
+    } catch (error) {
+      console.warn('[ConventionEditorTabs] Could not save active tab to localStorage:', error);
+    }
   };
 
-  const handleFormChange = (
+  const handleBasicInfoFormChange = (
     fieldName: keyof BasicInfoFormData,
     value: any
   ) => {
-    setConventionDataState((prevData) => ({
+    setBasicInfoData((prevData) => ({
       ...prevData,
       [fieldName]: value,
     }));
   };
+  
+  const handlePricingDataChange = (data: PricingTabData) => {
+    setPricingTabData(data);
+  };
 
   const handleSaveConvention = async () => {
-    // TODO: Add full validation before calling onSave
-    console.log('Saving convention data:', conventionDataState);
-    await onSave(conventionDataState);
+    const fullDataToSave: Partial<ConventionDataForEditor> = {
+      ...basicInfoData,
+      id: conventionId,
+      priceTiers: pricingTabData.priceTiers,
+      priceDiscounts: pricingTabData.priceDiscounts,
+    };
+    console.log('Saving combined convention data:', fullDataToSave);
+    await onSave(fullDataToSave);
   };
 
   return (
@@ -102,19 +160,25 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="Convention editor tabs">
           <Tab label="Basic Info & Series" {...allyProps(0)} />
-          {/* Future tabs will be added here */}
+          <Tab label="Pricing" {...allyProps(1)} />
         </Tabs>
       </Box>
 
       <TabPanel value={activeTab} index={0}>
         <BasicInfoTab
-          initialData={conventionDataState}
-          onFormChange={handleFormChange}
+          initialData={basicInfoData}
+          onFormChange={handleBasicInfoFormChange}
           isEditing={isEditing}
         />
       </TabPanel>
 
-      {/* Other TabPanels will go here */}
+      <TabPanel value={activeTab} index={1}>
+        <PricingTab
+          conventionId={conventionId}
+          value={pricingTabData}
+          onChange={handlePricingDataChange}
+        />
+      </TabPanel>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2, mt: 2, gap: 2, borderTop: 1, borderColor: 'divider' }}>
         <Button variant="outlined" onClick={onCancel} disabled={isSaving}>

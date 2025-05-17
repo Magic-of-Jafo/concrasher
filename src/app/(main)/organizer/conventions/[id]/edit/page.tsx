@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import ConventionSeriesSelector from '@/components/ConventionSeriesSelector';
 import ConventionEditorTabs from '@/components/organizer/convention-editor/ConventionEditorTabs';
-import { type BasicInfoFormData } from '@/lib/validators';
+import { type BasicInfoFormData, type PriceTier, type PriceDiscount } from '@/lib/validators';
 
 // Define ConventionSeries interface locally
 interface ConventionSeries {
@@ -24,9 +24,16 @@ interface ConventionSeries {
   logoUrl?: string;
 }
 
-// This page-level initialFormData is used if creating a new convention directly on this page (though new/page.tsx is typical)
-// or as a base before loading existing data.
-const pageInitialFormData: BasicInfoFormData = {
+// This interface will hold the complete data for the convention being edited on this page
+interface PageConventionData extends BasicInfoFormData {
+  id?: string; // Convention ID itself
+  priceTiers?: PriceTier[];
+  priceDiscounts?: PriceDiscount[];
+  // Add other top-level fields if the API for fetching a single convention returns more
+}
+
+// pageInitialFormData is more of a base for BasicInfo, might not need it if PageConventionData starts undefined
+const initialBasicInfoValues: BasicInfoFormData = {
   name: '',
   slug: '',
   startDate: null,
@@ -34,32 +41,35 @@ const pageInitialFormData: BasicInfoFormData = {
   isOneDayEvent: false,
   isTBD: false,
   city: '',
-  state: '',
+  stateName: '', // Changed from state to stateName for consistency with BasicInfoFormSchema
+  stateAbbreviation: '', // Added for consistency
   country: '',
-  descriptionShort: null, // Align with ConventionEditorTabs initial state
-  descriptionMain: null,  // Align with ConventionEditorTabs initial state
-  seriesId: null,
-  newSeriesName: '', // Align with ConventionEditorTabs initial state
+  descriptionShort: undefined,
+  descriptionMain: undefined,
+  seriesId: undefined,
+  newSeriesName: '',
 };
 
 interface NewSeriesData extends Omit<ConventionSeries, 'id'> {}
 
-export default function ConventionEditPage({ params }: { params: { id?: string } }) {
+export default function ConventionEditPage({ params }: { params: { id: string } }) { // params.id is expected to be a string here
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const isEditing = !!params.id;
+  const isEditing = true; // Since params.id is required for this page
   
-  const [currentStep, setCurrentStep] = useState<'selectSeries' | 'editDetails'>(isEditing ? 'editDetails' : 'selectSeries');
-  // conventionFormData on page level is for loading initial data and series selection
-  const [conventionFormData, setConventionFormData] = useState<BasicInfoFormData>(pageInitialFormData);
-  const [isLoading, setIsLoading] = useState(isEditing);
+  const [currentStep, setCurrentStep] = useState<'selectSeries' | 'editDetails'>('editDetails');
+  
+  // State to hold all convention data for the editor tabs
+  const [conventionPageData, setConventionPageData] = useState<PageConventionData | undefined>(undefined);
+  
+  const [isLoading, setIsLoading] = useState(true); // Start true if editing
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seriesError, setSeriesError] = useState<string | null>(null);
 
   // Load existing convention data if editing
   useEffect(() => {
-    if (isEditing && params.id) {
+    if (params.id) {
       const loadConvention = async () => {
         setIsLoading(true);
         try {
@@ -68,45 +78,50 @@ export default function ConventionEditPage({ params }: { params: { id?: string }
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to load convention');
           }
-          const loadedConvention = await response.json(); // Renamed for clarity
-          setConventionFormData({
-            name: loadedConvention.name || '',
-            slug: loadedConvention.slug || '',
-            startDate: loadedConvention.startDate ? new Date(loadedConvention.startDate) : null,
-            endDate: loadedConvention.endDate ? new Date(loadedConvention.endDate) : null,
-            isOneDayEvent: loadedConvention.isOneDayEvent || false,
-            isTBD: loadedConvention.isTBD || false,
-            city: loadedConvention.city || '',
-            // Prefer stateAbbreviation, fallback to state, then empty string
-            state: loadedConvention.stateAbbreviation || loadedConvention.state || '', 
-            country: loadedConvention.country || '',
-            descriptionShort: loadedConvention.descriptionShort,
-            descriptionMain: loadedConvention.descriptionMain,
-            seriesId: loadedConvention.seriesId, // Critical field
-            newSeriesName: '', 
+          const loadedApiConvention = await response.json(); // Data from API
+          
+          setConventionPageData({
+            ...initialBasicInfoValues, // Start with all required fields
+            id: params.id,
+            name: loadedApiConvention.name || '',
+            slug: loadedApiConvention.slug || '',
+            startDate: loadedApiConvention.startDate ? new Date(loadedApiConvention.startDate) : null,
+            endDate: loadedApiConvention.endDate ? new Date(loadedApiConvention.endDate) : null,
+            isOneDayEvent: loadedApiConvention.isOneDayEvent || false,
+            isTBD: loadedApiConvention.isTBD || false,
+            city: loadedApiConvention.city || '',
+            stateName: loadedApiConvention.stateName || loadedApiConvention.stateAbbreviation || '',
+            stateAbbreviation: loadedApiConvention.stateAbbreviation || '',
+            country: loadedApiConvention.country || '',
+            descriptionShort: loadedApiConvention.descriptionShort,
+            descriptionMain: loadedApiConvention.descriptionMain,
+            seriesId: loadedApiConvention.conventionSeriesId || loadedApiConvention.seriesId,
+            priceTiers: loadedApiConvention.priceTiers || [], 
+            priceDiscounts: loadedApiConvention.priceDiscounts || [],
           });
           
-          // If editing and no seriesId, force series selection. Otherwise, go to details.
-          if (loadedConvention.seriesId) {
+          if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {
             setCurrentStep('editDetails');
           } else {
-            setCurrentStep('selectSeries'); // Force series selection if missing
+            setCurrentStep('selectSeries');
           }
 
         } catch (err: any) {
           setError(err.message || 'Failed to load convention data.');
-          setCurrentStep('editDetails'); // Fallback to details view on error to avoid blocking UI
+          setCurrentStep('editDetails'); 
         } finally {
           setIsLoading(false);
         }
       };
       loadConvention();
-    } else if (!isEditing) {
-      // For new conventions (if this page were used for it, though new/page.tsx is standard)
-      setCurrentStep('selectSeries');
-      setIsLoading(false); 
+    } else {
+      // This case should ideally not be reached if params.id is guaranteed by routing for an edit page.
+      // If it can be reached, redirect or show an error.
+      setError('Convention ID is missing. Cannot edit.');
+      setIsLoading(false);
+      // router.push('/organizer/conventions'); // Or some error page
     }
-  }, [isEditing, params.id]); // Removed 'router' from dependencies as it's stable
+  }, [params.id]);
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -119,17 +134,20 @@ export default function ConventionEditPage({ params }: { params: { id?: string }
 
   const handleExistingSeriesSelected = (selectedSeriesId: string | null) => {
     if (selectedSeriesId) {
-      setConventionFormData(prevData => ({
-        ...prevData,
+      setConventionPageData(prevData => ({
+        ...(prevData || initialBasicInfoValues), // Ensure prevData is not undefined and spread initial values first
+        id: prevData?.id, // Preserve existing id if any
+        priceTiers: prevData?.priceTiers || [],
+        priceDiscounts: prevData?.priceDiscounts || [],
         seriesId: selectedSeriesId,
-      }));
+      } as PageConventionData));
       setCurrentStep('editDetails');
       setSeriesError(null);
     }
   };
 
   const handleNewSeriesCreated = async (newSeriesData: NewSeriesData) => {
-    setIsSaving(true); // Use main isSaving state
+    setIsSaving(true); 
     setSeriesError(null);
     try {
       const response = await fetch('/api/convention-series', {
@@ -144,133 +162,123 @@ export default function ConventionEditPage({ params }: { params: { id?: string }
       }
       const createdSeries: ConventionSeries = await response.json();
 
-      setConventionFormData(prevData => ({
-        ...prevData,
+      setConventionPageData(prevData => ({
+        ...(prevData || initialBasicInfoValues),
+        id: prevData?.id, // Preserve existing id
+        priceTiers: prevData?.priceTiers || [],
+        priceDiscounts: prevData?.priceDiscounts || [],
         seriesId: createdSeries.id,
-      }));
+      } as PageConventionData));
       setCurrentStep('editDetails');
     } catch (err: any) {
       setSeriesError(err.message || 'An unexpected error occurred while creating the series.');
     } finally {
-      setIsSaving(false); // Reset main isSaving state
+      setIsSaving(false);
     }
   };
 
-  // This function is now the callback for ConventionEditorTabs' save button
-  const handleSubmitConvention = async (dataFromTabs: BasicInfoFormData) => {
+  const handleSubmitConvention = async (dataFromTabs: Partial<PageConventionData>) => {
     setIsSaving(true);
     setError(null);
     
-    // dataFromTabs is BasicInfoFormData.
-    const dataToSubmit: BasicInfoFormData = { ...dataFromTabs }; 
+    const currentData = conventionPageData || initialBasicInfoValues;
+
+    const payload: BasicInfoFormData = {
+        name: dataFromTabs.name ?? currentData.name ?? '',
+        slug: dataFromTabs.slug ?? currentData.slug ?? '',
+        startDate: (dataFromTabs.startDate !== undefined ? dataFromTabs.startDate : currentData.startDate) || null,
+        endDate: (dataFromTabs.endDate !== undefined ? dataFromTabs.endDate : currentData.endDate) || null,
+        isOneDayEvent: dataFromTabs.isOneDayEvent ?? currentData.isOneDayEvent ?? false,
+        isTBD: dataFromTabs.isTBD ?? currentData.isTBD ?? false,
+        city: dataFromTabs.city ?? currentData.city ?? '',
+        stateName: dataFromTabs.stateName ?? currentData.stateName ?? '',
+        stateAbbreviation: dataFromTabs.stateAbbreviation ?? currentData.stateAbbreviation ?? '',
+        country: dataFromTabs.country ?? currentData.country ?? '',
+        descriptionShort: dataFromTabs.descriptionShort ?? currentData.descriptionShort,
+        descriptionMain: dataFromTabs.descriptionMain ?? currentData.descriptionMain,
+        seriesId: dataFromTabs.seriesId ?? currentData.seriesId,
+        newSeriesName: dataFromTabs.newSeriesName, 
+    };
+
+    if (payload.isTBD) {
+      payload.isOneDayEvent = false;
+    }
     
-    // If isTBD is true, isOneDayEvent must be false.
-    // Dates (startDate, endDate) are preserved as per form input regardless of isTBD state.
-    // The API will handle date validation conditionally based on isTBD.
-    if (dataToSubmit.isTBD) {
-      dataToSubmit.isOneDayEvent = false;
-    }
-    // No longer nullifying startDate and endDate here if isTBD is true.
-
-    const payload: any = { ...dataToSubmit };
-
-    if (!isEditing) {
-      payload.status = 'DRAFT'; 
-    }
+    // Note: The main save button in ConventionEditorTabs saves basic info. Pricing tab has its own save.
+    // This handleSubmitConvention is for the main save button.
 
     try {
-      const url = isEditing 
-        ? `/api/organizer/conventions/${params.id}`
-        : '/api/organizer/conventions'; 
-      
+      const url = `/api/organizer/conventions/${params.id}`;
       const response = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload), 
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} convention`);
+        throw new Error(errorData.error || `Failed to update convention`);
       }
 
       const conventionResult = await response.json();
-      router.push('/organizer/conventions'); 
+      // Optionally, update conventionPageData with conventionResult if API returns full updated object
+      // setConventionPageData(prev => ({...prev, ...conventionResult, id: params.id }));
+      router.push('/organizer/conventions?toastMessage=Convention+updated+successfully'); // Or back to conventions list
     } catch (err: any) {
-      console.error('Client-side error during handleSubmitConvention:', err); // Enhanced logging
-      const errorMessage = err.response?.data?.error || err.message || 'An unexpected error occurred.';
-      setError(errorMessage);
+      console.error('Client-side error during handleSubmitConvention:', err);
+      setError(err.message || 'Failed to update convention. Please check console for details.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    router.back();
+    router.push('/organizer/conventions');
   };
 
-  if (sessionStatus === 'loading' || (isLoading && isEditing)) { // Only show main loader if actually loading existing
+  if (isLoading && !conventionPageData) { // Show loading only if data isn't there yet
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
+
+  if (sessionStatus === 'loading') {
+    return <p>Loading session...</p>; 
+  }
   
-  // This check might be redundant if session check redirects, but good for safety.
-  if (sessionStatus !== 'authenticated' || !session?.user?.roles?.includes('ORGANIZER')) {
-    // Or show an unauthorized message, redirect is handled by useEffect
-    return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-        <Typography>Loading session or redirecting...</Typography>
-        <CircularProgress />
-      </Container>
-    );
+  if (sessionStatus === 'unauthenticated' || (sessionStatus === 'authenticated' && !session?.user?.roles?.includes('ORGANIZER'))) {
+    return <p>Redirecting...</p>;
+  }
+
+  if (error && !conventionPageData) { // If loading failed and no data, show error prominently
+    return <Alert severity="error">{error}</Alert>;
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 4 } }}>
+    <Container maxWidth="lg">
+      <Paper elevation={3} sx={{ p: 3, mt: 3, mb: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          {isEditing ? 'Edit Convention' : 'Create New Convention'}
+          Edit Convention
         </Typography>
-
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-        {/* Show series selector if currentStep is 'selectSeries' (for new or existing without seriesId) */}
-        {currentStep === 'selectSeries' ? (
-          <Paper elevation={2} sx={{ p: 3, maxWidth: 700, mx: 'auto', mb: 3 }}>
-            <Typography variant="h6" gutterBottom align="center">
-              {isEditing && !conventionFormData.seriesId 
-                ? 'Link Convention to Series' 
-                : 'Link or Create Convention Series'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph align="center">
-              {isEditing && !conventionFormData.seriesId
-                ? 'This convention is not currently linked to a series. Please select an existing series or create a new one.'
-                : 'Every convention must belong to a series. Select an existing series or create a new one to begin.'}
-            </Typography>
-            {seriesError && <Alert severity="error" sx={{ mb: 2 }}>{seriesError}</Alert>}
-            <ConventionSeriesSelector 
-              onSeriesSelect={handleExistingSeriesSelected}
-              onNewSeriesCreate={handleNewSeriesCreated}
-              // Consider passing currentSeriesId if selector can use it for pre-selection,
-              // though if in 'selectSeries' step, seriesId on conventionFormData is likely null.
-              // currentSeriesId={conventionFormData.seriesId} 
-            />
-          </Paper>
-        ) : (
-          // Render ConventionEditorTabs once series is selected/exists or if editing with a seriesId
-          <> 
-            <ConventionEditorTabs 
-              initialConventionData={conventionFormData}
-              isEditing={isEditing}
-              onSave={handleSubmitConvention} // Pass the refactored submit handler
-              isSaving={isSaving} // Pass the page's saving state
-              onCancel={handleCancel} // Pass the cancel handler
-            />
-          </>
+        {currentStep === 'selectSeries' && conventionPageData && (
+          <ConventionSeriesSelector 
+            onSeriesSelect={handleExistingSeriesSelected}
+            onNewSeriesCreate={handleNewSeriesCreated}
+            initialSeriesId={conventionPageData?.seriesId}
+          />
         )}
+        {currentStep === 'editDetails' && conventionPageData && (
+          <ConventionEditorTabs
+            initialConventionData={conventionPageData} 
+            isEditing={isEditing}
+            onSave={handleSubmitConvention} 
+            isSaving={isSaving}
+            onCancel={handleCancel}
+          />
+        )}
+         {error && currentStep === 'editDetails' && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>} 
       </Paper>
     </Container>
   );

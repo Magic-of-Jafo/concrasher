@@ -1,0 +1,7 @@
+name,email,hashedPassword,roles,bio,emailVerified,image,resetToken,resetTokenExpiry 
+Jason Fields,magicjafo@gmail.com,$2b$12$Yn.MbICaIrLLQz/QZWiTfuWpsG4mvrRp0D8mflamaguxhl6whSNmW,USER|ADMIN,,,,,
+Joe Blow,jafo@getjafo.com,$2b$10$7X0eksdDHhpUWZzn1Mp1KuNlYeyif/REXYyFqiBcF3s.nv7Fya.Ya,USER|TALENT|ORGANIZER,,,,,
+Test01,test01@example.com,$2b$10$7X0eksdDHhpUWZzn1Mp1KuNlYeyif/REXYyFqiBcF3s.nv7Fya.Ya,USER,,,,,
+Test02,test02@example.com,$2b$10$7X0eksdDHhpUWZzn1Mp1KuNlYeyif/REXYyFqiBcF3s.nv7Fya.Ya,USER,,,,,
+Test03,test03@example.com,$2b$10$7X0eksdDHhpUWZzn1Mp1KuNlYeyif/REXYyFqiBcF3s.nv7Fya.Ya,USER,,,,,
+Test04,test04@example.com,$2b$10$7X0eksdDHhpUWZzn1Mp1KuNlYeyif/REXYyFqiBcF3s.nv7Fya.Ya,USER,,,,,

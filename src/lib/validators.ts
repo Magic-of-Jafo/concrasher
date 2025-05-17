@@ -70,8 +70,8 @@ export const LoginSchema = z.object({
 });
 
 export const ProfileSchema = z.object({
-  name: z.string().min(1, { message: "Display name is required" }).optional(), // Assuming name can be empty if user wants to remove it, but if provided, not empty.
-  bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional(),
+  name: z.string().min(1, { message: "Display name is required" }).optional().nullable().transform(val => val === null ? undefined : val),
+  bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional().nullable().transform(val => val === null ? undefined : val),
 });
 
 export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;
@@ -93,7 +93,7 @@ export const ConventionCreateSchema = z.object({
   conventionSeriesId: z.string().cuid({ message: 'Invalid Series ID' }).optional(),
   status: ConventionStatusEnum,
   bannerImageUrl: z.string().optional().or(z.literal('')),
-  galleryImageUrls: z.array(z.string()).optional().default([]),
+  galleryImageUrls: z.array(z.string().url({ message: 'Each gallery image must be a valid URL' })).optional().default([]),
 });
 
 export const ConventionUpdateSchema = ConventionCreateSchema.partial().extend({
@@ -158,4 +158,35 @@ export const BasicInfoFormSchema = z.object({
   path: ['stateName'],
 });
 
-export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>; 
+export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>;
+
+// --- Pricing Tab Schemas ---
+
+export const PriceTierSchema = z.object({
+  id: z.string().cuid().optional(), // New tiers may not have an id yet
+  conventionId: z.string().cuid().optional(),
+  label: z.string().min(1, 'Tier label is required'),
+  amount: z.preprocess((val) => (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().min(0, 'Amount must be non-negative')
+  ),
+  order: z.number().int().min(0),
+});
+
+export const PriceDiscountSchema = z.object({
+  id: z.string().cuid().optional(),
+  conventionId: z.string().cuid().optional(),
+  cutoffDate: z.coerce.date({ required_error: 'Discount date is required' }),
+  priceTierId: z.string().cuid({ message: 'Price Tier is required' }),
+  discountedAmount: z.preprocess((val) => (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().min(0, 'Discounted amount must be non-negative')
+  ),
+});
+
+export const PricingTabSchema = z.object({
+  priceTiers: z.array(PriceTierSchema).min(1, 'At least one price tier is required'),
+  priceDiscounts: z.array(PriceDiscountSchema),
+});
+
+export type PriceTier = z.infer<typeof PriceTierSchema>;
+export type PriceDiscount = z.infer<typeof PriceDiscountSchema>;
+export type PricingTabData = z.infer<typeof PricingTabSchema>; 

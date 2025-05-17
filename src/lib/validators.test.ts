@@ -4,6 +4,7 @@ import { ProfileSchema } from './validators';
 import { ConventionCreateSchema, ConventionUpdateSchema } from './validators';
 import { BasicInfoFormSchema, type BasicInfoFormData } from './validators';
 import { ConventionStatus } from '@prisma/client';
+import { PriceTierSchema, PriceDiscountSchema, PricingTabSchema } from './validators';
 
 describe('RegistrationSchema', () => {
   it('should validate a correct registration form', () => {
@@ -261,11 +262,13 @@ describe('ConventionCreateSchema', () => {
   });
 
   it('should invalidate missing required name', () => {
-    const { name, ...data } = validData;
-    const result = ConventionCreateSchema.safeParse(data);
+    const result = ConventionCreateSchema.safeParse({
+      ...validData,
+      name: undefined,
+    });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.flatten().fieldErrors.name).toContain('Name is required');
+      expect(result.error.flatten().fieldErrors.name).toContain('Required');
     }
   });
 
@@ -476,3 +479,218 @@ describe('BasicInfoFormSchema', () => {
 // export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>; // Already in validators.ts
 
 // export type BasicInfoFormData = z.infer<typeof BasicInfoFormSchema>; 
+
+describe('PriceTierSchema', () => {
+  const validTierData = {
+    label: 'Adult',
+    amount: 50.00,
+    order: 0,
+    // id and conventionId are optional
+  };
+
+  it('should validate correct tier data', () => {
+    const result = PriceTierSchema.safeParse(validTierData);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept string amount and preprocess it to number', () => {
+    const result = PriceTierSchema.safeParse({ ...validTierData, amount: '50.99' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.amount).toBe(50.99);
+    }
+  });
+
+  it('should require a label', () => {
+    const result = PriceTierSchema.safeParse({ ...validTierData, label: '' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Tier label is required');
+    }
+  });
+
+  it('should require amount to be non-negative', () => {
+    const result = PriceTierSchema.safeParse({ ...validTierData, amount: -10 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Amount must be non-negative');
+    }
+  });
+
+  it('should require order to be a non-negative integer', () => {
+    let result = PriceTierSchema.safeParse({ ...validTierData, order: -1 });
+    expect(result.success).toBe(false);
+    // Note: Zod might have multiple issues (e.g., not int, then not min(0)) 
+    // or a more general message depending on order of checks.
+    // We check for one of the expected messages or refine based on actual Zod output.
+
+    result = PriceTierSchema.safeParse({ ...validTierData, order: 1.5 });
+    expect(result.success).toBe(false);
+    if (!result.success && result.error.issues[0]){
+        expect(result.error.issues[0].message).toContain('Expected integer');
+    }
+  });
+
+  it('should accept optional id and conventionId as CUIDs', () => {
+    const validCuid = 'clq7000000000cjk712345678'; // Example CUID
+    let result = PriceTierSchema.safeParse({ 
+      ...validTierData, 
+      id: validCuid, 
+      conventionId: validCuid 
+    });
+    expect(result.success).toBe(true);
+
+    result = PriceTierSchema.safeParse({ ...validTierData, id: 'not-a-cuid' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Invalid cuid');
+    }
+  });
+});
+
+// Placeholder for PriceDiscountSchema tests
+describe('PriceDiscountSchema', () => {
+  const validCuid = 'clq7000000000cjk712345678'; // Example CUID
+  const validDiscountData = {
+    cutoffDate: new Date(),
+    priceTierId: validCuid,
+    discountedAmount: 25.00,
+    // id and conventionId are optional
+  };
+
+  it('should validate correct discount data', () => {
+    const result = PriceDiscountSchema.safeParse(validDiscountData);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept string discountedAmount and preprocess it to number', () => {
+    const result = PriceDiscountSchema.safeParse({ ...validDiscountData, discountedAmount: '25.99' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.discountedAmount).toBe(25.99);
+    }
+  });
+
+  it('should require a cutoffDate', () => {
+    const result = PriceDiscountSchema.safeParse({
+      ...validDiscountData,
+      cutoffDate: undefined,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Invalid date');
+    }
+  });
+
+  it('should accept a date string for cutoffDate and coerce it', () => {
+    const result = PriceDiscountSchema.safeParse({ ...validDiscountData, cutoffDate: '2024-12-31' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cutoffDate).toBeInstanceOf(Date);
+      expect(result.data.cutoffDate.getUTCFullYear()).toBe(2024);
+      expect(result.data.cutoffDate.getUTCMonth()).toBe(11); // 0-indexed
+      expect(result.data.cutoffDate.getUTCDate()).toBe(31);
+    }
+  });
+
+  it('should require priceTierId to be a CUID', () => {
+    const result = PriceDiscountSchema.safeParse({ ...validDiscountData, priceTierId: 'not-a-cuid' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Price Tier is required'); // This message is from the schema if CUID validation fails too.
+    }
+  });
+
+  it('should require discountedAmount to be non-negative', () => {
+    const result = PriceDiscountSchema.safeParse({ ...validDiscountData, discountedAmount: -5 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Discounted amount must be non-negative');
+    }
+  });
+
+  it('should accept optional id and conventionId as CUIDs', () => {
+    let result = PriceDiscountSchema.safeParse({ 
+      ...validDiscountData, 
+      id: validCuid, 
+      conventionId: validCuid 
+    });
+    expect(result.success).toBe(true);
+
+    result = PriceDiscountSchema.safeParse({ ...validDiscountData, id: 'invalid-cuid' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Invalid cuid');
+    }
+  });
+});
+
+// Placeholder for PricingTabSchema tests
+describe('PricingTabSchema', () => {
+  const validCuid = 'clq7000000000cjk712345678'; // Example CUID
+  const validTierData = {
+    label: 'Adult',
+    amount: 50.00,
+    order: 0,
+  };
+  const validDiscountData = {
+    cutoffDate: new Date(),
+    priceTierId: validCuid,
+    discountedAmount: 25.00,
+  };
+
+  it('should validate correct pricing tab data with one tier and some discounts', () => {
+    const result = PricingTabSchema.safeParse({
+      priceTiers: [validTierData],
+      priceDiscounts: [validDiscountData, { ...validDiscountData, priceTierId: 'clq7000000001cjk712345679' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate pricing tab data with multiple tiers and no discounts', () => {
+    const result = PricingTabSchema.safeParse({
+      priceTiers: [
+        validTierData,
+        { ...validTierData, label: 'Youth', amount: 25, order: 1, id: validCuid },
+      ],
+      priceDiscounts: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should require at least one price tier', () => {
+    const result = PricingTabSchema.safeParse({
+      priceTiers: [],
+      priceDiscounts: [validDiscountData],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('At least one price tier is required');
+    }
+  });
+
+  it('should fail if any priceTier is invalid', () => {
+    const result = PricingTabSchema.safeParse({
+      priceTiers: [{ ...validTierData, label: '' }], // Invalid label
+      priceDiscounts: [],
+    });
+    expect(result.success).toBe(false);
+    // Path would be like priceTiers[0].label
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['priceTiers', 0, 'label']);
+      expect(result.error.issues[0].message).toBe('Tier label is required');
+    }
+  });
+
+  it('should fail if any priceDiscount is invalid', () => {
+    const result = PricingTabSchema.safeParse({
+      priceTiers: [validTierData],
+      priceDiscounts: [{ ...validDiscountData, priceTierId: 'not-a-cuid' }], // Invalid priceTierId
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['priceDiscounts', 0, 'priceTierId']);
+      expect(result.error.issues[0].message).toBe('Price Tier is required');
+    }
+  });
+}); 

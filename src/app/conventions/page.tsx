@@ -28,16 +28,20 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Convert search params to ConventionSearchParams using useMemo to prevent unnecessary recalculations
-  const params = useMemo(() => ({
-    limit: Number(currentSearchParams.get('limit')) || 10,
-    query: currentSearchParams.get('query') || '',
-    city: currentSearchParams.get('city') || '',
-    state: currentSearchParams.get('state') || '',
-    country: currentSearchParams.get('country') || '',
-    startDate: currentSearchParams.get('startDate') || undefined,
-    endDate: currentSearchParams.get('endDate') || undefined,
-    status: [status],
-  }), [currentSearchParams, status]);
+  const params = useMemo(() => {
+    const limitFromURL = currentSearchParams.get('limit');
+    const parsedLimit = Number(limitFromURL);
+    return {
+      limit: parsedLimit || 200, 
+      query: currentSearchParams.get('query') || '',
+      city: currentSearchParams.get('city') || '',
+      state: currentSearchParams.get('state') || '',
+      country: currentSearchParams.get('country') || '',
+      startDate: currentSearchParams.get('startDate') || undefined,
+      endDate: currentSearchParams.get('endDate') || undefined,
+      status: [status],
+    };
+  }, [currentSearchParams, status]);
 
   const handleFilterChange = useCallback((newFilters: ConventionSearchParams) => {
     const params = new URLSearchParams(currentSearchParams.toString());
@@ -79,11 +83,30 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
       try {
         const response = await getConventions(params);
         if (isMounted) {
-          setConventions(response.items);
+          let fetchedItems = response.items;
+
+          if (params.status && params.status.includes(ConventionStatus.PUBLISHED)) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+
+            fetchedItems = fetchedItems.filter(conv => {
+              if (!conv.endDate) return true; 
+              const endDate = new Date(conv.endDate);
+              endDate.setHours(0,0,0,0);
+              return endDate >= today;
+            });
+
+            fetchedItems.sort((a, b) => {
+              if (!a.startDate) return 1; 
+              if (!b.startDate) return -1;
+              return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+            });
+          }
+          
+          setConventions(fetchedItems);
           setIsInitialLoading(false);
         }
       } catch (error) {
-        console.error('Failed to fetch conventions:', error);
         if (isMounted) {
           setIsInitialLoading(false);
         }

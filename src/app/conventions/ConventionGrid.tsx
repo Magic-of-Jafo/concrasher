@@ -12,6 +12,22 @@ interface ConventionGridProps {
   onPageChange?: (page: number) => void;
 }
 
+// Helper function to format Date object to DD Mmm YY using UTC methods
+const formatDateToDDMonYY_UTC = (date: Date | string | null): string => {
+  if (!date) {
+    return "N/A";
+  }
+  const d = new Date(date);
+  if (isNaN(d.getTime())) {
+    return "N/A";
+  }
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[d.getUTCMonth()];
+  const year = String(d.getUTCFullYear()).slice(-2);
+  return `${day} ${month} ${year}`;
+};
+
 export default function ConventionGrid({ 
   conventions = [], 
   loading = false,
@@ -23,14 +39,39 @@ export default function ConventionGrid({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const getDaysUntilStart = (startDate: Date) => {
+  const getConventionStatusText = (startDate: Date | null, endDate: Date | null) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    today.setHours(0, 0, 0, 0); // Compare dates only
+
+    if (!startDate) return "Date TBD";
+
     const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0); // Reset time to start of day
+    start.setHours(0, 0, 0, 0);
+
+    const end = endDate ? new Date(endDate) : new Date(startDate); // Assume single day if no end date
+    end.setHours(0,0,0,0);
+
+
+    if (today >= start && today <= end) {
+      return "Happening Now!";
+    }
+
     const diffTime = start.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+
+    if (diffDays < 0) {
+      // This case should ideally be filtered out, but as a fallback:
+      return "Event Over"; 
+    } else if (diffDays === 0) {
+      // This means startDate is today, but it's not "Happening Now!" yet (e.g. event starts later today)
+      // Or if an event is single-day and already happened today but not marked as "Happening Now"
+      // Let's refine this: if it's today and not "Happening Now", it means it starts today.
+      return "Starts Today";
+    } else if (diffDays === 1) {
+      return "Starts Tomorrow";
+    } else {
+      return `In ${diffDays} Days`;
+    }
   };
 
   if (loading) {
@@ -63,19 +104,7 @@ export default function ConventionGrid({
     <Box sx={{ width: '100%' }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {conventions.map((convention) => {
-          let daysText = "Date TBD";
-          if (convention.startDate) {
-            const days = getDaysUntilStart(new Date(convention.startDate)); // Ensure it's a Date object
-            if (days < 0) {
-              daysText = "Event Started";
-            } else if (days === 0) {
-              daysText = "Today";
-            } else if (days === 1) {
-              daysText = "1 Day";
-            } else {
-              daysText = `${days} Days`;
-            }
-          }
+          const daysText = getConventionStatusText(convention.startDate, convention.endDate);
           const city = convention.city || '';
           const state = convention.stateAbbreviation || '';
           const country = convention.country || '';
@@ -105,7 +134,7 @@ export default function ConventionGrid({
                     width: isMobile ? '100%' : '16.66%',
                     minWidth: isMobile ? 'auto' : '100px'
                   }}>
-                    <Typography variant="subtitle1" color="primary">
+                    <Typography variant="subtitle1" color={daysText === "Happening Now!" ? "success.main" : "primary"}>
                       {daysText}
                     </Typography>
                   </Box>
@@ -122,7 +151,7 @@ export default function ConventionGrid({
                     minWidth: isMobile ? 'auto' : '130px'
                   }}>
                     <Typography variant="body1">
-                      {convention.startDate ? new Date(convention.startDate).toLocaleDateString() : "N/A"}
+                      {formatDateToDDMonYY_UTC(convention.startDate)}
                     </Typography>
                   </Box>
                   <Box sx={{ 

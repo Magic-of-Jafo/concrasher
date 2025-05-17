@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useQuery } from '@tanstack/react-query';
 import ConventionList from "./ConventionList";
@@ -13,6 +13,8 @@ import {
   CircularProgress,
   Alert as MuiAlert,
   Button,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 
@@ -24,44 +26,97 @@ enum Role {
   ADMIN = 'ADMIN'
 }
 
-// Define Convention type locally
+// Define ConventionStatus enum locally if not already available from Prisma Client in this context
+enum ConventionStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  PAST = 'PAST',
+  CANCELLED = 'CANCELLED'
+}
+
+// Define Convention type locally - Attempting a closer match to Prisma Model
 interface Convention {
   id: string;
   name: string;
   slug: string;
   startDate: Date | null;
   endDate: Date | null;
-  isOneDayEvent: boolean;
-  isTBD: boolean;
   city: string;
-  state: string;
   country: string;
-  descriptionShort: string | null;
-  descriptionMain: string | null;
-  coverImageUrl: string | null;
-  profileImageUrl: string | null;
-  seriesId: string | null;
-  deletedAt: Date | null;
+  venueName: string | null;
+  websiteUrl: string | null;
+  status: ConventionStatus;
+  galleryImageUrls: string[];
   createdAt: Date;
   updatedAt: Date;
+  stateAbbreviation: string | null;
+  stateName: string | null;
+  seriesId: string; // Prisma: No ? so it's required
+  deletedAt: Date | null;
+  coverImageUrl: string | null;
+  descriptionMain: string | null;
+  descriptionShort: string | null;
+  isOneDayEvent: boolean; // Prisma: @default(false)
+  isTBD: boolean;         // Prisma: @default(false)
+  profileImageUrl: string | null;
+  // Explicitly excluding relational fields like: 
+  // series: ConventionSeries
+  // priceTiers: PriceTier[]
+  // priceDiscounts: PriceDiscount[]
 }
 
 // API fetching function for useQuery
-const fetchAllConventionsAPI = async () => {
+const fetchAllConventionsAPI = async (): Promise<Convention[]> => {
   const response = await fetch("/api/organizer/conventions/all-conventions");
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch conventions: ${response.statusText}`);
   }
   const data = await response.json();
-  return data.conventions || [];
+  const conventionsRaw: any[] = data.conventions || [];
+
+  // Parse date strings into Date objects and ensure type conformity
+  return conventionsRaw.map((conv): Convention => ({
+    ...conv,
+    startDate: conv.startDate ? new Date(conv.startDate) : null,
+    endDate: conv.endDate ? new Date(conv.endDate) : null,
+    deletedAt: conv.deletedAt ? new Date(conv.deletedAt) : null,
+    createdAt: conv.createdAt ? new Date(conv.createdAt) : new Date(),
+    updatedAt: conv.updatedAt ? new Date(conv.updatedAt) : new Date(),
+    status: conv.status || ConventionStatus.DRAFT,
+    galleryImageUrls: conv.galleryImageUrls || [],
+    isOneDayEvent: typeof conv.isOneDayEvent === 'boolean' ? conv.isOneDayEvent : false,
+    isTBD: typeof conv.isTBD === 'boolean' ? conv.isTBD : false,
+  }));
 };
 
 export default function OrganizerConventionsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [viewMode, setViewMode] = useState<"active" | "deleted">("active");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('success');
+
+  useEffect(() => {
+    if (searchParams) {
+      const message = searchParams.get('toastMessage');
+      if (message) {
+        setSnackbarMessage(decodeURIComponent(message));
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      }
+    }
+  }, [searchParams, router]);
+
+  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
+  };
 
   // Use React Query to fetch conventions
   const {
@@ -99,6 +154,12 @@ export default function OrganizerConventionsPage() {
   }
 
   const displayedConventions = useMemo(() => {
+    // DEBUG LINE - Log the raw conventions received from the API
+    // Check the structure of one convention, especially startDate and endDate
+    if (allConventions && allConventions.length > 0) {
+      console.log('First convention object from API (in page.tsx):', JSON.stringify(allConventions[0], null, 2));
+    }
+
     if (viewMode === "active") {
       return allConventions.filter(c => c.deletedAt === null);
     }
@@ -169,6 +230,17 @@ export default function OrganizerConventionsPage() {
           />
         </Suspense>
       )}
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 } 

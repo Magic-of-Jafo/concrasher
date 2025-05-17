@@ -56,8 +56,12 @@ export async function GET(
         id: params.id,
         deletedAt: null, // Ensure we don't fetch soft-deleted conventions
       },
-      include: { // Optionally include series if needed by the edit form
+      include: { 
         series: true,
+        priceTiers: true, // Include PriceTiers
+        priceDiscounts: true, // Include PriceDiscounts (though these are more complex to load directly)
+                              // Consider if PriceDiscounts should be a separate fetch or structured differently
+                              // For now, including them to see if it works for the page load.
       }
     });
 
