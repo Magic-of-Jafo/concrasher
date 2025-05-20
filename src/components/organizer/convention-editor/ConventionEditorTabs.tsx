@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Tabs, Tab, Box, Button, CircularProgress } from '@mui/material';
 import { BasicInfoTab } from './BasicInfoTab';
 import { type BasicInfoFormData } from '@/lib/validators';
 import { PricingTab } from './PricingTab';
 import { type PricingTabData, type PriceTier, type PriceDiscount } from '@/lib/validators';
+import VenueHotelTab from './VenueHotelTab';
+import { type VenueHotelTabData, createDefaultVenueHotelTabData } from '@/lib/validators';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -54,6 +56,7 @@ interface ConventionDataForEditor extends BasicInfoFormData {
   id?: string;
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
+  venueHotel?: VenueHotelTabData;
 }
 
 interface ConventionEditorTabsProps {
@@ -71,7 +74,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   isSaving,
   onCancel,
 }) => {
-  console.log('[ConventionEditorTabs] Received initialConventionData:', initialConventionData);
+  // console.log('[ConventionEditorTabs] Received initialConventionData:', initialConventionData);
   const [activeTab, setActiveTab] = useState(0);
 
   const localStorageKey = 'conventionEditorActiveTab';
@@ -81,22 +84,20 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     const storedTab = localStorage.getItem(localStorageKey);
     if (storedTab) {
       const tabIndex = parseInt(storedTab, 10);
-      // Assuming 2 tabs (0 and 1). Validate against the actual number of tabs if it can change.
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 1) { 
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 2) { 
         setActiveTab(tabIndex);
-        console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
+        // console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
       }
     }
   }, []); // Empty dependency array ensures this runs only once on mount
 
-  const [basicInfoData, setBasicInfoData] =
-    useState<BasicInfoFormData>(() => {
-      const { priceTiers, priceDiscounts, id, ...basicDataFromInitial } = initialConventionData || {};
-      return {
-        ...initialBasicFormData,
-        ...basicDataFromInitial,
-      };
-    });
+  const [basicInfoData, setBasicInfoData] = useState<BasicInfoFormData>(() => {
+    const { priceTiers, priceDiscounts, id, venueHotel, ...basicDataFromInitial } = initialConventionData || {};
+    return {
+      ...initialBasicFormData,
+      ...basicDataFromInitial,
+    };
+  });
 
   const [pricingTabData, setPricingTabData] = useState<PricingTabData>(() => ({
     priceTiers: initialConventionData?.priceTiers || [],
@@ -104,27 +105,71 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   }));
   
   const conventionId = initialConventionData?.id;
-  console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
+  // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
+
+  // Memoize the default venue hotel data
+  const defaultVenueHotelData = useMemo(() => createDefaultVenueHotelTabData(), []);
+  
+  const [venueHotelData, setVenueHotelData] = useState<VenueHotelTabData>(() => {
+    const defaultSettings = defaultVenueHotelData;
+    console.log('[ConventionEditorTabs - useState init] defaultSettings.guestsStayAtPrimaryVenue:', defaultSettings.guestsStayAtPrimaryVenue);
+    if (initialConventionData) { // We have an existing convention's data
+      const loadedVH = initialConventionData.venueHotel;
+      console.log('[ConventionEditorTabs - useState init] initialConventionData.venueHotel:', loadedVH);
+      console.log('[ConventionEditorTabs - useState init] loadedVH?.guestsStayAtPrimaryVenue:', loadedVH?.guestsStayAtPrimaryVenue);
+      const finalValue = loadedVH?.guestsStayAtPrimaryVenue ?? false;
+      console.log('[ConventionEditorTabs - useState init] resolved guestsStayAtPrimaryVenue for existing:', finalValue);
+      return {
+        ...defaultSettings, // Apply general defaults for structure
+        ...(loadedVH || {}),   // Spread loaded specifics from initialConventionData.venueHotel
+        guestsStayAtPrimaryVenue: finalValue 
+      };
+    }
+    console.log('[ConventionEditorTabs - useState init] Using full defaultSettings for new convention.');
+    // No initialConventionData (new convention): use all settings from createDefaultVenueHotelTabData()
+    return defaultSettings;
+  });
 
   useEffect(() => {
+    console.log('[ConventionEditorTabs - useEffect] Fired. initialConventionData present?', !!initialConventionData);
     if (initialConventionData) {
-      const { priceTiers, priceDiscounts, id, ...basicDataFromInitial } = initialConventionData;
+      // Restore Basic Info update
+      const { priceTiers, priceDiscounts, id, venueHotel, ...basicDataFromInitial } = initialConventionData;
       setBasicInfoData(prev => ({ ...initialBasicFormData, ...prev, ...basicDataFromInitial }));
+  
+      // Restore Pricing Tab update
       setPricingTabData({
         priceTiers: initialConventionData.priceTiers || [],
         priceDiscounts: initialConventionData.priceDiscounts || [],
       });
+  
+      // Corrected Venue/Hotel Tab update
+      const defaultSettings = defaultVenueHotelData;
+      const loadedVH = venueHotel; // 'venueHotel' was destructured above from initialConventionData
+      console.log('[ConventionEditorTabs - useEffect] defaultSettings.guestsStayAtPrimaryVenue:', defaultSettings.guestsStayAtPrimaryVenue);
+      console.log('[ConventionEditorTabs - useEffect] initialConventionData.venueHotel (loadedVH):', loadedVH);
+      console.log('[ConventionEditorTabs - useEffect] loadedVH?.guestsStayAtPrimaryVenue:', loadedVH?.guestsStayAtPrimaryVenue);
+      const finalValue = loadedVH?.guestsStayAtPrimaryVenue ?? false;
+      console.log('[ConventionEditorTabs - useEffect] resolved guestsStayAtPrimaryVenue for existing:', finalValue);
+      setVenueHotelData({
+        ...defaultSettings,
+        ...(loadedVH || {}),
+        guestsStayAtPrimaryVenue: finalValue
+      });
     } else {
-      setBasicInfoData(initialBasicFormData);
-      setPricingTabData({ priceTiers: [], priceDiscounts: [] });
+      console.log('[ConventionEditorTabs - useEffect] initialConventionData is null/undefined. Resetting forms.');
+      // If initialConventionData is cleared (e.g., switching from edit to new), revert to full defaults
+      setBasicInfoData(initialBasicFormData); // Reset basic info
+      setPricingTabData({ priceTiers: [], priceDiscounts: [] }); // Reset pricing
+      setVenueHotelData(defaultVenueHotelData); // Reset venue/hotel
     }
-  }, [initialConventionData]);
+  }, [initialConventionData, defaultVenueHotelData]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
     try {
       localStorage.setItem(localStorageKey, newValue.toString());
-      console.log(`[ConventionEditorTabs] Saved active tab ${newValue} to localStorage.`);
+      // console.log(`[ConventionEditorTabs] Saved active tab ${newValue} to localStorage.`);
     } catch (error) {
       console.warn('[ConventionEditorTabs] Could not save active tab to localStorage:', error);
     }
@@ -140,9 +185,19 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     }));
   };
   
-  const handlePricingDataChange = (data: PricingTabData) => {
+  const handlePricingDataChange = useCallback((data: PricingTabData) => {
     setPricingTabData(data);
-  };
+  }, []);
+
+  const handleVenueHotelDataChange = useCallback((data: VenueHotelTabData, isValid: boolean) => {
+    setVenueHotelData(data);
+    // console.log("VenueHotelTab data updated. Is valid:", isValid); // For future use with validation state
+  }, []);
+
+  // Dummy handler for onValidationChange, can be expanded later
+  const handleVenueHotelValidationChange = useCallback((isValid: boolean) => {
+    // Here you could, for example, disable the save button if a tab reports invalid data
+  }, []);
 
   const handleSaveConvention = async () => {
     const fullDataToSave: Partial<ConventionDataForEditor> = {
@@ -150,8 +205,8 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       id: conventionId,
       priceTiers: pricingTabData.priceTiers,
       priceDiscounts: pricingTabData.priceDiscounts,
+      venueHotel: venueHotelData,
     };
-    console.log('Saving combined convention data:', fullDataToSave);
     await onSave(fullDataToSave);
   };
 
@@ -161,6 +216,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="Convention editor tabs">
           <Tab label="Basic Info & Series" {...allyProps(0)} />
           <Tab label="Pricing" {...allyProps(1)} />
+          <Tab label="Venue/Hotel" {...allyProps(2)} />
         </Tabs>
       </Box>
 
@@ -177,6 +233,16 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           conventionId={conventionId}
           value={pricingTabData}
           onChange={handlePricingDataChange}
+        />
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={2}>
+        <VenueHotelTab
+          conventionId={conventionId || null}
+          value={venueHotelData}
+          onChange={handleVenueHotelDataChange}
+          onValidationChange={handleVenueHotelValidationChange}
+          disabled={isSaving}
         />
       </TabPanel>
 

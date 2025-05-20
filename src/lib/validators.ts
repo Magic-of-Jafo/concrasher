@@ -189,4 +189,159 @@ export const PricingTabSchema = z.object({
 
 export type PriceTier = z.infer<typeof PriceTierSchema>;
 export type PriceDiscount = z.infer<typeof PriceDiscountSchema>;
-export type PricingTabData = z.infer<typeof PricingTabSchema>; 
+export type PricingTabData = z.infer<typeof PricingTabSchema>;
+
+// --- Venue & Hotel Tab Schemas ---
+
+export const VenuePhotoSchema = z.object({
+  id: z.string().uuid().optional(),
+  url: z.string().url({ message: "Invalid photo URL" }).min(1, "Photo URL is required"),
+  caption: z.string().optional(),
+});
+
+export const VenueSchema = z.object({
+  id: z.string().uuid().optional(),
+  conventionId: z.string().cuid().optional(), // Assuming conventionId is CUID from existing schemas
+  isPrimaryVenue: z.boolean().default(false),
+  markedForPrimaryPromotion: z.boolean().optional().default(false),
+  tempId: z.string().uuid().optional(),
+  venueName: z.string().min(1, "Venue name is required"),
+  description: z.string().optional(),
+  websiteUrl: z.string().url({ message: "Invalid website URL" }).optional().or(z.literal('')),
+  googleMapsUrl: z.string().url({ message: "Invalid Google Maps URL" }).optional().or(z.literal('')),
+  streetAddress: z.string().optional(),
+  city: z.string().optional(),
+  stateRegion: z.string().optional(),
+  postalCode: z.string().optional(),
+  country: z.string().optional(),
+  contactEmail: z.string().email({ message: "Invalid contact email" }).optional().or(z.literal('')),
+  contactPhone: z.string().optional(),
+  amenities: z.array(z.string()).optional().default([]),
+  parkingInfo: z.string().optional(),
+  publicTransportInfo: z.string().optional(),
+  overallAccessibilityNotes: z.string().optional(),
+  photos: z.array(VenuePhotoSchema).max(1, { message: "Only one photo is allowed." }).optional().default([]),
+});
+
+export const HotelPhotoSchema = z.object({
+  id: z.string().uuid().optional(),
+  url: z.string().url({ message: "Invalid photo URL" }).min(1, "Photo URL is required"),
+  caption: z.string().optional(),
+});
+
+export const HotelSchema = z.object({
+  id: z.string().uuid().optional(),
+  conventionId: z.string().cuid().optional(),
+  isPrimaryHotel: z.boolean().default(false),
+  isAtPrimaryVenueLocation: z.boolean().default(false),
+  markedForPrimaryPromotion: z.boolean().optional().default(false),
+  tempId: z.string().uuid().optional(),
+  hotelName: z.string().optional(),
+  description: z.string().optional(),
+  websiteUrl: z.string().url({ message: "Invalid website URL" }).optional().or(z.literal('')),
+  googleMapsUrl: z.string().url({ message: "Invalid Google Maps URL" }).optional().or(z.literal('')),
+  streetAddress: z.string().optional(),
+  city: z.string().optional(),
+  stateRegion: z.string().optional(),
+  postalCode: z.string().optional(),
+  country: z.string().optional(),
+  contactEmail: z.string().email({ message: "Invalid contact email" }).optional().or(z.literal('')),
+  contactPhone: z.string().optional(),
+  groupRateOrBookingCode: z.string().optional(),
+  groupPrice: z.string().optional(),
+  bookingLink: z.string().url({ message: "Invalid booking link"}).optional().or(z.literal('')),
+  bookingCutoffDate: z.date().nullable().optional(),
+  amenities: z.array(z.string()).optional().default([]),
+  parkingInfo: z.string().optional(),
+  publicTransportInfo: z.string().optional(),
+  overallAccessibilityNotes: z.string().optional(),
+  photos: z.array(HotelPhotoSchema).max(1, { message: "Only one photo is allowed." }).optional().default([]),
+}).superRefine((data, ctx) => {
+  // Fields that, if populated, indicate an attempt to define a hotel.
+  // Excludes: id, tempId, isPrimaryHotel, isAtPrimaryVenueLocation (these are often system-set or flags).
+  const definingFieldsKeyof: (keyof Omit<HotelData, 'hotelName' | 'id' | 'tempId' | 'isPrimaryHotel' | 'isAtPrimaryVenueLocation'>)[] = [
+    'description', 'websiteUrl', 'googleMapsUrl', 'streetAddress', 'city', 
+    'stateRegion', 'postalCode', 'country', 'contactEmail', 'contactPhone',
+    'groupRateOrBookingCode', 'groupPrice', 'bookingLink', 'bookingCutoffDate',
+    'amenities', 'parkingInfo', 'publicTransportInfo', 'overallAccessibilityNotes', 'photos'
+  ];
+
+  const hasDefiningDetails = definingFieldsKeyof.some(field => {
+    const value = data[field as keyof typeof data]; // Type assertion needed here
+    if (Array.isArray(value)) return value.length > 0;
+    // Check for non-empty strings, or if it's a date (bookingCutoffDate)
+    if (value instanceof Date) return true; // bookingCutoffDate is a defining detail if set
+    return value !== undefined && value !== null && value !== '';
+  });
+
+  if (hasDefiningDetails && (!data.hotelName || data.hotelName.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['hotelName'],
+      message: 'Hotel name is required if other hotel details are provided.',
+    });
+  }
+});
+
+export const VenueHotelTabSchema = z.object({
+  primaryVenue: VenueSchema.optional(),
+  guestsStayAtPrimaryVenue: z.boolean().optional(),
+  primaryHotelDetails: HotelSchema.optional(),
+  hotels: z.array(HotelSchema).optional().default([]),
+  secondaryVenues: z.array(VenueSchema).optional().default([]),
+});
+
+// Helper functions to create default data structures
+export const createDefaultVenue = (isPrimary: boolean = false): VenueData => ({
+  isPrimaryVenue: isPrimary,
+  markedForPrimaryPromotion: false,
+  venueName: '',
+  // tempId is optional and will be undefined by default
+  // other optional fields like description, websiteUrl, etc., will be undefined by Zod's default behavior
+  amenities: [],
+  photos: [], // photos is array of VenuePhotoData, default empty array
+});
+
+export const createDefaultHotel = (isPrimaryHotelFlag: boolean = false): HotelData => ({
+  isPrimaryHotel: isPrimaryHotelFlag,
+  isAtPrimaryVenueLocation: false,
+  hotelName: '',
+  amenities: [],
+  photos: [],
+  bookingCutoffDate: null,
+  // Initialize other HotelData fields with sensible defaults
+  description: '',
+  websiteUrl: '',
+  googleMapsUrl: '',
+  streetAddress: '',
+  city: '',
+  stateRegion: '',
+  postalCode: '',
+  country: '',
+  contactEmail: '',
+  contactPhone: '',
+  groupRateOrBookingCode: '',
+  groupPrice: '',
+  bookingLink: '',
+  parkingInfo: '',
+  publicTransportInfo: '',
+  overallAccessibilityNotes: '',
+  markedForPrimaryPromotion: false,
+  // id, conventionId, tempId are typically omitted from creation, or handled by uuid/backend
+});
+
+export function createDefaultVenueHotelTabData(): VenueHotelTabData {
+  return {
+    primaryVenue: createDefaultVenue(true),
+    guestsStayAtPrimaryVenue: false,
+    primaryHotelDetails: undefined,
+    hotels: [],
+    secondaryVenues: []
+  };
+}
+
+export type VenuePhotoData = z.infer<typeof VenuePhotoSchema>;
+export type VenueData = z.infer<typeof VenueSchema>;
+export type HotelPhotoData = z.infer<typeof HotelPhotoSchema>;
+export type HotelData = z.infer<typeof HotelSchema>;
+export type VenueHotelTabData = z.infer<typeof VenueHotelTabSchema>; 

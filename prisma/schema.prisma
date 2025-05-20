@@ -114,33 +114,129 @@ model PriceDiscount {
 }
 
 model Convention {
-  id                String            @id @default(cuid())
+  id                String       @id @default(cuid())
   name              String
-  slug              String            @unique
+  slug              String       @unique
   startDate         DateTime?
   endDate           DateTime?
-  city              String
-  country           String
-  venueName         String?
-  websiteUrl        String?
-  status            ConventionStatus
-  galleryImageUrls  String[]          @default([])
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  city              String?
   stateAbbreviation String?
   stateName         String?
-  seriesId          String
+  country           String?
+  venueName         String?
+  websiteUrl        String?
+  status            ConventionStatus @default(DRAFT)
+  galleryImageUrls  String[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  seriesId          String?
+  series            ConventionSeries? @relation(fields: [seriesId], references: [id])
   deletedAt         DateTime?
   coverImageUrl     String?
   descriptionMain   String?
   descriptionShort  String?
-  isOneDayEvent     Boolean           @default(false)
-  isTBD             Boolean           @default(false)
+  isOneDayEvent     Boolean      @default(false)
+  isTBD             Boolean      @default(false)
   profileImageUrl   String?
-  series            ConventionSeries @relation(fields: [seriesId], references: [id])
+  timezone          String?
   priceTiers        PriceTier[]
   priceDiscounts    PriceDiscount[]
-  timezone          String?
+  guestsStayAtPrimaryVenue Boolean? @default(false)
+
+  venues            Venue[]
+  hotels            Hotel[]
+}
+
+model Venue {
+  id                      String        @id @default(uuid())
+  conventionId            String
+  isPrimaryVenue          Boolean       @default(false)
+  venueName               String
+  description             String?
+  websiteUrl              String?
+  googleMapsUrl           String?
+
+  streetAddress           String?
+  city                    String?
+  stateRegion             String?
+  postalCode              String?
+  country                 String?
+
+  contactEmail            String?
+  contactPhone            String?
+
+  amenities               String[]
+
+  parkingInfo             String?
+  publicTransportInfo     String?
+  overallAccessibilityNotes String?
+
+  convention              Convention    @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  photos                  VenuePhoto[]
+
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+}
+
+model VenuePhoto {
+  id        String    @id @default(uuid())
+  venueId   String
+  url       String
+  caption   String?
+
+  venue     Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Hotel {
+  id                        String    @id @default(uuid())
+  conventionId              String
+  isPrimaryHotel            Boolean   @default(false)
+  isAtPrimaryVenueLocation  Boolean   @default(false)
+  hotelName                 String
+  description               String?
+  websiteUrl                String?
+  googleMapsUrl             String?
+
+  streetAddress           String?
+  city                    String?
+  stateRegion             String?
+  postalCode              String?
+  country                 String?
+
+  contactEmail            String?
+  contactPhone            String?
+
+  groupRateOrBookingCode    String?
+  groupPrice                String?
+  bookingLink               String?
+  bookingCutoffDate         DateTime?
+
+  amenities                 String[]
+
+  parkingInfo             String?
+  publicTransportInfo     String?
+  overallAccessibilityNotes String?
+
+  convention                Convention  @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  photos                    HotelPhoto[]
+
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+}
+
+model HotelPhoto {
+  id        String    @id @default(uuid())
+  hotelId   String
+  url       String
+  caption   String?
+
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 enum Role {
