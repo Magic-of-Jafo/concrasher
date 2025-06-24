@@ -1,0 +1,16 @@
+  dataToSave.id = item.id;
+}
+
+console.log('[handleSave] Data prepared for saving:', dataToSave);
+try {
+  onSave(dataToSave);
+  console.log('[handleSave] onSave has been called successfully.');
+} catch (error) {
+  console.error('[handleSave] An error occurred immediately when calling onSave:', error);
+}
+};
+
+const handleFeeTierChange = (index: number, field: 'label' | 'amount', value: string) => {
+  const updatedTiers = [...feeTiers];
+// ... existing code ...
+} 

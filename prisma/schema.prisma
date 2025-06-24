@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  emailVerified    DateTime?
+  image            String?
+  hashedPassword   String?
+  roles            Role[]             @default([USER])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  bio              String?
+  resetToken       String?            @unique
+  resetTokenExpiry DateTime?
+  timezone         String?
+  accounts         Account[]
+  conventionSeries ConventionSeries[]
+  roleApplications RoleApplication[]
+  sessions         Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model RoleApplication {
+  id            String            @id @default(cuid())
+  userId        String
+  requestedRole RequestedRole
+  status        ApplicationStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, requestedRole])
+}
+
+model ConventionSeries {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organizerUserId String
+  logoUrl         String?
+  slug            String       @unique
+  conventions     Convention[]
+  organizer       User         @relation(fields: [organizerUserId], references: [id])
+}
+
+model PriceTier {
+  id             String          @id @default(cuid())
+  conventionId   String
+  label          String
+  amount         Decimal
+  order          Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  priceDiscounts PriceDiscount[]
+  convention     Convention      @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+}
+
+model PriceDiscount {
+  id               String     @id @default(cuid())
+  conventionId     String
+  cutoffDate       DateTime
+  priceTierId      String
+  discountedAmount Decimal
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  convention       Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  priceTier        PriceTier  @relation(fields: [priceTierId], references: [id], onDelete: Cascade)
+
+  @@unique([conventionId, priceTierId, cutoffDate])
+}
+
+model Convention {
+  id                       String                   @id @default(cuid())
+  name                     String
+  slug                     String                   @unique
+  startDate                DateTime?
+  endDate                  DateTime?
+  city                     String?
+  country                  String?
+  venueName                String?
+  websiteUrl               String?
+  status                   ConventionStatus         @default(DRAFT)
+  galleryImageUrls         String[]
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  stateAbbreviation        String?
+  stateName                String?
+  seriesId                 String?
+  deletedAt                DateTime?
+  coverImageUrl            String?
+  descriptionMain          String?
+  descriptionShort         String?
+  isOneDayEvent            Boolean                  @default(false)
+  isTBD                    Boolean                  @default(false)
+  profileImageUrl          String?
+  timezone                 String?
+  guestsStayAtPrimaryVenue Boolean?                 @default(false)
+  series                   ConventionSeries?        @relation(fields: [seriesId], references: [id])
+  scheduleItems            ConventionScheduleItem[]
+  hotels                   Hotel[]
+  priceDiscounts           PriceDiscount[]
+  priceTiers               PriceTier[]
+  scheduleDays             ScheduleDay[]
+  venues                   Venue[]
+}
+
+model Venue {
+  id                        String                   @id @default(uuid())
+  conventionId              String
+  isPrimaryVenue            Boolean                  @default(false)
+  venueName                 String
+  description               String?
+  websiteUrl                String?
+  googleMapsUrl             String?
+  streetAddress             String?
+  city                      String?
+  stateRegion               String?
+  postalCode                String?
+  country                   String?
+  contactEmail              String?
+  contactPhone              String?
+  amenities                 String[]
+  parkingInfo               String?
+  publicTransportInfo       String?
+  overallAccessibilityNotes String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  scheduleItems             ConventionScheduleItem[]
+  convention                Convention               @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  photos                    VenuePhoto[]
+}
+
+model VenuePhoto {
+  id        String   @id @default(uuid())
+  venueId   String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model Hotel {
+  id                        String       @id @default(uuid())
+  conventionId              String
+  isPrimaryHotel            Boolean      @default(false)
+  isAtPrimaryVenueLocation  Boolean      @default(false)
+  hotelName                 String
+  description               String?
+  websiteUrl                String?
+  googleMapsUrl             String?
+  streetAddress             String?
+  city                      String?
+  stateRegion               String?
+  postalCode                String?
+  country                   String?
+  contactEmail              String?
+  contactPhone              String?
+  groupRateOrBookingCode    String?
+  groupPrice                String?
+  bookingLink               String?
+  bookingCutoffDate         DateTime?
+  amenities                 String[]
+  parkingInfo               String?
+  publicTransportInfo       String?
+  overallAccessibilityNotes String?
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  convention                Convention   @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  photos                    HotelPhoto[]
+}
+
+model HotelPhoto {
+  id        String   @id @default(uuid())
+  hotelId   String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleDay {
+  id           String                   @id @default(cuid())
+  conventionId String
+  dayOffset    Int
+  isOfficial   Boolean
+  label        String?
+  events       ConventionScheduleItem[]
+  convention   Convention               @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+}
+
+model ConventionScheduleItem {
+  id               String                    @id @default(cuid())
+  conventionId     String
+  title            String
+  description      String?
+  locationName     String?
+  venueId          String?
+  order            Int?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  eventType        String
+  atPrimaryVenue   Boolean
+  dayOffset        Int?
+  durationMinutes  Int?
+  startTimeMinutes Int?
+  scheduleDayId    String?
+  convention       Convention                @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  scheduleDay      ScheduleDay?              @relation(fields: [scheduleDayId], references: [id])
+  venue            Venue?                    @relation(fields: [venueId], references: [id])
+  brandLinks       ScheduleEventBrandLink[]
+  feeTiers         ScheduleEventFeeTier[]
+  talentLinks      ScheduleEventTalentLink[]
+}
+
+model ScheduleEventFeeTier {
+  id             String                 @id @default(cuid())
+  scheduleItemId String
+  label          String
+  amount         Decimal
+  scheduleItem   ConventionScheduleItem @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleEventTalentLink {
+  id              String                 @id @default(cuid())
+  scheduleItemId  String
+  talentProfileId String
+  scheduleItem    ConventionScheduleItem @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleEventBrandLink {
+  id             String                 @id @default(cuid())
+  scheduleItemId String
+  brandProfileId String
+  scheduleItem   ConventionScheduleItem @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  ORGANIZER
+  TALENT
+  ADMIN
+}
+
+enum RequestedRole {
+  ORGANIZER
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConventionStatus {
+  DRAFT
+  PUBLISHED
+  PAST
+  CANCELLED
+}

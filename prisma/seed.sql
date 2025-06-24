@@ -1,0 +1,14 @@
+-- This file is intentionally left (almost) empty.
+-- Seeding of Users, ConventionSeries, and Conventions
+-- is now handled programmatically in prisma/seed.ts to ensure
+-- consistency with the evolving schema.
+--
+-- Previously, this file contained INSERT statements for:
+-- User (magicjafo@gmail.com)
+-- ConventionSeries (linked to magicjafo@gmail.com)
+-- Convention (linked to magicjafo@gmail.com, but with outdated columns)
+-- These are superseded by the logic in prisma/seed.ts which creates
+-- admin@example.com and organizer@example.com and associated series/conventions.
+
+-- The COMMIT statement that was previously here, associated with the raw SQL execution,
+-- is also no longer needed if no raw SQL is executed from this file. 
