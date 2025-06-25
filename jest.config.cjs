@@ -18,7 +18,7 @@ const customJestConfig = {
     '<rootDir>/e2e/',       // Ignore Playwright E2E tests in the root e2e folder
   ],
   transformIgnorePatterns: [
-    '/node_modules/(?!next-auth|@babel|@next|dnd-core|@react-dnd|react-dnd|react-dnd-html5-backend)/',
+    '/node_modules/(?!jest-fetch-mock)/'
   ],
   // reporters: [
   //   'default',

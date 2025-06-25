@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Switch, FormControlLabel, Select, InputLabel, FormControl, Box, Typography, IconButton, Tooltip
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Switch, FormControlLabel, Select, InputLabel, FormControl, Box, Typography, IconButton, Tooltip, FormHelperText
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -298,48 +298,45 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
             />
           )}
           <FormControlLabel
-            control={<Switch checked={atPrimaryVenue} onChange={e => setAtPrimaryVenue(e.target.checked)} />}
-            label="Event is at the Primary Venue"
+            control={
+              <Switch
+                checked={atPrimaryVenue}
+                onChange={(e) => setAtPrimaryVenue(e.target.checked)}
+                name="atPrimaryVenue"
+              />
+            }
+            label="Event is at Primary Venue"
           />
-          {atPrimaryVenue ? (
+          {!atPrimaryVenue && (
+            <FormControl fullWidth margin="normal" required error={!!errors.venueId}>
+              <InputLabel id="venue-select-label">Select Secondary Venue or Hotel</InputLabel>
+              <Select
+                labelId="venue-select-label"
+                value={venueId}
+                onChange={e => setVenueId(e.target.value)}
+                label="Select Secondary Venue or Hotel"
+              >
+                {loadingVenues ? (
+                  <MenuItem disabled><em>Loading...</em></MenuItem>
+                ) : (
+                  venueOptions.map(option => (
+                    <MenuItem key={option.id} value={option.id}>{option.name}</MenuItem>
+                  ))
+                )}
+              </Select>
+              {errors.venueId && <FormHelperText>{errors.venueId}</FormHelperText>}
+            </FormControl>
+          )}
+          {atPrimaryVenue && (
             <TextField
-              label="Room Name / Location"
+              label="Room/Area Name (e.g., Main Stage)"
               value={locationName}
               onChange={e => setLocationName(e.target.value)}
               fullWidth
               margin="normal"
               helperText="e.g., Main Stage, Panel Room A"
             />
-          ) : (
-            <>
-              {loadingVenues ? (
-                <Typography>Loading venues...</Typography>
-              ) : (
-                <FormControl fullWidth margin="normal" required error={!!errors.venueId}>
-                  <InputLabel>Select Secondary Venue or Hotel</InputLabel>
-                  <Select
-                    value={venueId}
-                    onChange={e => setVenueId(e.target.value)}
-                    label="Select Secondary Venue or Hotel"
-                  >
-                    {venueOptions.map(option => (
-                      <MenuItem key={option.id} value={option.id}>{option.name}</MenuItem>
-                    ))}
-                  </Select>
-                  {errors.venueId && <Typography color="error" variant="caption">{errors.venueId}</Typography>}
-                </FormControl>
-              )}
-              <TextField
-                label="Room Name / Specific Location (Optional)"
-                value={locationName}
-                onChange={e => setLocationName(e.target.value)}
-                fullWidth
-                margin="normal"
-                helperText="e.g., Ballroom West, Conference Room 3"
-              />
-            </>
           )}
-
           <FormControlLabel
             control={<Switch checked={noFee} onChange={e => setNoFee(e.target.checked)} />}
             label="No additional fees for this event"

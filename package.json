@@ -12,7 +12,9 @@
     "test:unit": "npx jest",
     "test:e2e": "npx dotenv-cli -e .env.local -- playwright test",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:vitest": "vitest run",
+    "test:vitest:ui": "vitest --ui"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
@@ -69,18 +71,23 @@
     "@types/react": "^18",
     "@types/react-dnd": "^2.0.36",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/ui": "^3.2.4",
     "dotenv": "^16.5.0",
     "dotenv-cli": "^8.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.2.3",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
+    "jsdom": "^26.1.0",
     "playwright": "^1.52.0",
     "prisma": "^6.9.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.3.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.7.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }
