@@ -9,24 +9,26 @@ datasource db {
 }
 
 model User {
-  id               String             @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String?
-  email            String?            @unique
+  email            String?  @unique
   emailVerified    DateTime?
   image            String?
   hashedPassword   String?
-  roles            Role[]             @default([USER])
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  roles            Role[]   @default([USER])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   bio              String?
-  resetToken       String?            @unique
+  resetToken       String?  @unique
   resetTokenExpiry DateTime?
   timezone         String?
   accounts         Account[]
   conventionSeries ConventionSeries[]
   roleApplications RoleApplication[]
   sessions         Session[]
+  dealerProfile    Dealer?  // one-to-one relationship
 }
+
 
 model Account {
   id                String  @id @default(cuid())
@@ -285,6 +287,7 @@ enum Role {
   ORGANIZER
   TALENT
   ADMIN
+  DEALER
 }
 
 enum RequestedRole {
@@ -302,4 +305,12 @@ enum ConventionStatus {
   PUBLISHED
   PAST
   CANCELLED
+}
+
+model Dealer {
+  id        String @id @default(cuid())
+  userId    String @unique
+  displayName String
+  bio       String?
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

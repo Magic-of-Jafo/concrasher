@@ -1,0 +1,104 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import ScheduleEventForm from './ScheduleEventForm';
+import { Convention, Venue, Hotel } from '@prisma/client';
+import { SessionProvider } from 'next-auth/react';
+import fetchMock from 'jest-fetch-mock';
+
+// Mocks
+const mockOnSave = jest.fn();
+const mockOnClose = jest.fn();
+
+const mockConvention: Partial<Convention> = {
+    id: 'conv1',
+    startDate: new Date('2025-01-01T00:00:00.000Z'),
+    endDate: new Date('2025-01-03T00:00:00.000Z'),
+};
+
+const mockVenues: (Venue & { hotels: Hotel[] })[] = [
+    {
+        id: 'venue1',
+        name: 'Main Venue',
+        isPrimaryHotelSeparate: false,
+        hotels: [
+            { id: 'hotel1', name: 'Main Hotel', venueId: 'venue1' }
+        ]
+    } as any,
+];
+
+const initialValues = {
+    title: '',
+    description: '',
+    locationName: '',
+    venueId: null,
+    dayOffset: 0,
+    startTime: '09:00',
+    endTime: '10:00',
+    feeTiers: [],
+};
+
+// Mocking the SessionProvider
+const mockSession = {
+    data: { user: { id: 'test-user-id' } },
+    status: 'authenticated',
+};
+
+const renderWithProviders = (ui: React.ReactElement) => {
+    return render(
+        <SessionProvider session={mockSession}>
+            {ui}
+        </SessionProvider>
+    );
+};
+
+describe('ScheduleEventForm', () => {
+    beforeEach(() => {
+        fetchMock.resetMocks();
+    });
+
+    it('renders and functions correctly', async () => {
+        fetchMock.mockResponse(JSON.stringify([])); // Mock fetch for venues/hotels
+
+        const onSave = jest.fn();
+        const onClose = jest.fn();
+
+        renderWithProviders(
+            <ScheduleEventForm
+                open={true}
+                onClose={onClose}
+                item={{}}
+                conventionId="test-convention-id"
+                onSave={onSave}
+                forceCreateNew={true}
+            />
+        );
+
+        // 1. Initial render check
+        expect(screen.getByLabelText(/event name/i)).toBeInTheDocument();
+        expect(screen.getByLabelText("Event is at Primary Venue")).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+
+        // 2. Test fee tier visibility toggle
+        const noFeeSwitch = screen.getByLabelText(/no fee/i);
+        expect(screen.queryByRole('button', { name: /add fee tier/i })).not.toBeInTheDocument();
+        fireEvent.click(noFeeSwitch);
+        expect(await screen.findByRole('button', { name: /add fee tier/i })).toBeInTheDocument();
+        fireEvent.click(noFeeSwitch);
+        expect(screen.queryByRole('button', { name: /add fee tier/i })).not.toBeInTheDocument();
+
+        // 3. Test secondary venue visibility toggle
+        const primaryVenueSwitch = screen.getByLabelText("Event is at Primary Venue");
+        fireEvent.click(primaryVenueSwitch);
+
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledWith('/api/conventions/test-convention-id/venues');
+            expect(fetchMock).toHaveBeenCalledWith('/api/conventions/test-convention-id/hotels');
+        });
+
+        expect(await screen.findByLabelText(/select secondary venue or hotel/i)).toBeInTheDocument();
+
+        fireEvent.click(primaryVenueSwitch);
+        expect(screen.queryByLabelText(/select secondary venue or hotel/i)).not.toBeInTheDocument();
+    });
+}); 
