@@ -43,9 +43,14 @@ const DealersTab = ({ conventionId }: DealersTabProps) => {
         if (result.success) {
             loadDealerLinks(); // Refresh the list
         } else {
-            setError(result.error ?? 'Failed to add dealer.');
-            // Optionally, clear the error after a few seconds
-            setTimeout(() => setError(null), 5000);
+            // Silently ignore duplicate linking attempts - no error message needed
+            const isDuplicateError = result.error?.includes('already linked as a dealer');
+            if (!isDuplicateError) {
+                setError(result.error ?? 'Failed to add dealer.');
+                // Clear the error after a few seconds
+                setTimeout(() => setError(null), 5000);
+            }
+            // If it's a duplicate, do nothing - user can continue working normally
         }
     };
 

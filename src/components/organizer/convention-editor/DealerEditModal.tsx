@@ -33,9 +33,13 @@ const DealerEditModal = ({ dealerLink, isOpen, onClose, onSave }: DealerEditModa
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
             <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                <h2 className="text-xl font-bold mb-4">Edit Dealer Overrides</h2>
+                <h2 className="text-xl font-bold mb-2">Customize Dealer Display</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                    <strong>Note:</strong> These changes only affect how this brand appears for your convention.
+                    The original brand profile remains unchanged.
+                </p>
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700">Display Name Override</label>
+                    <label className="block text-sm font-medium text-gray-700">Convention Display Name</label>
                     <input
                         type="text"
                         value={displayName}
@@ -43,17 +47,22 @@ const DealerEditModal = ({ dealerLink, isOpen, onClose, onSave }: DealerEditModa
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
                         placeholder={dealerLink.profile?.name || 'Original Name'}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave blank to use original name: {dealerLink.profile?.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Leave blank to use original name: <strong>{dealerLink.profile?.name}</strong>
+                    </p>
                 </div>
                 <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700">Description Override</label>
+                    <label className="block text-sm font-medium text-gray-700">Convention-Specific Description</label>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-                        placeholder="Enter an optional description for this convention..."
+                        placeholder="e.g., 'Featured vendor in Hall B' or 'Specializing in vintage comics'..."
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Optional description that only appears for this convention
+                    </p>
                 </div>
                 <div className="flex justify-end gap-4">
                     <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">

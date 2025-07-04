@@ -31,8 +31,9 @@ const DealerListItem = ({ dealerLink, onRemove, onEdit }: DealerListItemProps) =
                 <button
                     onClick={() => onEdit(dealerLink)}
                     className="text-sm text-blue-500 hover:underline"
+                    title="Customize how this brand appears for your convention"
                 >
-                    Edit
+                    Customize
                 </button>
                 <button
                     onClick={() => onRemove(dealerLink.id)}

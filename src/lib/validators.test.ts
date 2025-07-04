@@ -3,7 +3,8 @@ import { LoginSchema } from './validators';
 import { ProfileSchema } from './validators';
 import { ConventionCreateSchema, ConventionUpdateSchema } from './validators';
 import { BasicInfoFormSchema, type BasicInfoFormData } from './validators';
-import { ConventionStatus } from '@prisma/client';
+import { DealerLinkSchema, type DealerLinkData } from './validators';
+import { ConventionStatus, ProfileType } from '@prisma/client';
 import { PriceTierSchema, PriceDiscountSchema, PricingTabSchema } from './validators';
 
 describe('RegistrationSchema', () => {
@@ -219,7 +220,7 @@ describe('ProfileSchema', () => {
     expect(result.success).toBe(true);
   });
 
-   it('should pass if only name is provided', () => {
+  it('should pass if only name is provided', () => {
     const result = ProfileSchema.safeParse({ name: 'Only Name' });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -310,7 +311,7 @@ describe('ConventionCreateSchema', () => {
     }
   });
 
-   it('should invalidate invalid URL in galleryImageUrls', () => {
+  it('should invalidate invalid URL in galleryImageUrls', () => {
     const result = ConventionCreateSchema.safeParse({ ...validData, galleryImageUrls: ['invalid-url'] });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -410,21 +411,21 @@ describe('BasicInfoFormSchema', () => {
   });
 
   it('should validate if one-day event and endDate is null (and not TBD)', () => {
-    const result = BasicInfoFormSchema.safeParse(getValidData({ 
-      isTBD: false, 
-      isOneDayEvent: true, 
-      startDate: new Date(), 
-      endDate: null 
+    const result = BasicInfoFormSchema.safeParse(getValidData({
+      isTBD: false,
+      isOneDayEvent: true,
+      startDate: new Date(),
+      endDate: null
     }));
     expect(result.success).toBe(true);
   });
 
   it('should invalidate if not TBD, not one-day, and endDate is null', () => {
-    const result = BasicInfoFormSchema.safeParse(getValidData({ 
-      isTBD: false, 
-      isOneDayEvent: false, 
-      startDate: new Date(), 
-      endDate: null 
+    const result = BasicInfoFormSchema.safeParse(getValidData({
+      isTBD: false,
+      isOneDayEvent: false,
+      startDate: new Date(),
+      endDate: null
     }));
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.flatten().fieldErrors.endDate).toContain('End date is required for multi-day events');
@@ -458,7 +459,7 @@ describe('BasicInfoFormSchema', () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.flatten().fieldErrors.stateName).toContain('Invalid US state name or abbreviation');
   });
-  
+
   it('should allow optional fields (city, descriptions, seriesId, newSeriesName) to be empty/undefined', () => {
     const data = getValidData({
       city: '',
@@ -526,17 +527,17 @@ describe('PriceTierSchema', () => {
 
     result = PriceTierSchema.safeParse({ ...validTierData, order: 1.5 });
     expect(result.success).toBe(false);
-    if (!result.success && result.error.issues[0]){
-        expect(result.error.issues[0].message).toContain('Expected integer');
+    if (!result.success && result.error.issues[0]) {
+      expect(result.error.issues[0].message).toContain('Expected integer');
     }
   });
 
   it('should accept optional id and conventionId as CUIDs', () => {
     const validCuid = 'clq7000000000cjk712345678'; // Example CUID
-    let result = PriceTierSchema.safeParse({ 
-      ...validTierData, 
-      id: validCuid, 
-      conventionId: validCuid 
+    let result = PriceTierSchema.safeParse({
+      ...validTierData,
+      id: validCuid,
+      conventionId: validCuid
     });
     expect(result.success).toBe(true);
 
@@ -610,10 +611,10 @@ describe('PriceDiscountSchema', () => {
   });
 
   it('should accept optional id and conventionId as CUIDs', () => {
-    let result = PriceDiscountSchema.safeParse({ 
-      ...validDiscountData, 
-      id: validCuid, 
-      conventionId: validCuid 
+    let result = PriceDiscountSchema.safeParse({
+      ...validDiscountData,
+      id: validCuid,
+      conventionId: validCuid
     });
     expect(result.success).toBe(true);
 
@@ -693,4 +694,210 @@ describe('PricingTabSchema', () => {
       expect(result.error.issues[0].message).toBe('Price Tier is required');
     }
   });
-}); 
+});
+
+describe('DealerLinkSchema', () => {
+  const validCuid = 'clq7000000000cjk712345678'; // Example CUID
+  const validDealerLinkData: DealerLinkData = {
+    conventionId: validCuid,
+    linkedProfileId: validCuid,
+    profileType: ProfileType.BRAND,
+  };
+
+  it('should validate correct dealer link data', () => {
+    const result = DealerLinkSchema.safeParse(validDealerLinkData);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.conventionId).toBe(validCuid);
+      expect(result.data.linkedProfileId).toBe(validCuid);
+      expect(result.data.profileType).toBe(ProfileType.BRAND);
+      expect(result.data.displayNameOverride).toBeUndefined();
+      expect(result.data.descriptionOverride).toBeUndefined();
+    }
+  });
+
+  it('should validate dealer link data with all optional fields', () => {
+    const dataWithOverrides = {
+      ...validDealerLinkData,
+      displayNameOverride: 'Custom Display Name',
+      descriptionOverride: 'Custom description for this convention',
+    };
+    const result = DealerLinkSchema.safeParse(dataWithOverrides);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayNameOverride).toBe('Custom Display Name');
+      expect(result.data.descriptionOverride).toBe('Custom description for this convention');
+    }
+  });
+
+  it('should accept USER profile type', () => {
+    const dataWithUser = {
+      ...validDealerLinkData,
+      profileType: ProfileType.USER,
+    };
+    const result = DealerLinkSchema.safeParse(dataWithUser);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.profileType).toBe(ProfileType.USER);
+    }
+  });
+
+  it('should accept TALENT profile type', () => {
+    const dataWithTalent = {
+      ...validDealerLinkData,
+      profileType: ProfileType.TALENT,
+    };
+    const result = DealerLinkSchema.safeParse(dataWithTalent);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.profileType).toBe(ProfileType.TALENT);
+    }
+  });
+
+  it('should require conventionId to be a valid CUID', () => {
+    const result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      conventionId: 'not-a-cuid',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['conventionId']);
+      expect(result.error.issues[0].message).toBe('Invalid cuid');
+    }
+  });
+
+  it('should require linkedProfileId to be a valid CUID', () => {
+    const result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      linkedProfileId: 'not-a-cuid',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['linkedProfileId']);
+      expect(result.error.issues[0].message).toBe('Invalid cuid');
+    }
+  });
+
+  it('should require all required fields', () => {
+    // Test missing conventionId
+    let result = DealerLinkSchema.safeParse({
+      linkedProfileId: validCuid,
+      profileType: ProfileType.BRAND,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['conventionId']);
+    }
+
+    // Test missing linkedProfileId
+    result = DealerLinkSchema.safeParse({
+      conventionId: validCuid,
+      profileType: ProfileType.BRAND,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['linkedProfileId']);
+    }
+
+    // Test missing profileType
+    result = DealerLinkSchema.safeParse({
+      conventionId: validCuid,
+      linkedProfileId: validCuid,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['profileType']);
+    }
+  });
+
+  it('should reject invalid profile type values', () => {
+    const result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      profileType: 'INVALID_TYPE',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['profileType']);
+      expect(result.error.issues[0].message).toContain('Invalid enum value');
+    }
+  });
+
+  it('should allow empty strings for optional override fields', () => {
+    const dataWithEmptyOverrides = {
+      ...validDealerLinkData,
+      displayNameOverride: '',
+      descriptionOverride: '',
+    };
+    const result = DealerLinkSchema.safeParse(dataWithEmptyOverrides);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayNameOverride).toBe('');
+      expect(result.data.descriptionOverride).toBe('');
+    }
+  });
+
+  it('should allow null/undefined for optional override fields', () => {
+    // Test with undefined
+    let result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      displayNameOverride: undefined,
+      descriptionOverride: undefined,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayNameOverride).toBeUndefined();
+      expect(result.data.descriptionOverride).toBeUndefined();
+    }
+
+    // Test with null (Zod typically converts null to undefined for optional fields)
+    result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      displayNameOverride: null,
+      descriptionOverride: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayNameOverride).toBeUndefined();
+      expect(result.data.descriptionOverride).toBeUndefined();
+    }
+  });
+
+  it('should reject non-string types for override fields', () => {
+    // Test displayNameOverride with non-string
+    let result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      displayNameOverride: 123,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['displayNameOverride']);
+      expect(result.error.issues[0].message).toContain('Expected string');
+    }
+
+    // Test descriptionOverride with non-string
+    result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      descriptionOverride: true,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['descriptionOverride']);
+      expect(result.error.issues[0].message).toContain('Expected string');
+    }
+  });
+
+  it('should handle edge case with very long override strings', () => {
+    const longString = 'A'.repeat(1000); // Very long string
+    const result = DealerLinkSchema.safeParse({
+      ...validDealerLinkData,
+      displayNameOverride: longString,
+      descriptionOverride: longString,
+    });
+    // Schema doesn't currently have length limits, so this should pass
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.displayNameOverride).toBe(longString);
+      expect(result.data.descriptionOverride).toBe(longString);
+    }
+  });
+});

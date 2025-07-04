@@ -214,8 +214,8 @@ export const DealerLinkSchema = z.object({
   conventionId: z.string().cuid(),
   linkedProfileId: z.string().cuid(),
   profileType: ProfileTypeEnum,
-  displayNameOverride: z.string().optional(),
-  descriptionOverride: z.string().optional(),
+  displayNameOverride: z.string().optional().nullable().transform(val => val === null ? undefined : val),
+  descriptionOverride: z.string().optional().nullable().transform(val => val === null ? undefined : val),
 });
 
 export type DealerLinkData = z.infer<typeof DealerLinkSchema>;

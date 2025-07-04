@@ -508,6 +508,44 @@ export async function searchProfiles(
   }
 }
 
+export async function searchBrands(
+  query: string
+): Promise<{ id: string; name: string | null; profileType: 'BRAND' }[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return [];
+  }
+
+  if (!query || query.trim().length < 3) {
+    return []; // Don't search for very short queries (3 chars minimum for autocomplete)
+  }
+
+  try {
+    const brands = await db.brand.findMany({
+      where: {
+        name: {
+          contains: query,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+      take: 10, // Show up to 10 brand results
+      orderBy: {
+        name: 'asc', // Sort alphabetically for better UX
+      },
+    });
+
+    // Add profile type to each result
+    return brands.map(brand => ({ ...brand, profileType: 'BRAND' as const }));
+  } catch (error) {
+    console.error('Error searching brands:', error);
+    return [];
+  }
+}
+
 export async function addDealerLink(
   conventionId: string,
   linkedProfileId: string,
