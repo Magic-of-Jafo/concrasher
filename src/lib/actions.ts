@@ -15,10 +15,169 @@ import {
   type ConventionScheduleItemUpdateInput,
   type ScheduleEventFeeTierInput,
   ConventionScheduleItemBulkInputSchema, // Added for bulk upload
+  BrandCreateSchema,
+  type BrandCreateInput,
+  BrandUpdateSchema,
+  type BrandUpdateInput,
   // ConventionScheduleItemBulkUploadSchema, // Corrected: Removed the problematic one, this is the main schema for the array - THIS LINE IS THE CULPRIT
 } from './validators';
 
 // ... existing code ...
+
+export async function createBrand(data: BrandCreateInput): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: any;
+  brand?: any; // Consider defining a proper brand type
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  // Authorization check: User must have an approved BRAND_CREATOR application or be an ADMIN
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { roles: true },
+  });
+
+  if (!user?.roles.includes(Role.ADMIN)) {
+    const approvedBrandCreatorApplication = await db.roleApplication.findFirst({
+      where: {
+        userId: session.user.id,
+        requestedRole: RequestedRole.BRAND_CREATOR,
+        status: ApplicationStatus.APPROVED,
+      }
+    });
+    if (!approvedBrandCreatorApplication) {
+      return { success: false, error: "Authorization failed: You must have an approved Brand Creator application to perform this action." };
+    }
+  }
+
+  const validatedData = BrandCreateSchema.safeParse(data);
+
+  if (!validatedData.success) {
+    return {
+      success: false,
+      error: "Invalid data provided.",
+      fieldErrors: validatedData.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    const newBrand = await db.$transaction(async (prisma) => {
+      const brand = await prisma.brand.create({
+        data: {
+          name: validatedData.data.name,
+          description: validatedData.data.description,
+          logoUrl: validatedData.data.logoUrl,
+          websiteUrl: validatedData.data.websiteUrl,
+          ownerId: session.user.id, // Direct link to the owner user
+        },
+      });
+
+      await prisma.brandUser.create({
+        data: {
+          brandId: brand.id,
+          userId: session.user.id,
+          role: 'OWNER', // Assign the user as the owner
+        },
+      });
+
+      return brand;
+    });
+
+    revalidatePath("/profile"); // Revalidate profile to show brand-related info
+    // Also revalidate any pages where brands are listed
+
+    return {
+      success: true,
+      message: "Brand created successfully!",
+      brand: newBrand,
+    };
+
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { success: false, error: 'A brand with this name already exists.' };
+    }
+    console.error("Error creating brand:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while creating the brand.",
+    };
+  }
+}
+
+export async function updateBrand(data: BrandUpdateInput): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: any;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const validatedData = BrandUpdateSchema.safeParse(data);
+
+  if (!validatedData.success) {
+    return {
+      success: false,
+      error: "Invalid data provided.",
+      fieldErrors: validatedData.error.flatten().fieldErrors,
+    };
+  }
+
+  const { id, ...updateData } = validatedData.data;
+
+  try {
+    const brand = await db.brand.findUnique({
+      where: { id },
+    });
+
+    if (!brand) {
+      return { success: false, error: "Brand not found." };
+    }
+
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
+    const isOwner = brand.ownerId === session.user.id;
+    const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "Authorization failed. You are not the owner of this brand." };
+    }
+
+    await db.brand.update({
+      where: { id },
+      data: updateData,
+    });
+
+    revalidatePath("/profile");
+    revalidatePath(`/brands/${id}/edit`);
+
+    return {
+      success: true,
+      message: "Brand updated successfully!",
+    };
+
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { success: false, error: 'A brand with this name already exists.' };
+    }
+    console.error("Error updating brand:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while updating the brand.",
+    };
+  }
+}
 
 export async function updateUserProfile(data: ProfileSchemaInput) {
   try {
@@ -78,7 +237,7 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
   }
 }
 
-export async function applyForOrganizerRole(): Promise<{
+export async function requestRoles(roles: RequestedRole[]): Promise<{
   success: boolean;
   message?: string;
   error?: string;
@@ -97,56 +256,69 @@ export async function applyForOrganizerRole(): Promise<{
 
   const userId = session.user.id;
 
+  if (!roles || roles.length === 0) {
+    return { success: false, error: "No roles specified for application." };
+  }
+
   try {
-    // Check if user already has the ORGANIZER role
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { roles: true },
     });
 
-    if (user?.roles.includes(Role.ORGANIZER)) {
-      return {
-        success: false,
-        error: "You are already an Organizer.",
-        applicationStatus: ApplicationStatus.APPROVED, // Or some other status to indicate already has role
-      };
-    }
-
-    // Check if user has an existing PENDING application for ORGANIZER
-    const existingApplication = await db.roleApplication.findFirst({
+    const existingApplications = await db.roleApplication.findMany({
       where: {
         userId: userId,
-        requestedRole: RequestedRole.ORGANIZER,
+        requestedRole: { in: roles },
         status: ApplicationStatus.PENDING,
       },
     });
 
-    if (existingApplication) {
+    const rolesToCreate: RequestedRole[] = [];
+
+    for (const role of roles) {
+      // Check if user already has the role
+      const roleEnum = Role[role as keyof typeof Role]; // Convert string to enum
+      if (user?.roles.includes(roleEnum)) {
+        console.log(`User already has role: ${role}`);
+        continue; // Skip if they already have the role
+      }
+
+      // Check if there is a pending application for this role
+      if (existingApplications.some(app => app.requestedRole === role)) {
+        console.log(`User already has a pending application for: ${role}`);
+        continue; // Skip if pending application exists
+      }
+
+      rolesToCreate.push(role);
+    }
+
+    if (rolesToCreate.length === 0) {
       return {
         success: false,
-        error: "You already have a pending application for the Organizer role.",
-        applicationStatus: ApplicationStatus.PENDING,
+        error: "You either already have the requested role(s) or an application is already pending.",
+        applicationStatus: ApplicationStatus.PENDING, // Or reflect the most relevant status
       };
     }
 
-    // Create the role application
-    await db.roleApplication.create({
-      data: {
+    // Create the role applications
+    await db.roleApplication.createMany({
+      data: rolesToCreate.map(role => ({
         userId: userId,
-        requestedRole: RequestedRole.ORGANIZER,
+        requestedRole: role,
         status: ApplicationStatus.PENDING,
-      },
+      })),
     });
 
     revalidatePath("/profile"); // Or the relevant profile page path
 
     return {
       success: true,
-      message: "Your application for the Organizer role has been submitted successfully.",
+      message: `Your application for the following role(s) has been submitted successfully: ${rolesToCreate.join(', ')}.`,
       applicationStatus: ApplicationStatus.PENDING,
     };
   } catch (error) {
-    console.error("Error applying for Organizer role:", error);
+    console.error("Error applying for roles:", error);
     return {
       success: false,
       error: "An unexpected error occurred while submitting your application. Please try again.",
@@ -279,6 +451,233 @@ export async function deactivateTalentRole(): Promise<{
       success: false,
       error: "An unexpected error occurred while deactivating the Talent role. Please try again.",
     };
+  }
+}
+
+export async function searchProfiles(
+  query: string,
+  profileType: 'USER' | 'BRAND'
+): Promise<{ id: string; name: string | null; }[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    // Return empty or throw error if user is not authenticated
+    return [];
+  }
+
+  if (!query || query.trim().length < 2) {
+    return []; // Don't search for very short queries
+  }
+
+  try {
+    if (profileType === 'USER') {
+      const users = await db.user.findMany({
+        where: {
+          name: {
+            contains: query,
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        take: 10, // Limit results
+      });
+      return users;
+    } else if (profileType === 'BRAND') {
+      const brands = await db.brand.findMany({
+        where: {
+          name: {
+            contains: query,
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        take: 10,
+      });
+      return brands;
+    }
+
+    return [];
+  } catch (error) {
+    console.error(`Error searching profiles for type ${profileType}:`, error);
+    return []; // Return empty array on error
+  }
+}
+
+export async function addDealerLink(
+  conventionId: string,
+  linkedProfileId: string,
+  profileType: 'USER' | 'BRAND',
+  overrides?: { displayNameOverride?: string; descriptionOverride?: string; }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  try {
+    // Authorization check: User must be an organizer of the convention's series.
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      select: { series: { select: { organizerUserId: true } } },
+    });
+
+    if (convention?.series?.organizerUserId !== session.user.id) {
+      return { success: false, error: 'You are not authorized to edit this convention.' };
+    }
+
+    // Get the highest order value for existing links to append the new one
+    const lastDealerLink = await db.conventionDealerLink.findFirst({
+      where: { conventionId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+
+    const newOrder = (lastDealerLink?.order ?? 0) + 1;
+
+    const newDealerLink = await db.conventionDealerLink.create({
+      data: {
+        conventionId,
+        linkedProfileId,
+        profileType,
+        displayNameOverride: overrides?.displayNameOverride,
+        descriptionOverride: overrides?.descriptionOverride,
+        order: newOrder,
+      },
+    });
+
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`); // Revalidate the editor page
+
+    return { success: true, data: newDealerLink };
+
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // The .code property can be accessed in a type-safe way
+      if (error.code === 'P2002') {
+        return { success: false, error: 'This profile is already linked as a dealer for this convention.' };
+      }
+    }
+    console.error('Error adding dealer link:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function updateDealerLink(
+  dealerLinkId: string,
+  overrides: { displayNameOverride?: string; descriptionOverride?: string; }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  try {
+    // Authorization check
+    const dealerLink = await db.conventionDealerLink.findUnique({
+      where: { id: dealerLinkId },
+      select: {
+        convention: {
+          select: { id: true, series: { select: { organizerUserId: true } } }
+        }
+      }
+    });
+
+    if (!dealerLink || dealerLink.convention.series?.organizerUserId !== session.user.id) {
+      return { success: false, error: 'You are not authorized to edit this link.' };
+    }
+
+    const updatedDealerLink = await db.conventionDealerLink.update({
+      where: { id: dealerLinkId },
+      data: {
+        displayNameOverride: overrides.displayNameOverride,
+        descriptionOverride: overrides.descriptionOverride,
+      },
+    });
+
+    revalidatePath(`/organizer/conventions/${dealerLink.convention.id}/edit`);
+
+    return { success: true, data: updatedDealerLink };
+
+  } catch (error) {
+    console.error('Error updating dealer link:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function removeDealerLink(dealerLinkId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  try {
+    // Authorization check
+    const dealerLink = await db.conventionDealerLink.findUnique({
+      where: { id: dealerLinkId },
+      select: {
+        convention: {
+          select: { id: true, series: { select: { organizerUserId: true } } }
+        }
+      }
+    });
+
+    if (!dealerLink || dealerLink.convention.series?.organizerUserId !== session.user.id) {
+      return { success: false, error: 'You are not authorized to remove this link.' };
+    }
+
+    await db.conventionDealerLink.delete({
+      where: { id: dealerLinkId },
+    });
+
+    revalidatePath(`/organizer/conventions/${dealerLink.convention.id}/edit`);
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error removing dealer link:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function getDealerLinks(conventionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Authentication required.', data: [] };
+  }
+
+  try {
+    const dealerLinks = await db.conventionDealerLink.findMany({
+      where: { conventionId },
+      orderBy: { order: 'asc' },
+    });
+
+    // Enhance dealer links with profile information
+    const enhancedDealerLinks = await Promise.all(
+      dealerLinks.map(async (link) => {
+        let profile: { id: string; name: string | null } | null = null;
+        if (link.profileType === 'USER') {
+          profile = await db.user.findUnique({
+            where: { id: link.linkedProfileId },
+            select: { id: true, name: true },
+          });
+        } else if (link.profileType === 'BRAND') {
+          profile = await db.brand.findUnique({
+            where: { id: link.linkedProfileId },
+            select: { id: true, name: true },
+          });
+        }
+        return { ...link, profile };
+      })
+    );
+
+    return { success: true, data: enhancedDealerLinks };
+  } catch (error) {
+    console.error('Error fetching dealer links:', error);
+    return { success: false, error: 'An unexpected error occurred.', data: [] };
   }
 }
 
@@ -960,5 +1359,79 @@ export async function bulkCreateScheduleItems(
       createdCount: createdCount,
       errors: itemProcessingErrors.length > 0 ? itemProcessingErrors : undefined,
     };
+  }
+}
+
+export async function approveRoleApplication(applicationId: string): Promise<{ success: boolean; error?: string }> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+  if (!session.user.roles || !session.user.roles.includes(Role.ADMIN)) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const application = await db.roleApplication.findUnique({
+      where: { id: applicationId },
+      include: { user: true },
+    });
+
+    if (!application) {
+      return { success: false, error: "Application not found." };
+    }
+
+    // If the request is for ORGANIZER, grant the role.
+    if (application.requestedRole === RequestedRole.ORGANIZER) {
+      const user = application.user;
+      if (!user.roles.includes(Role.ORGANIZER)) {
+        await db.user.update({
+          where: { id: user.id },
+          data: {
+            roles: {
+              push: Role.ORGANIZER,
+            },
+          },
+        });
+      }
+    }
+
+    // For all cases, update the application status to APPROVED.
+    await db.roleApplication.update({
+      where: { id: applicationId },
+      data: { status: ApplicationStatus.APPROVED },
+    });
+
+    revalidatePath("/profile");
+    return { success: true };
+  } catch (error) {
+    console.error("Error approving role application:", error);
+    return { success: false, error: "Failed to approve application." };
+  }
+}
+
+export async function rejectRoleApplication(applicationId: string): Promise<{ success: boolean; error?: string }> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+  if (!session.user.roles || !session.user.roles.includes(Role.ADMIN)) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    await db.roleApplication.update({
+      where: { id: applicationId },
+      data: { status: ApplicationStatus.REJECTED },
+    });
+    revalidatePath("/profile");
+    return { success: true };
+  } catch (error) {
+    console.error("Error rejecting role application:", error);
+    return { success: false, error: "Failed to reject application." };
   }
 }

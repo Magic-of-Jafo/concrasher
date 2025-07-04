@@ -7,6 +7,7 @@ import { type PricingTabData, type PriceTier, type PriceDiscount } from '@/lib/v
 import VenueHotelTab from './VenueHotelTab';
 import { type VenueHotelTabData, createDefaultVenueHotelTabData } from '@/lib/validators';
 import ScheduleTab from './ScheduleTab';
+import DealersTab from './DealersTab';
 import { useRouter } from 'next/navigation';
 
 interface TabPanelProps {
@@ -86,7 +87,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     const storedTab = localStorage.getItem(localStorageKey);
     if (storedTab) {
       const tabIndex = parseInt(storedTab, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 3) { 
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
         setActiveTab(tabIndex);
         // console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
       }
@@ -105,13 +106,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     priceTiers: initialConventionData?.priceTiers || [],
     priceDiscounts: initialConventionData?.priceDiscounts || [],
   }));
-  
+
   const conventionId = initialConventionData?.id;
   // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
 
   // Memoize the default venue hotel data
   const defaultVenueHotelData = useMemo(() => createDefaultVenueHotelTabData(), []);
-  
+
   const [venueHotelData, setVenueHotelData] = useState<VenueHotelTabData>(() => {
     const defaultSettings = defaultVenueHotelData;
     console.log('[ConventionEditorTabs - useState init] defaultSettings.guestsStayAtPrimaryVenue:', defaultSettings.guestsStayAtPrimaryVenue);
@@ -124,7 +125,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       return {
         ...defaultSettings, // Apply general defaults for structure
         ...(loadedVH || {}),   // Spread loaded specifics from initialConventionData.venueHotel
-        guestsStayAtPrimaryVenue: finalValue 
+        guestsStayAtPrimaryVenue: finalValue
       };
     }
     console.log('[ConventionEditorTabs - useState init] Using full defaultSettings for new convention.');
@@ -139,13 +140,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       const { priceTiers, priceDiscounts, id, venueHotel, ...basicDataFromInitial } = initialConventionData;
       // setBasicInfoData(prev => ({ ...initialBasicFormData, ...prev, ...basicDataFromInitial }));
       setBasicInfoData({ ...initialBasicFormData, ...basicDataFromInitial }); // Simplified update
-  
+
       // Restore Pricing Tab update
       setPricingTabData({
         priceTiers: initialConventionData.priceTiers || [],
         priceDiscounts: initialConventionData.priceDiscounts || [],
       });
-  
+
       // Corrected Venue/Hotel Tab update
       const defaultSettings = defaultVenueHotelData;
       const loadedVH = venueHotel; // 'venueHotel' was destructured above from initialConventionData
@@ -187,7 +188,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       [fieldName]: value,
     }));
   };
-  
+
   const handlePricingDataChange = useCallback((data: PricingTabData) => {
     setPricingTabData(data);
   }, []);
@@ -227,6 +228,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           <Tab label="Pricing" {...allyProps(1)} />
           <Tab label="Venue/Hotel" {...allyProps(2)} />
           <Tab label="Schedule" {...allyProps(3)} />
+          <Tab label="Dealers" {...allyProps(4)} />
         </Tabs>
       </Box>
 
@@ -258,28 +260,32 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
       <TabPanel value={activeTab} index={3}>
         {conventionId ? (
-          <ScheduleTab 
-            conventionId={conventionId} 
-            startDate={basicInfoData.startDate} 
+          <ScheduleTab
+            conventionId={conventionId}
+            startDate={basicInfoData.startDate}
             isOneDayEvent={basicInfoData.isOneDayEvent}
             conventionName={basicInfoData.name}
             conventionEndDate={basicInfoData.endDate}
           />
         ) : (
-          <Box sx={{p:3, textAlign: 'center'}}>
+          <Box sx={{ p: 3, textAlign: 'center' }}>
             <CircularProgress />
             <p>Loading schedule information...</p>
           </Box>
         )}
       </TabPanel>
 
+      <TabPanel value={activeTab} index={4}>
+        <DealersTab conventionId={conventionId!} />
+      </TabPanel>
+
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2, mt: 2, gap: 2, borderTop: 1, borderColor: 'divider' }}>
         <Button variant="outlined" onClick={onCancel} disabled={isSaving || localIsSaving}>
-            Cancel
+          Cancel
         </Button>
-        <Button 
-          variant="contained" 
-          onClick={handleSaveConvention} 
+        <Button
+          variant="contained"
+          onClick={handleSaveConvention}
           disabled={isSaving || localIsSaving}
           startIcon={isSaving || localIsSaving ? <CircularProgress size={20} color="inherit" /> : null}
         >

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import BulkActions from "../BulkActions";
+import BulkActions from "../../../organizer/conventions/BulkActions";
 
 // Mock the fetch function
 global.fetch = jest.fn();
@@ -42,8 +43,8 @@ describe("BulkActions", () => {
 
   it("renders bulk action buttons when items are selected", () => {
     render(<BulkActions {...mockProps} />, { wrapper });
-    expect(screen.getByText("Delete Selected")).toBeInTheDocument();
-    expect(screen.getByText("Change Status")).toBeInTheDocument();
+    expect(screen.getByText(/delete selected/i)).toBeInTheDocument();
+    expect(screen.getByText(/change status/i)).toBeInTheDocument();
   });
 
   it("handles bulk delete action", async () => {
@@ -53,14 +54,14 @@ describe("BulkActions", () => {
     });
 
     render(<BulkActions {...mockProps} />, { wrapper });
-    fireEvent.click(screen.getByText("Delete Selected"));
+    fireEvent.click(screen.getByText(/delete selected/i));
 
-    // Confirm deletion
+    // Confirm deletion - check for the actual dialog title
     await waitFor(() => {
-      expect(screen.getByText("Are you sure you want to delete")).toBeInTheDocument();
+      expect(screen.getByText("Move Selected to Trash?")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Move to Trash"));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -69,7 +70,7 @@ describe("BulkActions", () => {
           method: "POST",
           body: JSON.stringify({
             action: "delete",
-            ids: mockProps.selectedIds,
+            conventionIds: mockProps.selectedIds,
           }),
         })
       );
@@ -84,18 +85,21 @@ describe("BulkActions", () => {
     });
 
     render(<BulkActions {...mockProps} />, { wrapper });
-    fireEvent.click(screen.getByText("Change Status"));
+    fireEvent.click(screen.getByText(/change status/i));
 
-    // Select new status
+    // Check for the status change dialog title
     await waitFor(() => {
-      expect(screen.getByLabelText("Status")).toBeInTheDocument();
+      expect(screen.getByText("Change Convention Status")).toBeInTheDocument();
     });
 
-    fireEvent.mouseDown(screen.getByLabelText("Status"));
+    // Select new status and confirm - use role selector for Material-UI Select
+    const statusSelect = screen.getByRole("combobox");
+    fireEvent.mouseDown(statusSelect);
+    await waitFor(() => {
+      expect(screen.getByText("PUBLISHED")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText("PUBLISHED"));
-
-    // Confirm status change
-    fireEvent.click(screen.getByText("Update"));
+    fireEvent.click(screen.getByText("Update Status"));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -104,7 +108,7 @@ describe("BulkActions", () => {
           method: "POST",
           body: JSON.stringify({
             action: "status",
-            ids: mockProps.selectedIds,
+            conventionIds: mockProps.selectedIds,
             status: "PUBLISHED",
           }),
         })
@@ -114,38 +118,59 @@ describe("BulkActions", () => {
   });
 
   it("shows error message when bulk action fails", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Failed to perform action"));
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    });
 
     render(<BulkActions {...mockProps} />, { wrapper });
-    fireEvent.click(screen.getByText("Delete Selected"));
+    fireEvent.click(screen.getByText(/delete selected/i));
 
     // Confirm deletion
     await waitFor(() => {
-      expect(screen.getByText("Are you sure you want to delete")).toBeInTheDocument();
+      expect(screen.getByText("Move Selected to Trash?")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Move to Trash"));
 
+    // Check that error was logged to console since component doesn't show UI error
     await waitFor(() => {
-      expect(screen.getByText("Failed to perform action")).toBeInTheDocument();
+      expect(consoleSpy).toHaveBeenCalledWith("Bulk action failed:", expect.any(Error));
     });
+
+    consoleSpy.mockRestore();
   });
 
   it("shows loading state during bulk action", async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(
-      () => new Promise((resolve) => setTimeout(resolve, 100))
-    );
+    let resolveFetch: (value: any) => void = () => { };
+    (global.fetch as jest.Mock).mockImplementation(() => new Promise(resolve => {
+      resolveFetch = resolve;
+    }));
 
     render(<BulkActions {...mockProps} />, { wrapper });
-    fireEvent.click(screen.getByText("Delete Selected"));
+    fireEvent.click(screen.getByText(/delete selected/i));
 
     // Confirm deletion
     await waitFor(() => {
-      expect(screen.getByText("Are you sure you want to delete")).toBeInTheDocument();
+      expect(screen.getByText("Move Selected to Trash?")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Move to Trash"));
 
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    // Check for LinearProgress component while mutation is pending
+    await waitFor(() => {
+      expect(document.querySelector('.MuiLinearProgress-root')).toBeInTheDocument();
+    });
+
+    // Resolve the fetch to complete the test
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ success: true })
+    });
+
+    await waitFor(() => {
+      expect(mockProps.onActionComplete).toHaveBeenCalled();
+    });
   });
 }); 

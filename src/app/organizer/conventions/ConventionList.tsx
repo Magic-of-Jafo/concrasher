@@ -56,10 +56,10 @@ const formatDateToDDMonYY_UTC = (date: Date | string | null): string => {
     // console.log('Date is null or empty, returning N/A');
     return "N/A";
   }
-  const d = new Date(date); 
+  const d = new Date(date);
   if (isNaN(d.getTime())) {
     // console.log('Parsed date is invalid (isNaN), returning N/A. Original value:', date);
-    return "N/A"; 
+    return "N/A";
   }
 
   const day = String(d.getUTCDate()).padStart(2, '0');
@@ -95,8 +95,8 @@ const getColumns = (viewMode?: "active" | "deleted", onActionComplete?: () => vo
           params.value === "PUBLISHED"
             ? "success"
             : params.value === "DRAFT"
-            ? "default"
-            : "warning"
+              ? "default"
+              : "warning"
         }
         size="small"
       />
@@ -135,12 +135,8 @@ const getColumns = (viewMode?: "active" | "deleted", onActionComplete?: () => vo
     sortable: false,
     renderCell: (params: GridRenderCellParams) => (
       <ConventionActions
-        conventionId={params.row.id}
-        conventionName={params.row.name}
-        currentStatus={params.row.status}
-        deletedAt={params.row.deletedAt}
-        onActionComplete={onActionComplete}
-        slug={params.row.slug}
+        convention={params.row}
+        onConventionUpdated={onActionComplete}
       />
     ),
   },
@@ -167,12 +163,12 @@ export default function ConventionList({ conventions, isAdmin, viewMode = "activ
       )} */}
       <Box sx={{ height: 600, width: "100%" }}>
         <DataGrid
-          rows={gridRows} 
+          rows={gridRows}
           columns={columns}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[10, 25, 50]}
-          getRowId={(row) => row.id} 
+          getRowId={(row) => row.id}
         />
       </Box>
     </Box>

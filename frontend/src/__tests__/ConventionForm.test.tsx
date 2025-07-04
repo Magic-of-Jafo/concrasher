@@ -27,6 +27,7 @@ describe('ConventionForm', () => {
 
   it('renders the form', () => {
     render(<ConventionForm />);
-    expect(screen.getByRole('form')).toBeInTheDocument();
+    // Check for form element directly since empty forms don't get form role
+    expect(document.querySelector('form')).toBeInTheDocument();
   });
 }); 

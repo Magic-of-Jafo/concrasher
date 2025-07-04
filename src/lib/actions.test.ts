@@ -1,3 +1,34 @@
+// Mock variables will be created inside jest.mock() factory functions
+
+// Mock authOptions directly to prevent circular dependency
+jest.mock('@/lib/auth', () => ({
+  authOptions: {},
+}));
+
+// Mocks
+jest.mock('next-auth/next', () => ({
+  getServerSession: jest.fn(),
+}));
+
+jest.mock('./db', () => ({
+  db: {
+    user: {
+      update: jest.fn(),
+    },
+    roleApplication: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn(),
+    },
+    $transaction: jest.fn().mockImplementation(async (callback) => callback(require('./db').db)),
+  },
+}));
+
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}));
+
+// Now import the modules after mocks are set up
 import { updateUserProfile } from './actions';
 import { getServerSession } from 'next-auth/next';
 import { db } from './db';
@@ -6,39 +37,16 @@ import { ProfileSchema } from './validators';
 import { reviewOrganizerApplication, getPendingOrganizerApplicationsAction } from './actions';
 import { Role, ApplicationStatus, RequestedRole, User } from '@prisma/client';
 
-// Mocks
-jest.mock('next-auth/next', () => ({
-  getServerSession: jest.fn(),
-}));
-
-// Expanded mock for the entire db object as needed by tests
-const mockUserUpdate = jest.fn();
-const mockRoleApplicationFindUnique = jest.fn();
-const mockRoleApplicationUpdate = jest.fn();
-const mockRoleApplicationFindMany = jest.fn();
-const mockTransaction = jest.fn().mockImplementation(async (callback) => callback(db)); // Basic pass-through for transaction
-
-jest.mock('./db', () => ({
-  db: {
-    user: {
-      update: mockUserUpdate,
-    },
-    roleApplication: {
-      findUnique: mockRoleApplicationFindUnique,
-      update: mockRoleApplicationUpdate,
-      findMany: mockRoleApplicationFindMany,
-    },
-    $transaction: mockTransaction,
-  },
-}));
-
-jest.mock('next/cache', () => ({
-  revalidatePath: jest.fn(),
-}));
-
 // Typed mocks
 const mockGetServerSession = getServerSession as jest.MockedFunction<typeof getServerSession>;
 const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
+
+// Get mock functions from mocked db
+const mockUserUpdate = db.user.update as jest.MockedFunction<typeof db.user.update>;
+const mockRoleApplicationFindUnique = db.roleApplication.findUnique as jest.MockedFunction<typeof db.roleApplication.findUnique>;
+const mockRoleApplicationUpdate = db.roleApplication.update as jest.MockedFunction<typeof db.roleApplication.update>;
+const mockRoleApplicationFindMany = db.roleApplication.findMany as jest.MockedFunction<typeof db.roleApplication.findMany>;
+const mockTransaction = db.$transaction as jest.MockedFunction<typeof db.$transaction>;
 
 describe('updateUserProfile Server Action', () => {
   beforeEach(() => {
@@ -84,7 +92,7 @@ describe('updateUserProfile Server Action', () => {
       ...validProfileData,
       image: null, // Assuming image is part of user model
     };
-    mockUserUpdate.mockResolvedValue(updatedUser);
+    mockUserUpdate.mockResolvedValue(updatedUser as any);
 
     const result = await updateUserProfile(validProfileData);
 
@@ -118,7 +126,7 @@ describe('updateUserProfile Server Action', () => {
     const partialData = { name: 'Only New Name' };
     const expectedDbData = { name: 'Only New Name', bio: undefined }; // Zod makes unspecified optionals undefined
     const updatedUser = { ...mockSession.user, ...expectedDbData };
-    mockUserUpdate.mockResolvedValue(updatedUser);
+    mockUserUpdate.mockResolvedValue(updatedUser as any);
 
     const result = await updateUserProfile(partialData);
 
@@ -135,7 +143,7 @@ describe('updateUserProfile Server Action', () => {
     const partialData = { bio: 'Only New Bio' };
     const expectedDbData = { name: undefined, bio: 'Only New Bio' };
     const updatedUser = { ...mockSession.user, ...expectedDbData };
-    mockUserUpdate.mockResolvedValue(updatedUser);
+    mockUserUpdate.mockResolvedValue(updatedUser as any);
 
     const result = await updateUserProfile(partialData);
 
@@ -150,9 +158,9 @@ describe('updateUserProfile Server Action', () => {
   it('should allow clearing bio by passing an empty string (if schema allows, current does)', async () => {
     mockGetServerSession.mockResolvedValue(mockSession);
     const dataToClearBio = { name: 'Keep Name', bio: '' };
-    const expectedDbData = { name: 'Keep Name', bio: '' }; 
-    const updatedUser = { ...mockSession.user, ...expectedDbData };    
-    mockUserUpdate.mockResolvedValue(updatedUser);
+    const expectedDbData = { name: 'Keep Name', bio: '' };
+    const updatedUser = { ...mockSession.user, ...expectedDbData };
+    mockUserUpdate.mockResolvedValue(updatedUser as any);
 
     const result = await updateUserProfile(dataToClearBio);
     expect(result.success).toBe(true);
@@ -168,7 +176,7 @@ describe('reviewOrganizerApplication', () => {
   beforeEach(() => {
     jest.clearAllMocks(); // Clears all mocks, including those above
     // Re-mock transaction specifically if its behavior needs to be default for this suite
-    mockTransaction.mockImplementation(async (callback) => callback(db)); 
+    mockTransaction.mockImplementation(async (callback) => callback(db));
   });
 
   const adminUserSession = {
@@ -200,8 +208,8 @@ describe('reviewOrganizerApplication', () => {
   it('should approve a pending ORGANIZER application', async () => {
     mockGetServerSession.mockResolvedValue(adminUserSession as any);
     mockRoleApplicationFindUnique.mockResolvedValue(pendingOrganizerApplication);
-    mockUserUpdate.mockResolvedValue({}); 
-    mockRoleApplicationUpdate.mockResolvedValue({}); 
+    mockUserUpdate.mockResolvedValue({} as any);
+    mockRoleApplicationUpdate.mockResolvedValue({} as any);
 
     const result = await reviewOrganizerApplication(sampleApplicationId, ApplicationStatus.APPROVED);
 
@@ -223,7 +231,7 @@ describe('reviewOrganizerApplication', () => {
   it('should reject a pending ORGANIZER application', async () => {
     mockGetServerSession.mockResolvedValue(adminUserSession as any);
     mockRoleApplicationFindUnique.mockResolvedValue(pendingOrganizerApplication);
-    mockRoleApplicationUpdate.mockResolvedValue({});
+    mockRoleApplicationUpdate.mockResolvedValue({} as any);
 
     const result = await reviewOrganizerApplication(sampleApplicationId, ApplicationStatus.REJECTED);
 
@@ -265,12 +273,12 @@ describe('reviewOrganizerApplication', () => {
     expect(result.success).toBe(false);
     expect(result.message).toBe('This action is only for ORGANIZER role applications.');
   });
-  
+
   it('should return error if application is not PENDING', async () => {
     mockGetServerSession.mockResolvedValue(adminUserSession as any);
     mockRoleApplicationFindUnique.mockResolvedValue({
       ...pendingOrganizerApplication,
-      status: ApplicationStatus.APPROVED, 
+      status: ApplicationStatus.APPROVED,
     });
     const result = await reviewOrganizerApplication(sampleApplicationId, ApplicationStatus.APPROVED);
     expect(result.success).toBe(false);
@@ -303,12 +311,12 @@ describe('reviewOrganizerApplication', () => {
       ...pendingOrganizerApplication,
       user: {
         ...pendingOrganizerApplication.user,
-        roles: [Role.USER, Role.ORGANIZER] as Role[], 
+        roles: [Role.USER, Role.ORGANIZER] as Role[],
       } as User & { roles: Role[] }, // Cast to satisfy stricter type check if necessary
     };
     mockRoleApplicationFindUnique.mockResolvedValue(appWithUserAlreadyOrganizer);
-    mockUserUpdate.mockResolvedValue({});
-    mockRoleApplicationUpdate.mockResolvedValue({});
+    mockUserUpdate.mockResolvedValue({} as any);
+    mockRoleApplicationUpdate.mockResolvedValue({} as any);
 
     const result = await reviewOrganizerApplication(sampleApplicationId, ApplicationStatus.APPROVED);
     expect(result.success).toBe(true);
@@ -346,15 +354,15 @@ describe('getPendingOrganizerApplicationsAction', () => {
     mockGetServerSession.mockResolvedValue(adminUserSession as any);
     const mockAppsRaw = [
       { ...pendingOrganizerApplicationForList, id: 'app1' },
-      { 
-        ...pendingOrganizerApplicationForList, 
-        id: 'app2', 
-        userId: 'user789', 
-        user: { id: 'user789', name: 'Another User', email: 'another@example.com' } 
+      {
+        ...pendingOrganizerApplicationForList,
+        id: 'app2',
+        userId: 'user789',
+        user: { id: 'user789', name: 'Another User', email: 'another@example.com' }
       },
     ];
     // Ensure dates are actual Date objects for the mockResolvedValue, action will stringify them
-    const mockAppsWithDates = mockAppsRaw.map(app => ({...app, createdAt: new Date(), updatedAt: new Date()}));
+    const mockAppsWithDates = mockAppsRaw.map(app => ({ ...app, createdAt: new Date(), updatedAt: new Date() }));
     mockRoleApplicationFindMany.mockResolvedValue(mockAppsWithDates);
 
     const result = await getPendingOrganizerApplicationsAction();
@@ -384,7 +392,7 @@ describe('getPendingOrganizerApplicationsAction', () => {
   });
 
   it('should return unauthorized if user is not admin', async () => {
-    mockGetServerSession.mockResolvedValue({ user: { id: 'someUserId', roles: [Role.USER] as Role[]}} as any);
+    mockGetServerSession.mockResolvedValue({ user: { id: 'someUserId', roles: [Role.USER] as Role[] } } as any);
     const result = await getPendingOrganizerApplicationsAction();
     expect(result.success).toBe(false);
     expect(result.error).toBe('Unauthorized: Admin role required.');

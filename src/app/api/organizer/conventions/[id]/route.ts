@@ -48,17 +48,20 @@ async function processPhotos(
 
 // Helper function to check ownership or admin status
 async function authorizeAccess(userId: string, userRoles: Role[], conventionId: string): Promise<boolean> {
-  const convention = await prisma.convention.findUnique({
-    where: { id: conventionId },
+  if (userRoles.includes(Role.ADMIN)) {
+    return true; // Admins have access, short-circuit
+  }
+
+  const convention = await prisma.convention.findFirst({
+    where: {
+      id: conventionId,
+      deletedAt: null,
+    },
     include: { series: true },
   });
 
   if (!convention) {
     return false; // Convention not found, access implicitly denied for operation
-  }
-
-  if (userRoles.includes(Role.ADMIN)) {
-    return true; // Admins have access
   }
 
   // Organizers can only access their own conventions
@@ -74,6 +77,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log(`[API GET /organizer/conventions/:id] -- Attempting to fetch convention with ID: ${params.id}`);
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -84,9 +88,9 @@ export async function GET(
   const hasAccess = await authorizeAccess(session.user.id, session.user.roles as Role[], params.id);
   if (!hasAccess) {
     // Attempt to fetch convention again just to give a 404 if it doesn't exist, vs 403 if it does but no access.
-    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null }});
+    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null } });
     if (!conventionExists) {
-        return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
+      return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -97,12 +101,12 @@ export async function GET(
         id: params.id,
         deletedAt: null, // Ensure we don't fetch soft-deleted conventions
       },
-      include: { 
+      include: {
         series: true,
         priceTiers: true, // Include PriceTiers
         priceDiscounts: true, // Include PriceDiscounts (though these are more complex to load directly)
-                              // Consider if PriceDiscounts should be a separate fetch or structured differently
-                              // For now, including them to see if it works for the page load.
+        // Consider if PriceDiscounts should be a separate fetch or structured differently
+        // For now, including them to see if it works for the page load.
         venues: true, // Include venues
         hotels: true, // Include hotels
       }
@@ -137,9 +141,9 @@ export async function PUT(
 
   const hasAccess = await authorizeAccess(session.user.id, session.user.roles as Role[], params.id);
   if (!hasAccess) {
-    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null }});
+    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null } });
     if (!conventionExists) {
-        return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
+      return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -149,9 +153,9 @@ export async function PUT(
   try {
     const body = await request.json();
     console.log(`[API PUT /organizer/conventions/${conventionId}] Received body:`, JSON.stringify(body, null, 2));
-    const { 
+    const {
       venueHotel,
-      name, 
+      name,
       slug,
       startDate: rawStartDate,
       endDate: rawEndDate,
@@ -191,17 +195,17 @@ export async function PUT(
         const demotedPrimary = { ...primaryVenueData, isPrimaryVenue: false };
         secondaryVenuesData.push(demotedPrimary);
       }
-      
+
       // Set new primary venue
       primaryVenueData = promotedVenue;
-      
+
       // Remove promoted venue from secondary list
       secondaryVenuesData.splice(promotedVenueIndex, 1);
     }
     // --- End Process Venue Promotion ---
     console.log(`[API PUT /organizer/conventions/${conventionId}] After promotion - primaryVenueData:`, JSON.stringify(primaryVenueData, null, 2));
     console.log(`[API PUT /organizer/conventions/${conventionId}] After promotion - secondaryVenuesData:`, JSON.stringify(secondaryVenuesData, null, 2));
-    
+
     const conventionDataForUpdate: any = {
       name, slug, city, stateAbbreviation, stateName, country, status, seriesId,
       descriptionShort, descriptionMain, isOneDayEvent, isTBD,
@@ -211,7 +215,7 @@ export async function PUT(
 
     let finalStartDate: Date | null = null;
     let finalEndDate: Date | null = null;
-    conventionDataForUpdate.isOneDayEvent = isOneDayEvent; 
+    conventionDataForUpdate.isOneDayEvent = isOneDayEvent;
 
     if (isTBD) {
       finalStartDate = rawStartDate ? new Date(rawStartDate) : null;
@@ -219,7 +223,7 @@ export async function PUT(
       if (finalStartDate && isNaN(finalStartDate.getTime())) return NextResponse.json({ error: 'Invalid start date format when TBD' }, { status: 400 });
       if (finalEndDate && isNaN(finalEndDate.getTime())) return NextResponse.json({ error: 'Invalid end date format when TBD' }, { status: 400 });
       if (finalStartDate && finalEndDate && finalStartDate > finalEndDate) return NextResponse.json({ error: 'Start date must be before end date, even if TBD' }, { status: 400 });
-      conventionDataForUpdate.isOneDayEvent = false; 
+      conventionDataForUpdate.isOneDayEvent = false;
     } else {
       if (!rawStartDate || !rawEndDate) return NextResponse.json({ error: 'Start date and end date are required when not TBD' }, { status: 400 });
       finalStartDate = new Date(rawStartDate);
@@ -241,15 +245,15 @@ export async function PUT(
       const validStatuses = Object.values(ConventionStatus);
       if (typeof status !== 'string' || !validStatuses.includes(status as ConventionStatus)) return NextResponse.json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` }, { status: 400 });
     }
-    
-    const existingConvention = await prisma.convention.findFirst({ where: { id: conventionId, deletedAt: null }});
+
+    const existingConvention = await prisma.convention.findFirst({ where: { id: conventionId, deletedAt: null } });
     if (!existingConvention) return NextResponse.json({ error: 'Convention not found or deleted, cannot update.' }, { status: 404 });
 
     if (slug && slug !== existingConvention.slug) {
-      const conflictingConvention = await prisma.convention.findFirst({ where: { slug: slug, id: { not: conventionId }, deletedAt: null }});
+      const conflictingConvention = await prisma.convention.findFirst({ where: { slug: slug, id: { not: conventionId }, deletedAt: null } });
       if (conflictingConvention) return NextResponse.json({ error: 'Slug already in use.' }, { status: 409 });
-      conventionDataForUpdate.slug = slug; 
-    } 
+      conventionDataForUpdate.slug = slug;
+    }
 
     const updatedConvention = await prisma.convention.update({
       where: { id: conventionId },
@@ -265,57 +269,57 @@ export async function PUT(
 
     // --- ScheduleDay isOfficial status update logic ---
     if (updatedConvention.startDate && updatedConvention.endDate) {
-        const newStartDate = new Date(updatedConvention.startDate);
-        const newEndDate = new Date(updatedConvention.endDate);
-        const scheduleDaysToAdjust = await prisma.scheduleDay.findMany({
-            where: { conventionId: updatedConvention.id },
-        });
+      const newStartDate = new Date(updatedConvention.startDate);
+      const newEndDate = new Date(updatedConvention.endDate);
+      const scheduleDaysToAdjust = await prisma.scheduleDay.findMany({
+        where: { conventionId: updatedConvention.id },
+      });
 
-        const scheduleDayUpdates: Prisma.PrismaPromise<any>[] = [];
+      const scheduleDayUpdates: Prisma.PrismaPromise<any>[] = [];
 
-        for (const day of scheduleDaysToAdjust) {
-            const actualDayDate = new Date(newStartDate); // Start with the convention's new start date
-            // Adjust actualDayDate by day.dayOffset
-            // Using setUTCDate and getUTCDate to work consistently with date parts regardless of server/db timezone for date-only logic.
-            actualDayDate.setUTCDate(newStartDate.getUTCDate() + day.dayOffset);
-            actualDayDate.setUTCHours(0,0,0,0); // Normalize to start of day UTC for comparison
+      for (const day of scheduleDaysToAdjust) {
+        const actualDayDate = new Date(newStartDate); // Start with the convention's new start date
+        // Adjust actualDayDate by day.dayOffset
+        // Using setUTCDate and getUTCDate to work consistently with date parts regardless of server/db timezone for date-only logic.
+        actualDayDate.setUTCDate(newStartDate.getUTCDate() + day.dayOffset);
+        actualDayDate.setUTCHours(0, 0, 0, 0); // Normalize to start of day UTC for comparison
 
-            // Normalize convention start/end dates to start of day UTC for comparison
-            const normalizedNewStartDate = new Date(newStartDate);
-            normalizedNewStartDate.setUTCHours(0,0,0,0);
-            const normalizedNewEndDate = new Date(newEndDate);
-            normalizedNewEndDate.setUTCHours(0,0,0,0);
-            
-            let newIsOfficialStatus = day.isOfficial; // Default to its current status
+        // Normalize convention start/end dates to start of day UTC for comparison
+        const normalizedNewStartDate = new Date(newStartDate);
+        normalizedNewStartDate.setUTCHours(0, 0, 0, 0);
+        const normalizedNewEndDate = new Date(newEndDate);
+        normalizedNewEndDate.setUTCHours(0, 0, 0, 0);
 
-            // Check if the schedule day (after offset calculation) is outside the new convention date range
-            if (actualDayDate.getTime() < normalizedNewStartDate.getTime() || actualDayDate.getTime() > normalizedNewEndDate.getTime()) {
-                newIsOfficialStatus = false;
-            } else {
-                // If the day's actual date is within the new convention date range, it should be official.
-                // This handles cases where the convention is extended to cover a day that might have been manually added as non-official.
-                newIsOfficialStatus = true; 
-            }
+        let newIsOfficialStatus = day.isOfficial; // Default to its current status
 
-            if (newIsOfficialStatus !== day.isOfficial) {
-                scheduleDayUpdates.push(
-                    prisma.scheduleDay.update({
-                        where: { id: day.id },
-                        data: { isOfficial: newIsOfficialStatus },
-                    })
-                );
-            }
+        // Check if the schedule day (after offset calculation) is outside the new convention date range
+        if (actualDayDate.getTime() < normalizedNewStartDate.getTime() || actualDayDate.getTime() > normalizedNewEndDate.getTime()) {
+          newIsOfficialStatus = false;
+        } else {
+          // If the day's actual date is within the new convention date range, it should be official.
+          // This handles cases where the convention is extended to cover a day that might have been manually added as non-official.
+          newIsOfficialStatus = true;
         }
 
-        if (scheduleDayUpdates.length > 0) {
-            console.log(`[API PUT /organizer/conventions/${conventionId}] Updating 'isOfficial' status for ${scheduleDayUpdates.length} schedule days.`);
-            await prisma.$transaction(scheduleDayUpdates);
-            // Consider revalidating schedule-specific paths if necessary
-            // e.g., revalidatePath(`/organizer/conventions/edit/${conventionId}/schedule`);
-            // However, the final revalidation for the whole convention might cover this.
+        if (newIsOfficialStatus !== day.isOfficial) {
+          scheduleDayUpdates.push(
+            prisma.scheduleDay.update({
+              where: { id: day.id },
+              data: { isOfficial: newIsOfficialStatus },
+            })
+          );
         }
+      }
+
+      if (scheduleDayUpdates.length > 0) {
+        console.log(`[API PUT /organizer/conventions/${conventionId}] Updating 'isOfficial' status for ${scheduleDayUpdates.length} schedule days.`);
+        await prisma.$transaction(scheduleDayUpdates);
+        // Consider revalidating schedule-specific paths if necessary
+        // e.g., revalidatePath(`/organizer/conventions/edit/${conventionId}/schedule`);
+        // However, the final revalidation for the whole convention might cover this.
+      }
     } else {
-        console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping ScheduleDay 'isOfficial' update due to missing start/end dates on updatedConvention.`);
+      console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping ScheduleDay 'isOfficial' update due to missing start/end dates on updatedConvention.`);
     }
     // --- END ScheduleDay isOfficial status update logic ---
 
@@ -349,7 +353,7 @@ export async function PUT(
       };
       console.log(`[API PUT /organizer/conventions/${conventionId}] Attempting to upsert PRIMARY venue. Current ID on primaryVenueData: ${primaryVenueData.id}. Payload for upsert:`, JSON.stringify(payload, null, 2));
       const upsertedPrimaryVenue = await prisma.venue.upsert({
-        where: { id: primaryVenueData.id || generateShortRandomId() }, 
+        where: { id: primaryVenueData.id || generateShortRandomId() },
         create: { ...payload, convention: { connect: { id: updatedConvention.id } } },
         update: payload, // conventionId is not updated for existing records
       });
@@ -384,11 +388,11 @@ export async function PUT(
         parkingInfo: sv.parkingInfo || '',
         publicTransportInfo: sv.publicTransportInfo || '',
         overallAccessibilityNotes: sv.overallAccessibilityNotes || '',
-         // Photos are handled after upsert
+        // Photos are handled after upsert
       };
       console.log(`[API PUT /organizer/conventions/${conventionId}] Attempting to upsert SECONDARY venue. Current ID on sv: ${sv.id}. Payload for upsert:`, JSON.stringify(payload, null, 2));
       const upsertedSecondaryVenue = await prisma.venue.upsert({
-        where: { id: sv.id || generateShortRandomId() }, 
+        where: { id: sv.id || generateShortRandomId() },
         create: { ...payload, convention: { connect: { id: updatedConvention.id } } },
         update: payload,
       });
@@ -411,7 +415,7 @@ export async function PUT(
       }
     }
     // --- END VENUE PROCESSING ---
-    
+
 
     // --- NEW HOTEL PROCESSING BLOCK ---
     console.log("--- DEBUGGING HOTEL PROCESSING (ORGANIZER ROUTE) ---");
@@ -437,11 +441,11 @@ export async function PUT(
       console.log(`[API PUT /organizer/conventions/${conventionId}] CHECKPOINT 3: guestsStayAtPrimaryVenue is FALSE/undefined. Processing primaryHotelDetails.`);
       if (primaryHotelDetailsFromRequest && primaryHotelDetailsFromRequest.hotelName) {
         console.log(`[API PUT /organizer/conventions/${conventionId}] CHECKPOINT 4: primaryHotelDetailsFromRequest HAS hotelName. Upserting it as primary.`);
-        
+
         // Unset any other hotel that might be primary
         await prisma.hotel.updateMany({
-          where: { 
-            conventionId: updatedConvention.id, 
+          where: {
+            conventionId: updatedConvention.id,
             isPrimaryHotel: true,
             id: primaryHotelDetailsFromRequest.id ? { not: primaryHotelDetailsFromRequest.id } : undefined // don't unmark itself if updating
           },
@@ -482,10 +486,10 @@ export async function PUT(
         incomingHotelIds.add(upsertedPrimaryHotel.id);
         primaryHotelIdToKeep = upsertedPrimaryHotel.id;
         console.log(`[API PUT /organizer/conventions/${conventionId}] Upserted primary hotel:`, JSON.stringify(upsertedPrimaryHotel, null, 2));
-        
+
         // Process photos for Primary Hotel
         if (primaryHotelDetailsFromRequest.photos) { // Ensure photos array exists
-            await processPhotos(upsertedPrimaryHotel.id, primaryHotelDetailsFromRequest.photos, prisma.hotelPhoto, 'hotelId');
+          await processPhotos(upsertedPrimaryHotel.id, primaryHotelDetailsFromRequest.photos, prisma.hotelPhoto, 'hotelId');
         }
       } else {
         console.log(`[API PUT /organizer/conventions/${conventionId}] CHECKPOINT 5: guestsStayAtPrimaryVenue is FALSE, but NO primaryHotelDetails. Unmarking all hotels as primary.`);
@@ -502,13 +506,13 @@ export async function PUT(
     if (Array.isArray(additionalHotelsFromRequest)) {
       for (const hotelData of additionalHotelsFromRequest) {
         if (!hotelData.hotelName) {
-            console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping additional hotel due to no hotelName. Data:`, JSON.stringify(hotelData, null, 2));
-            continue;
+          console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping additional hotel due to no hotelName. Data:`, JSON.stringify(hotelData, null, 2));
+          continue;
         }
         // If this hotel was already processed as primary, skip it.
         if (hotelData.id && hotelData.id === primaryHotelIdToKeep) {
-            console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping hotel ID ${hotelData.id} in additionalHotels loop as it was already processed as primary.`);
-            continue;
+          console.log(`[API PUT /organizer/conventions/${conventionId}] Skipping hotel ID ${hotelData.id} in additionalHotels loop as it was already processed as primary.`);
+          continue;
         }
 
         const hotelPayload = {
@@ -536,7 +540,7 @@ export async function PUT(
           // Photos are handled after upsert
         };
         console.log(`[API PUT /organizer/conventions/${conventionId}] Upserting ADDITIONAL hotel. ID: ${hotelData.id}. Payload:`, JSON.stringify(hotelPayload, null, 2));
-        
+
         const upsertedHotel = await prisma.hotel.upsert({
           where: { id: hotelData.id || generateShortRandomId() },
           create: { ...hotelPayload, convention: { connect: { id: updatedConvention.id } } },
@@ -547,7 +551,7 @@ export async function PUT(
 
         // Process photos for Additional Hotel
         if (hotelData.photos) { // Ensure photos array exists
-            await processPhotos(upsertedHotel.id, hotelData.photos, prisma.hotelPhoto, 'hotelId');
+          await processPhotos(upsertedHotel.id, hotelData.photos, prisma.hotelPhoto, 'hotelId');
         }
       }
     }
@@ -568,109 +572,109 @@ export async function PUT(
 
     // --- Process Price Tiers ---
     if (Array.isArray(priceTiers)) {
-        // Delete tiers not present in the incoming array
-        const incomingTierIds = priceTiers.map(tier => tier.id).filter(id => id);
-        if (incomingTierIds.length > 0) {
+      // Delete tiers not present in the incoming array
+      const incomingTierIds = priceTiers.map(tier => tier.id).filter(id => id);
+      if (incomingTierIds.length > 0) {
         await prisma.priceTier.deleteMany({
-            where: {
-                conventionId: updatedConvention.id,
-                NOT: {
-                    id: { in: incomingTierIds }
-                }
+          where: {
+            conventionId: updatedConvention.id,
+            NOT: {
+              id: { in: incomingTierIds }
             }
+          }
         });
-        } else { // If no tiers are incoming, delete all existing for this convention
-             await prisma.priceTier.deleteMany({
-                where: { conventionId: updatedConvention.id }
-            });
-        }
+      } else { // If no tiers are incoming, delete all existing for this convention
+        await prisma.priceTier.deleteMany({
+          where: { conventionId: updatedConvention.id }
+        });
+      }
 
-        // Upsert incoming tiers
-        for (const tierData of priceTiers) {
-            const tierPayload = {
-                label: tierData.label,
-                amount: parseFloat(tierData.amount), // Ensure amount is float
-                order: tierData.order,
-            };
-            if (tierData.id) {
-                await prisma.priceTier.update({
-                    where: { id: tierData.id },
-                    data: tierPayload,
-                });
-            } else {
-                await prisma.priceTier.create({
-                    data: { ...tierPayload, convention: { connect: { id: updatedConvention.id } } },
-                });
-            }
+      // Upsert incoming tiers
+      for (const tierData of priceTiers) {
+        const tierPayload = {
+          label: tierData.label,
+          amount: parseFloat(tierData.amount), // Ensure amount is float
+          order: tierData.order,
+        };
+        if (tierData.id) {
+          await prisma.priceTier.update({
+            where: { id: tierData.id },
+            data: tierPayload,
+          });
+        } else {
+          await prisma.priceTier.create({
+            data: { ...tierPayload, convention: { connect: { id: updatedConvention.id } } },
+          });
         }
+      }
     } else { // If priceTiers array is not provided, or null, assume all existing should be deleted
-        await prisma.priceTier.deleteMany({
-            where: { conventionId: updatedConvention.id }
-        });
+      await prisma.priceTier.deleteMany({
+        where: { conventionId: updatedConvention.id }
+      });
     }
     // --- End Process Price Tiers ---
 
     // --- Process Price Discounts ---
     if (Array.isArray(priceDiscounts)) {
-        const incomingDiscountIds = priceDiscounts.map(discount => discount.id).filter(id => id);
-        if (incomingDiscountIds.length > 0) {
+      const incomingDiscountIds = priceDiscounts.map(discount => discount.id).filter(id => id);
+      if (incomingDiscountIds.length > 0) {
         await prisma.priceDiscount.deleteMany({
-            where: {
-                conventionId: updatedConvention.id,
-                NOT: {
-                    id: { in: incomingDiscountIds }
-                }
+          where: {
+            conventionId: updatedConvention.id,
+            NOT: {
+              id: { in: incomingDiscountIds }
             }
+          }
         });
-        } else { // If no discounts are incoming, delete all existing for this convention
-            await prisma.priceDiscount.deleteMany({
-                where: { conventionId: updatedConvention.id }
-            });
-        }
-        
-        for (const discountData of priceDiscounts) {
-            const discountPayload: any = { // Use 'any' temporarily for flexibility
-                code: discountData.code, // Assuming code is always present
-                percentage: discountData.percentage ? parseFloat(discountData.percentage) : null,
-                fixedAmount: discountData.fixedAmount ? parseFloat(discountData.fixedAmount) : null,
-                cutoffDate: discountData.cutoffDate ? new Date(discountData.cutoffDate) : null,
-                priceTierId: discountData.priceTierId || null, // Link to priceTier
-            };
-            // Ensure only one of percentage or fixedAmount is set
-            if (discountPayload.percentage && discountPayload.fixedAmount) {
-                // Handle error or prioritize one, e.g., clear fixedAmount if percentage is set
-                console.warn(`[API PUT /organizer/conventions/${conventionId}] Discount has both percentage and fixedAmount. Prioritizing percentage.`);
-                discountPayload.fixedAmount = null;
-            }
+      } else { // If no discounts are incoming, delete all existing for this convention
+        await prisma.priceDiscount.deleteMany({
+          where: { conventionId: updatedConvention.id }
+        });
+      }
 
-            if (discountData.id) {
-                await prisma.priceDiscount.update({
-                    where: { id: discountData.id },
-                    data: discountPayload,
-                });
-            } else {
-                await prisma.priceDiscount.create({
-                    data: { ...discountPayload, convention: { connect: { id: updatedConvention.id } } },
-                });
-            }
+      for (const discountData of priceDiscounts) {
+        const discountPayload: any = { // Use 'any' temporarily for flexibility
+          code: discountData.code, // Assuming code is always present
+          percentage: discountData.percentage ? parseFloat(discountData.percentage) : null,
+          fixedAmount: discountData.fixedAmount ? parseFloat(discountData.fixedAmount) : null,
+          cutoffDate: discountData.cutoffDate ? new Date(discountData.cutoffDate) : null,
+          priceTierId: discountData.priceTierId || null, // Link to priceTier
+        };
+        // Ensure only one of percentage or fixedAmount is set
+        if (discountPayload.percentage && discountPayload.fixedAmount) {
+          // Handle error or prioritize one, e.g., clear fixedAmount if percentage is set
+          console.warn(`[API PUT /organizer/conventions/${conventionId}] Discount has both percentage and fixedAmount. Prioritizing percentage.`);
+          discountPayload.fixedAmount = null;
         }
+
+        if (discountData.id) {
+          await prisma.priceDiscount.update({
+            where: { id: discountData.id },
+            data: discountPayload,
+          });
+        } else {
+          await prisma.priceDiscount.create({
+            data: { ...discountPayload, convention: { connect: { id: updatedConvention.id } } },
+          });
+        }
+      }
     } else { // If priceDiscounts array is not provided, or null, delete all existing
-         await prisma.priceDiscount.deleteMany({
-            where: { conventionId: updatedConvention.id }
-        });
+      await prisma.priceDiscount.deleteMany({
+        where: { conventionId: updatedConvention.id }
+      });
     }
     // --- End Process Price Discounts ---
 
 
     // Fetch the fully updated convention to return
-    const finalUpdatedConvention = await prisma.convention.findUnique({
+    const finalUpdatedConvention = await prisma.convention.findFirst({
       where: { id: conventionId },
-      include: { 
-        series: true, 
+      include: {
+        series: true,
         venues: { include: { photos: true } }, // Include photos for venues
         hotels: { include: { photos: true } }, // Include photos for hotels
-        priceTiers: true, 
-        priceDiscounts: true 
+        priceTiers: true,
+        priceDiscounts: true
       },
     });
 
@@ -679,7 +683,7 @@ export async function PUT(
   } catch (error: any) {
     console.error(`[API PUT /organizer/conventions/${conventionId}] Error updating convention:`, error);
     if (error.code && error.meta) {
-        console.error(`[API PUT /organizer/conventions/${conventionId}] Prisma Error Code: ${error.code}, Meta: ${JSON.stringify(error.meta)}`);
+      console.error(`[API PUT /organizer/conventions/${conventionId}] Prisma Error Code: ${error.code}, Meta: ${JSON.stringify(error.meta)}`);
     }
     return NextResponse.json({ error: 'Failed to update convention', details: error.message }, { status: 500 });
   }
@@ -698,12 +702,12 @@ export async function DELETE(
   // Authorization check
   const hasAccess = await authorizeAccess(session.user.id, session.user.roles as Role[], params.id);
   if (!hasAccess) {
-    const conventionExists = await prisma.convention.findUnique({ where: { id: params.id } });
+    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null } });
     if (!conventionExists) {
-        return NextResponse.json({ error: 'Convention not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
     }
     if (conventionExists.deletedAt) {
-        return NextResponse.json({ error: 'Convention already deleted' }, { status: 400 });
+      return NextResponse.json({ error: 'Convention already deleted' }, { status: 400 });
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -712,7 +716,7 @@ export async function DELETE(
     const conventionToMarkDeleted = await prisma.convention.findFirst({
       where: {
         id: params.id,
-        deletedAt: null, 
+        deletedAt: null,
       },
     });
 
@@ -760,9 +764,9 @@ export async function PATCH(
   // Authorization check
   const hasAccess = await authorizeAccess(session.user.id, session.user.roles as Role[], params.id);
   if (!hasAccess) {
-    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null }});
+    const conventionExists = await prisma.convention.findFirst({ where: { id: params.id, deletedAt: null } });
     if (!conventionExists) {
-        return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
+      return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -789,11 +793,11 @@ export async function PATCH(
 
     // Ensure convention is not soft-deleted before update
     const existingConvention = await prisma.convention.findFirst({
-        where: { id: params.id, deletedAt: null }
+      where: { id: params.id, deletedAt: null }
     });
 
     if (!existingConvention) {
-        return NextResponse.json({ error: 'Convention not found or has been deleted, cannot update status.' }, { status: 404 });
+      return NextResponse.json({ error: 'Convention not found or has been deleted, cannot update status.' }, { status: 404 });
     }
 
     // Additional validation for specific status transitions can be added here if needed

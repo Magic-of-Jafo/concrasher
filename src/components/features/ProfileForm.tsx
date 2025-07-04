@@ -27,7 +27,7 @@ export default function ProfileForm({ currentName, currentBio, onProfileUpdate }
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileSchemaInput>({
-    resolver: zodResolver(ProfileSchema),
+    resolver: ProfileSchema ? zodResolver(ProfileSchema) : undefined,
     defaultValues: {
       name: currentName || '',
       bio: currentBio || '',
@@ -90,7 +90,7 @@ export default function ProfileForm({ currentName, currentBio, onProfileUpdate }
             label="Display Name"
             autoComplete="name"
             error={!!errors.name || !!fieldErrors?.name}
-            helperText={errors.name?.message || fieldErrors?.name?.[0]}
+            helperText={errors.name?.message || (fieldErrors?.name ? fieldErrors.name[0] : '')}
             disabled={isSubmitting}
           />
         )}
@@ -109,7 +109,7 @@ export default function ProfileForm({ currentName, currentBio, onProfileUpdate }
             multiline
             rows={4}
             error={!!errors.bio || !!fieldErrors?.bio}
-            helperText={errors.bio?.message || fieldErrors?.bio?.[0]}
+            helperText={errors.bio?.message || (fieldErrors?.bio ? fieldErrors.bio[0] : '')}
             disabled={isSubmitting}
           />
         )}

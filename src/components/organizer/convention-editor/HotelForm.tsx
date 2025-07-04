@@ -11,7 +11,7 @@ import ImageUploadInput from '@/components/shared/ImageUploadInput';
 // Assume this component takes an onUploadComplete callback which returns the uploaded file's URL
 const FileUploadPlaceholder = ({ onUploadComplete, disabled }: { onUploadComplete: (url: string) => void; disabled?: boolean; }) => {
   return (
-    <Button variant="contained" component="label" disabled={disabled} sx={{mb:1}}>
+    <Button variant="contained" component="label" disabled={disabled} sx={{ mb: 1 }}>
       Upload Photo
       <input type="file" hidden onChange={(e) => {
         if (e.target.files && e.target.files[0]) {
@@ -20,7 +20,7 @@ const FileUploadPlaceholder = ({ onUploadComplete, disabled }: { onUploadComplet
           setTimeout(() => {
             // const dummyUrl = URL.createObjectURL(e.target.files[0]);
             console.log("Placeholder: File selected for hotel photo.");
-            onUploadComplete(`https://via.placeholder.com/300x200.png?text=Hotel+Photo`); 
+            onUploadComplete(`https://via.placeholder.com/300x200.png?text=Hotel+Photo`);
             // URL.revokeObjectURL(dummyUrl); // Clean up
           }, 500);
         }
@@ -60,52 +60,33 @@ interface HotelFormProps {
     groupPrice?: string;
     bookingLink?: string;
     bookingCutoffDate?: string; // Assuming date errors are strings
+    parkingInfo?: string;
     // Add any other fields from HotelData that might have validation
   };
 }
 
-const HotelForm: React.FC<HotelFormProps> = ({ 
-  formData, 
-  onFormDataChange, 
-  isPrimaryHotel = false, 
+const HotelForm: React.FC<HotelFormProps> = ({
+  formData,
+  onFormDataChange,
+  isPrimaryHotel = false,
   title = "Hotel Details",
   disabled = false,
   errors // Destructure errors
 }) => {
-  const initialDescriptionRef = useRef(formData.description); // Store initial description
+  const initialDescriptionRef = useRef(formData.description);
 
-  // Update ref only when formData.id or tempId changes, indicating a different item
   useEffect(() => {
     initialDescriptionRef.current = formData.description;
-  }, [formData.id, (formData as any).tempId]); // Dependency on item identity
+  }, [formData.id, (formData as any).tempId]); // Dependency on item identity, ensuring type safety for tempId if not in HotelData
 
+  // --- START OF REWRITTEN handleChange FUNCTION ---
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = event.target;
-    
-    let finalValue = value;
-
-    // Special handling for websiteUrl to prepend http:// if no scheme is present
-    if (name === "websiteUrl") {
-      if (value && !value.match(/^(\w+):\/\//) && value.includes('.')) {
-        finalValue = `http://${value}`;
-      }
-      // For websiteUrl, call onFormDataChange directly with the potentially modified value.
-      onFormDataChange({ [name]: finalValue });
-      return; // Exit early as we've handled this field.
-    }
-    
-    // Handle other fields
-    if (type === 'checkbox') {
-      // This was for the removed isAtPrimaryVenueLocation switch. 
-      // If other checkboxes are added, this logic might be needed.
-      // const { checked } = event.target as HTMLInputElement;
-      // onFormDataChange({ [name]: checked }); 
-    } else if (name === 'amenitiesPasted') {
+    const { name, value } = event.target;
+    if (name === 'amenitiesPasted') {
       const amenitiesArray = value.split('\n').map(line => line.trim()).filter(line => line !== '');
       onFormDataChange({ amenities: amenitiesArray });
     } else {
-      // For any other fields not specifically handled above, update parent immediately.
-      onFormDataChange({ [name]: value });
+      onFormDataChange({ [name]: value } as Partial<HotelData>);
     }
   };
 
@@ -115,7 +96,7 @@ const HotelForm: React.FC<HotelFormProps> = ({
 
   const handleEditorChange = (content: any) => {
     if (!disabled) {
-        onFormDataChange({ description: content });
+      onFormDataChange({ description: content });
     }
   };
 
@@ -132,7 +113,7 @@ const HotelForm: React.FC<HotelFormProps> = ({
       // Ensure we preserve the URL when changing caption
       onFormDataChange({ photos: [{ ...formData.photos[0], url: formData.photos[0].url, caption: event.target.value }] });
     } else {
-       console.warn("Attempted to change caption but no photo exists in formData for hotel");
+      console.warn("Attempted to change caption but no photo exists in formData for hotel");
     }
   };
 
@@ -143,10 +124,10 @@ const HotelForm: React.FC<HotelFormProps> = ({
   const showLocationDetails = true; // Always show for both primary (if separate) and additional hotels.
 
   return (
-    <Box component="form" noValidate autoComplete="off" sx={{ mt: 2, mb: 3, p: isPrimaryHotel ? 0 : 2, border: isPrimaryHotel ? 'none' : '1px dashed grey', borderRadius: isPrimaryHotel? 0:1 }}>
+    <Box component="form" noValidate autoComplete="off" sx={{ mt: 2, mb: 3, p: isPrimaryHotel ? 0 : 2, border: isPrimaryHotel ? 'none' : '1px dashed grey', borderRadius: isPrimaryHotel ? 0 : 1 }}>
       <GlobalStyles />
       <Typography variant="h6" gutterBottom>{title}</Typography>
-      
+
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
           fullWidth
@@ -310,7 +291,7 @@ const HotelForm: React.FC<HotelFormProps> = ({
           disabled={disabled}
           error={!!errors?.bookingLink}
           helperText={errors?.bookingLink || ''}
-          sx={{ flexGrow: 2, flexBasis: {xs: '100%', md: '66%'} }}
+          sx={{ flexGrow: 2, flexBasis: { xs: '100%', md: '66%' } }}
         />
         <DatePicker
           label="Booking Cut-off Date"
@@ -323,10 +304,10 @@ const HotelForm: React.FC<HotelFormProps> = ({
               helperText: errors?.bookingCutoffDate || '',
             },
           }}
-          sx={{ flexGrow: 1, flexBasis: {xs: '100%', md: '33%'} }}
+          sx={{ flexGrow: 1, flexBasis: { xs: '100%', md: '33%' } }}
         />
       </Box>
-      
+
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Contact Information</Typography>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
@@ -358,8 +339,8 @@ const HotelForm: React.FC<HotelFormProps> = ({
       <TextField
         fullWidth
         label="Hotel Amenities (one per line)"
-        name="amenitiesPasted"
-        value={(formData.amenities || []).join('\n')}
+        name="amenitiesPasted" // <-- Note the name
+        value={(formData.amenities || []).join('\n')} // <-- Accessing formData.amenities
         onChange={handleChange}
         multiline
         rows={4}
@@ -370,40 +351,42 @@ const HotelForm: React.FC<HotelFormProps> = ({
 
       {showLocationDetails && (
         <>
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Hotel Location Access</Typography>
-            <TextField
-                fullWidth
-                label="Parking Information"
-                name="parkingInfo"
-                value={formData.parkingInfo || ''}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                disabled={disabled}
-                sx={{ mb: 2 }}
-            />
-            <TextField
-                fullWidth
-                label="Public Transportation Access"
-                name="publicTransportInfo"
-                value={formData.publicTransportInfo || ''}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                disabled={disabled}
-                sx={{ mb: 2 }}
-            />
-            <TextField
-                fullWidth
-                label="Overall Accessibility Notes (Hotel Specific)"
-                name="overallAccessibilityNotes"
-                value={formData.overallAccessibilityNotes || ''}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                disabled={disabled}
-                sx={{ mb: 2 }}
-            />
+          <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Hotel Location Access</Typography>
+          <TextField
+            fullWidth
+            label="Parking Information"
+            name="parkingInfo"
+            value={formData.parkingInfo || ''}
+            onChange={handleChange}
+            multiline
+            rows={3}
+            disabled={disabled}
+            error={!!errors?.parkingInfo}
+            helperText={errors?.parkingInfo || ''}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Public Transportation Access"
+            name="publicTransportInfo"
+            value={formData.publicTransportInfo || ''}
+            onChange={handleChange}
+            multiline
+            rows={3}
+            disabled={disabled}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Overall Accessibility Notes (Hotel Specific)"
+            name="overallAccessibilityNotes"
+            value={formData.overallAccessibilityNotes || ''}
+            onChange={handleChange}
+            multiline
+            rows={3}
+            disabled={disabled}
+            sx={{ mb: 2 }}
+          />
         </>
       )}
 
@@ -416,26 +399,26 @@ const HotelForm: React.FC<HotelFormProps> = ({
           onRemoveImage={handleRemovePhoto}
           disabled={disabled}
         />
-        {/* Caption field only if photo exists */} 
+        {/* Caption field only if photo exists */}
         {formData.photos && formData.photos.length > 0 && formData.photos[0].url && (
-            <TextField
-                fullWidth
-                label="Photo Caption"
-                value={formData.photos[0].caption || ''}
-                onChange={handleCaptionChange}
-                disabled={disabled}
-                variant="outlined"
-                size="small"
-                sx={{ mt: 1 }}
-            />
+          <TextField
+            fullWidth
+            label="Photo Caption"
+            value={formData.photos[0].caption || ''}
+            onChange={handleCaptionChange}
+            disabled={disabled}
+            variant="outlined"
+            size="small"
+            sx={{ mt: 1 }}
+          />
         )}
         {errors && (errors as any).photos && <Typography color="error" variant="caption">{(errors as any).photos}</Typography>}
       </Paper>
 
       {!isPrimaryHotel && (
-         <Button variant="outlined" color="error" onClick={() => console.log('TODO: Remove this hotel')} sx={{mt:1}}>
-           Remove Hotel
-         </Button>
+        <Button variant="outlined" color="error" onClick={() => console.log('TODO: Remove this hotel')} sx={{ mt: 1 }}>
+          Remove Hotel
+        </Button>
       )}
     </Box>
   );

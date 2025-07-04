@@ -1,14 +1,37 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: jafo38583
-      POSTGRES_PASSWORD: Alameda38583!
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Alameda45212!
       POSTGRES_DB: conventioncrasher_dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d conventioncrasher_dev" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prisma:
+    build:
+      context: .
+      dockerfile: prisma/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:Alameda45212!@postgres:5432/conventioncrasher_dev?schema=public"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for database to be fully available..."
+        sleep 10
+        echo "Applying migration using deploy..."
+        npx prisma migrate deploy
+
 volumes:
-  postgres_data: 
+  postgres_data:

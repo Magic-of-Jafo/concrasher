@@ -15,6 +15,7 @@ import {
   useTheme,
   useMediaQuery,
   Paper,
+  OutlinedInput,
 } from '@mui/material';
 import { FilterList as FilterIcon, Close as CloseIcon } from '@mui/icons-material';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -52,37 +53,37 @@ export function FilterPanel({ className }: FilterPanelProps) {
 
   const handleApplyFilters = () => {
     if (!searchParams) return;
-    
+
     const params = new URLSearchParams(searchParams.toString());
-    
+
     // Reset to page 1 when filters change
     params.set('page', '1');
-    
+
     // Update params with current filter values
     if (startDate) params.set('startDate', startDate.toISOString());
     else params.delete('startDate');
-    
+
     if (endDate) params.set('endDate', endDate.toISOString());
     else params.delete('endDate');
-    
+
     if (country) params.set('country', country);
     else params.delete('country');
-    
+
     if (state) params.set('state', state);
     else params.delete('state');
-    
+
     if (city) params.set('city', city);
     else params.delete('city');
-    
+
     if (status.length) params.set('status', status.join(','));
     else params.delete('status');
-    
+
     if (minPrice) params.set('minPrice', minPrice);
     else params.delete('minPrice');
-    
+
     if (maxPrice) params.set('maxPrice', maxPrice);
     else params.delete('maxPrice');
-    
+
     router.push(`/conventions?${params.toString()}`);
     if (isMobile) setIsOpen(false);
   };
@@ -96,7 +97,7 @@ export function FilterPanel({ className }: FilterPanelProps) {
     setStatus([]);
     setMinPrice('');
     setMaxPrice('');
-    
+
     if (!searchParams) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete('startDate');
@@ -108,7 +109,7 @@ export function FilterPanel({ className }: FilterPanelProps) {
     params.delete('minPrice');
     params.delete('maxPrice');
     params.set('page', '1');
-    
+
     router.push(`/conventions?${params.toString()}`);
   };
 
@@ -163,8 +164,8 @@ export function FilterPanel({ className }: FilterPanelProps) {
   };
 
   const filterContent = (
-    <Box 
-      component="form" 
+    <Box
+      component="form"
       onSubmit={(e) => {
         e.preventDefault();
         handleApplyFilters();
@@ -183,7 +184,6 @@ export function FilterPanel({ className }: FilterPanelProps) {
       <Stack spacing={2}>
         <LocalizationProvider dateAdapter={AdapterDateFns}>
           <DatePicker
-            label="Start Date"
             value={startDate}
             onChange={(newValue) => setStartDate(newValue)}
             slotProps={{
@@ -201,7 +201,6 @@ export function FilterPanel({ className }: FilterPanelProps) {
             }}
           />
           <DatePicker
-            label="End Date"
             value={endDate}
             onChange={(newValue) => setEndDate(newValue)}
             slotProps={{
@@ -265,11 +264,14 @@ export function FilterPanel({ className }: FilterPanelProps) {
         />
 
         <FormControl {...commonSelectProps}>
-          <InputLabel>Status</InputLabel>
+          <InputLabel id="status-select-label">Status</InputLabel>
           <Select
+            labelId="status-select-label"
+            id="status-select"
             multiple
             value={status}
             onChange={(e) => setStatus(e.target.value as ConventionStatus[])}
+            input={<OutlinedInput label="Status" />}
             renderValue={(selected) => (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {selected.map((value) => (

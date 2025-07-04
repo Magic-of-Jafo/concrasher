@@ -3,6 +3,24 @@ import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { NextRequest } from 'next/server';
 
+// Mock NextResponse
+jest.mock('next/server', () => ({
+  ...jest.requireActual('next/server'),
+  NextResponse: {
+    json: jest.fn((data, init) => {
+      const response = new Response(JSON.stringify(data), {
+        status: init?.status || 200,
+        statusText: init?.statusText || 'OK',
+        headers: {
+          'Content-Type': 'application/json',
+          ...init?.headers,
+        },
+      });
+      return response;
+    }),
+  },
+}));
+
 // Mock Prisma Client
 jest.mock('@prisma/client', () => {
   const mockPrismaClient = {
@@ -13,7 +31,7 @@ jest.mock('@prisma/client', () => {
   };
   return {
     PrismaClient: jest.fn(() => mockPrismaClient),
-    Role: { USER: 'USER' , ORGANIZER: 'ORGANIZER', TALENT: 'TALENT', ADMIN: 'ADMIN' }, // Mock Role enum
+    Role: { USER: 'USER', ORGANIZER: 'ORGANIZER', TALENT: 'TALENT', ADMIN: 'ADMIN' }, // Mock Role enum
   };
 });
 
@@ -33,12 +51,12 @@ const mockRequest = (body: any): NextRequest => {
 
 // Helper to get response body
 async function getResponseBody(response: Response) {
-    const text = await response.text();
-    try {
-        return JSON.parse(text);
-    } catch (e) {
-        return text; // In case it's not JSON, like a plain text error
-    }
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return text; // In case it's not JSON, like a plain text error
+  }
 }
 
 describe('POST /api/auth/register', () => {
@@ -153,7 +171,7 @@ describe('POST /api/auth/register', () => {
 
     prismaMock.user.findUnique.mockRejectedValue(new Error('Database connection failed')); // Simulate DB error
 
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
 
     const response = await POST(req);
     const responseBody = await getResponseBody(response);

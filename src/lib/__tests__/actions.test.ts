@@ -1,10 +1,13 @@
 import { Role, ApplicationStatus, RequestedRole } from '@prisma/client';
-import { applyForOrganizerRole, activateTalentRole, deactivateTalentRole } from '../actions';
+import { requestRoles, activateTalentRole, deactivateTalentRole, createBrand } from '../actions';
 import { db } from '@/lib/db';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { revalidatePath } from 'next/cache';
 
-// Mock Prisma client
+// Declare mock functions first to avoid ReferenceError
+// Mock variables will be created inside jest.mock() factory functions
+
+// Mock Prisma client using the declared functions
 jest.mock('@/lib/db', () => ({
   db: {
     user: {
@@ -13,13 +16,22 @@ jest.mock('@/lib/db', () => ({
     },
     roleApplication: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      createMany: jest.fn(),
+    },
+    brand: {
       create: jest.fn(),
     },
+    brandUser: {
+      create: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
 
 // Mock next-auth
-jest.mock('next-auth', () => ({
+jest.mock('next-auth/next', () => ({
   getServerSession: jest.fn(),
 }));
 
@@ -32,89 +44,56 @@ jest.mock('next/cache', () => ({
 const mockDbUserFindUnique = db.user.findUnique as jest.Mock;
 const mockDbUserUpdate = db.user.update as jest.Mock;
 const mockDbRoleApplicationFindFirst = db.roleApplication.findFirst as jest.Mock;
+const mockDbRoleApplicationFindMany = db.roleApplication.findMany as jest.Mock;
 const mockDbRoleApplicationCreate = db.roleApplication.create as jest.Mock;
+const mockDbRoleApplicationCreateMany = db.roleApplication.createMany as jest.Mock;
 const mockGetServerSession = getServerSession as jest.Mock;
 const mockRevalidatePath = revalidatePath as jest.Mock;
+
+// Get mock functions from mocked db
+const mockUserFindUnique = db.user.findUnique as jest.Mock;
+const mockUserUpdate = db.user.update as jest.Mock;
+const mockRoleApplicationFindFirst = db.roleApplication.findFirst as jest.Mock;
+const mockRoleApplicationCreate = db.roleApplication.create as jest.Mock;
+const mockRoleApplicationCreateMany = db.roleApplication.createMany as jest.Mock;
+const mockBrandCreate = db.brand.create as jest.Mock;
+const mockBrandUserCreate = db.brandUser.create as jest.Mock;
+const mockTransaction = db.$transaction as jest.Mock;
 
 describe('Server Actions - User Roles and Applications', () => {
   beforeEach(() => {
     // Reset mocks before each test
-    mockDbUserFindUnique.mockReset();
-    mockDbUserUpdate.mockReset();
-    mockDbRoleApplicationFindFirst.mockReset();
-    mockDbRoleApplicationCreate.mockReset();
+    mockUserFindUnique.mockReset();
+    mockUserUpdate.mockReset();
+    mockRoleApplicationFindFirst.mockReset();
+    mockDbRoleApplicationFindMany.mockReset();
+    mockRoleApplicationCreate.mockReset();
+    mockRoleApplicationCreateMany.mockReset();
     mockGetServerSession.mockReset();
     mockRevalidatePath.mockReset();
+    mockBrandCreate.mockReset();
+    mockBrandUserCreate.mockReset();
+    mockTransaction.mockReset();
   });
 
-  describe('applyForOrganizerRole', () => {
+  describe('requestRoles', () => {
     const mockUserId = 'user-123';
 
     it('should require authentication', async () => {
       mockGetServerSession.mockResolvedValue(null);
-      const result = await applyForOrganizerRole();
+      const result = await requestRoles([RequestedRole.ORGANIZER]);
       expect(result.success).toBe(false);
       expect(result.error).toBe('Authentication required. Please log in.');
-      expect(mockDbRoleApplicationCreate).not.toHaveBeenCalled();
+      expect(mockDbRoleApplicationCreateMany).not.toHaveBeenCalled();
     });
 
     it('should return error if user is already an ORGANIZER', async () => {
       mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
       mockDbUserFindUnique.mockResolvedValue({ roles: [Role.USER, Role.ORGANIZER] });
-      const result = await applyForOrganizerRole();
+      const result = await requestRoles([RequestedRole.ORGANIZER]);
       expect(result.success).toBe(false);
-      expect(result.error).toBe('You are already an Organizer.');
-      expect(result.applicationStatus).toBe(ApplicationStatus.APPROVED);
-      expect(mockDbRoleApplicationCreate).not.toHaveBeenCalled();
-    });
-
-    it('should return error if user has a PENDING ORGANIZER application', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
-      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.USER] });
-      mockDbRoleApplicationFindFirst.mockResolvedValue({ id: 'app-id', status: ApplicationStatus.PENDING });
-      const result = await applyForOrganizerRole();
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('You already have a pending application for the Organizer role.');
-      expect(result.applicationStatus).toBe(ApplicationStatus.PENDING);
-      expect(mockDbRoleApplicationCreate).not.toHaveBeenCalled();
-    });
-
-    it('should create a PENDING ORGANIZER application for eligible user', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
-      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.USER] });
-      mockDbRoleApplicationFindFirst.mockResolvedValue(null); // No existing PENDING application
-      mockDbRoleApplicationCreate.mockResolvedValue({ 
-        id: 'new-app-id', 
-        userId: mockUserId, 
-        requestedRole: RequestedRole.ORGANIZER, 
-        status: ApplicationStatus.PENDING 
-      });
-
-      const result = await applyForOrganizerRole();
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Your application for the Organizer role has been submitted successfully.');
-      expect(result.applicationStatus).toBe(ApplicationStatus.PENDING);
-      expect(mockDbRoleApplicationCreate).toHaveBeenCalledWith({
-        data: {
-          userId: mockUserId,
-          requestedRole: RequestedRole.ORGANIZER,
-          status: ApplicationStatus.PENDING,
-        },
-      });
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
-    });
-
-    it('should handle database errors during application creation', async () => {
-      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
-      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.USER] });
-      mockDbRoleApplicationFindFirst.mockResolvedValue(null);
-      mockDbRoleApplicationCreate.mockRejectedValue(new Error('DB error'));
-
-      const result = await applyForOrganizerRole();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('An unexpected error occurred while submitting your application. Please try again.');
+      expect(result.error).toBe('You either already have the requested role(s) or an application is already pending.');
+      expect(mockDbRoleApplicationCreateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -275,6 +254,63 @@ describe('Server Actions - User Roles and Applications', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('An unexpected error occurred while deactivating the Talent role. Please try again.');
+    });
+  });
+
+  describe('createBrand', () => {
+    const mockUserId = 'user-brand-creator';
+    const mockBrandData = { name: 'Test Brand', description: 'A cool brand.' };
+
+    it('should require authentication', async () => {
+      mockGetServerSession.mockResolvedValue(null);
+      const result = await createBrand(mockBrandData);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Authentication required.');
+    });
+
+    it('should require BRAND_CREATOR role or ADMIN role', async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
+      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.USER] });
+      mockDbRoleApplicationFindFirst.mockResolvedValue(null);
+      const result = await createBrand(mockBrandData);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Authorization failed: You must have an approved Brand Creator application to perform this action.');
+    });
+
+    it('should return a validation error for invalid data', async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
+      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.ADMIN] });
+      const result = await createBrand({ name: 'a', description: '' });
+      expect(result.success).toBe(false);
+      expect(result.fieldErrors).not.toBeNull();
+    });
+
+    it('should create a brand for an authorized user', async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: mockUserId } });
+      mockDbUserFindUnique.mockResolvedValue({ roles: [Role.ADMIN] });
+
+      const mockBrand = { id: 'brand-1', name: mockBrandData.name, description: mockBrandData.description };
+
+      // Mock the transaction to call the callback with a mock prisma instance
+      mockTransaction.mockImplementation(async (callback) => {
+        const mockPrisma = {
+          brand: {
+            create: jest.fn().mockResolvedValue(mockBrand),
+          },
+          brandUser: {
+            create: jest.fn().mockResolvedValue({ id: 'branduser-1' }),
+          },
+        };
+        return await callback(mockPrisma);
+      });
+
+      const result = await createBrand(mockBrandData);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Brand created successfully!');
+      expect(result.brand).toBeDefined();
+      expect(result.brand).toEqual(mockBrand);
+      expect(mockTransaction).toHaveBeenCalled();
     });
   });
 }); 

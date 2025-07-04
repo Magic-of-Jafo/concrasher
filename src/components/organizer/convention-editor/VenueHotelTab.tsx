@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  VenueHotelTabData, 
+import {
+  VenueHotelTabData,
   VenueHotelTabSchema,
-  VenueData, 
+  VenueData,
   HotelData,
   createDefaultVenue,
   createDefaultHotel,
-  createDefaultVenueHotelTabData
 } from '@/lib/validators';
 import { Button, Box, Typography, Checkbox, FormControlLabel, Paper, Divider, Accordion, AccordionSummary, AccordionDetails, Alert, IconButton } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -26,430 +25,271 @@ interface VenueHotelTabProps {
   onChange: (data: VenueHotelTabData, isValid: boolean) => void;
   onValidationChange: (isValid: boolean) => void;
   disabled?: boolean;
+  schema?: typeof VenueHotelTabSchema;
 }
 
-const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled }) => {
+const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>('primaryVenue');
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
-  const [currentValue, setCurrentValue] = useState<VenueHotelTabData>(value);
-  const [validationError, setValidationError] = useState<ZodError | null>(null);
 
-  const getFieldError = useCallback((path: (string | number)[]): string | undefined => {
-    if (!zodErrors) return undefined;
-    const issue = zodErrors.find(err => {
-      if (err.path.length !== path.length) return false;
-      return err.path.every((segment, index) => segment === path[index]);
-    });
-    return issue?.message;
+  const structuredErrors = useMemo(() => {
+    const errors: {
+      venues: Record<number, Record<string, string>>;
+      hotels: Record<number, Record<string, string>>;
+    } = { venues: {}, hotels: {} };
+
+    if (zodErrors) {
+      for (const issue of zodErrors) {
+        const [level, index, field] = issue.path;
+        if ((level === 'venues' || level === 'hotels') && typeof index === 'number' && typeof field === 'string') {
+          if (!errors[level][index]) {
+            errors[level][index] = {};
+          }
+          errors[level][index][field] = issue.message;
+        }
+      }
+    }
+    return errors;
   }, [zodErrors]);
+
+  // Memoize finds for primary entities to avoid re-computation on every render
+  const primaryVenue = useMemo(() => value.venues.find(v => v.isPrimaryVenue), [value.venues]);
+  const primaryHotel = useMemo(() => value.hotels.find(h => h.isPrimaryHotel), [value.hotels]);
+
+  const validateAndNotify = useCallback((data: VenueHotelTabData) => {
+    const result = schema.safeParse(data);
+    const isValid = result.success;
+    setZodErrors(isValid ? null : result.error.issues);
+    onValidationChange(isValid);
+    onChange(data, isValid);
+  }, [onChange, onValidationChange, schema]);
+
+  useEffect(() => {
+    validateAndNotify(value);
+  }, [value, validateAndNotify]);
 
   const handleAccordionChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpandedAccordion(isExpanded ? panel : false);
   };
 
-  const validateDataAndNotifyParent = useCallback((dataToValidate: VenueHotelTabData, isNewData: boolean) => {
-    const validationResult = VenueHotelTabSchema.safeParse(dataToValidate);
-    if (validationResult.success) {
-      setZodErrors(null);
-      setValidationError(null);
-      onChange(validationResult.data, true);
-      if (onValidationChange) onValidationChange(true);
-    } else {
-      setZodErrors(validationResult.error.issues);
-      setValidationError(validationResult.error);
-      onChange(dataToValidate, false);
-      if (onValidationChange) onValidationChange(false);
-    }
-  }, [onChange, onValidationChange]);
-  
-  const shouldUpdateHotelDetails = useMemo(() => {
-    return currentValue.hotels.length > 0;
-  }, [currentValue.hotels.length]);
+  const getFieldError = useCallback((path: (string | number)[]): string | undefined => {
+    return zodErrors?.find(err => JSON.stringify(err.path) === JSON.stringify(path))?.message;
+  }, [zodErrors]);
 
-  const handlePrimaryVenueChange = (updatedPrimaryVenue: Partial<VenueData>) => {
-    const newData: VenueHotelTabData = { 
-      ...currentValue, 
-      primaryVenue: { ...(currentValue.primaryVenue || createDefaultVenue(true)), ...updatedPrimaryVenue } as VenueData 
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
+  const handleDataChange = (updatedData: Partial<VenueHotelTabData>) => {
+    validateAndNotify({ ...value, ...updatedData });
+  };
+
+  const handleVenueChange = (index: number, updatedVenueData: Partial<VenueData>) => {
+    const newVenues = [...value.venues];
+    newVenues[index] = { ...newVenues[index], ...updatedVenueData };
+    handleDataChange({ venues: newVenues });
+  };
+
+  const handleHotelChange = (index: number, updatedHotelData: Partial<HotelData>) => {
+    const newHotels = [...value.hotels];
+    newHotels[index] = { ...newHotels[index], ...updatedHotelData };
+    handleDataChange({ hotels: newHotels });
+  };
+
+  const handleAddVenue = () => {
+    const newVenue = createDefaultVenue(false);
+    handleDataChange({ venues: [...value.venues, newVenue] });
+  };
+
+  const handleRemoveVenue = (index: number) => {
+    handleDataChange({ venues: value.venues.filter((_, i) => i !== index) });
+  };
+
+  const handleAddHotel = () => {
+    const newHotel = createDefaultHotel(false);
+    handleDataChange({ hotels: [...value.hotels, newHotel] });
+  };
+
+  const handleRemoveHotel = (index: number) => {
+    const hotels = value.hotels.filter((_, i) => i !== index);
+    // If the removed hotel was primary, we might need a rule to assign a new primary
+    if (!hotels.some(h => h.isPrimaryHotel) && !value.guestsStayAtPrimaryVenue) {
+      // Potentially handle this case, for now, just remove. Schema will invalidate.
+    }
+    handleDataChange({ hotels });
   };
 
   const handleGuestsStayAtPrimaryVenueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const isChecked = event.target.checked;
-    const newData: VenueHotelTabData = {
-      ...currentValue,
-      guestsStayAtPrimaryVenue: isChecked,
-      primaryHotelDetails: isChecked ? undefined : (currentValue.primaryHotelDetails || createDefaultHotel(true)),
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
+    const guestsStayAtPrimaryVenue = event.target.checked;
+    let hotels = [...value.hotels];
 
-    if (!isChecked && expandedAccordion !== 'primaryHotel') {
-      setExpandedAccordion('primaryHotel');
+    if (guestsStayAtPrimaryVenue) {
+      // If guests stay at the venue, remove any designated primary hotel
+      hotels = hotels.filter(h => !h.isPrimaryHotel);
+    } else {
+      // If they don't, and there's no primary hotel, add one.
+      if (!hotels.some(h => h.isPrimaryHotel)) {
+        hotels.unshift(createDefaultHotel(true));
+      }
     }
+    handleDataChange({ guestsStayAtPrimaryVenue, hotels });
   };
 
-  const handlePrimaryHotelChange = (updatedPrimaryHotel: Partial<HotelData>) => {
-    const newData: VenueHotelTabData = { 
-      ...currentValue, 
-      primaryHotelDetails: { ...(currentValue.primaryHotelDetails || createDefaultHotel(true)), ...updatedPrimaryHotel } as HotelData 
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
+  const renderVenueForms = () => {
+    const primaryVenueIndex = value.venues.findIndex(v => v.isPrimaryVenue);
+    const secondaryVenues = value.venues.filter(v => !v.isPrimaryVenue);
 
-  const handleSecondaryVenueChange = (updatedSecondaryVenue: Partial<VenueData>, index: number) => {
-    const updatedSecondaryVenues = [...currentValue.secondaryVenues];
-    updatedSecondaryVenues[index] = { ...updatedSecondaryVenues[index], ...updatedSecondaryVenue } as VenueData;
-    const newData: VenueHotelTabData = { ...currentValue, secondaryVenues: updatedSecondaryVenues };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
+    return (
+      <>
+        {primaryVenue && primaryVenueIndex !== -1 && (
+          <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">Primary Venue</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <PrimaryVenueForm
+                formData={primaryVenue}
+                onFormDataChange={(data) => handleVenueChange(primaryVenueIndex, data)}
+                errors={structuredErrors.venues[primaryVenueIndex]}
+                title="Primary Venue Details"
+                disabled={disabled}
+              />
+            </AccordionDetails>
+          </Accordion>
+        )}
 
-  const handleAddSecondaryVenue = () => {
-    const newSecondaryVenue: VenueData = {
-      ...createDefaultVenue(),
-      id: undefined,
-      tempId: uuidv4(),
-    };
-    const newData: VenueHotelTabData = { ...currentValue, secondaryVenues: [...currentValue.secondaryVenues, newSecondaryVenue] };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-
-  const handleRemoveSecondaryVenue = (index: number) => {
-    const updatedSecondaryVenues = currentValue.secondaryVenues.filter((_, i) => i !== index);
-    const newData: VenueHotelTabData = { ...currentValue, secondaryVenues: updatedSecondaryVenues };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-
-  const handleHotelChange = (index: number, hotelPartialData: Partial<HotelData>) => {
-    const updatedHotels = currentValue.hotels.map((hotel: HotelData, i: number) => 
-      i === index ? { ...hotel, ...hotelPartialData } : hotel
+        <Accordion expanded={expandedAccordion === 'secondaryVenues'} onChange={handleAccordionChange('secondaryVenues')}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Secondary Venue(s)</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {secondaryVenues.map((venue, index) => {
+              const originalIndex = value.venues.findIndex(v => v.tempId === venue.tempId);
+              return (
+                <Paper key={venue.tempId || index} elevation={2} sx={{ p: 2, mb: 2 }}>
+                  <PrimaryVenueForm
+                    formData={venue}
+                    onFormDataChange={(data) => handleVenueChange(originalIndex, data)}
+                    errors={structuredErrors.venues[originalIndex]}
+                    title={`Secondary Venue ${index + 1}`}
+                    disabled={disabled}
+                  />
+                  <Button
+                    startIcon={<DeleteIcon />}
+                    onClick={() => handleRemoveVenue(originalIndex)}
+                    color="error"
+                    sx={{ mt: 1 }}
+                    disabled={disabled}
+                  >
+                    Remove Venue
+                  </Button>
+                </Paper>
+              );
+            })}
+            <Button startIcon={<AddCircleOutlineIcon />} onClick={handleAddVenue} disabled={disabled}>
+              Add Secondary Venue
+            </Button>
+          </AccordionDetails>
+        </Accordion>
+      </>
     );
-    const newData: VenueHotelTabData = { ...currentValue, hotels: updatedHotels };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
   };
 
-  const addHotel = () => {
-    const newHotel: HotelData = { 
-        ...createDefaultHotel(),
-        id: undefined,
-        tempId: uuidv4(), 
-        markedForPrimaryPromotion: false
-    };
-    const updatedHotels = [...currentValue.hotels, newHotel];
-    const newData: VenueHotelTabData = { ...currentValue, hotels: updatedHotels };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
+  const renderHotelForms = () => {
+    const primaryHotelIndex = value.hotels.findIndex(h => h.isPrimaryHotel);
+    const additionalHotels = value.hotels.filter(h => !h.isPrimaryHotel);
+
+    return (
+      <>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={value.guestsStayAtPrimaryVenue}
+              onChange={handleGuestsStayAtPrimaryVenueChange}
+              name="guestsStayAtPrimaryVenue"
+              disabled={disabled}
+            />
+          }
+          label="The Primary Venue will also serve as the Primary Hotel"
+        />
+
+        {!value.guestsStayAtPrimaryVenue && primaryHotel && primaryHotelIndex !== -1 && (
+          <Accordion expanded={expandedAccordion === 'primaryHotel'} onChange={handleAccordionChange('primaryHotel')}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">Primary Hotel</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <HotelForm
+                formData={primaryHotel}
+                onFormDataChange={(data) => handleHotelChange(primaryHotelIndex, data)}
+                errors={structuredErrors.hotels[primaryHotelIndex]}
+                title="Primary Hotel Details"
+                disabled={disabled}
+                isPrimaryHotel={true}
+              />
+            </AccordionDetails>
+          </Accordion>
+        )}
+
+        <Accordion expanded={expandedAccordion === 'additionalHotels'} onChange={handleAccordionChange('additionalHotels')}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Additional Hotel(s)</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {additionalHotels.map((hotel, index) => {
+              const originalIndex = value.hotels.findIndex(h => h.tempId === hotel.tempId);
+              return (
+                <Paper key={hotel.tempId || index} elevation={2} sx={{ p: 2, mb: 2 }}>
+                  <HotelForm
+                    formData={hotel}
+                    onFormDataChange={(data) => handleHotelChange(originalIndex, data)}
+                    errors={structuredErrors.hotels[originalIndex]}
+                    title={`Additional Hotel ${index + 1}`}
+                    disabled={disabled}
+                    isPrimaryHotel={false}
+                  />
+                  <Button
+                    startIcon={<DeleteIcon />}
+                    onClick={() => handleRemoveHotel(originalIndex)}
+                    color="error"
+                    sx={{ mt: 1 }}
+                    disabled={disabled}
+                  >
+                    Remove Hotel
+                  </Button>
+                </Paper>
+              );
+            })}
+            <Button startIcon={<AddCircleOutlineIcon />} onClick={handleAddHotel} disabled={disabled}>
+              Add Additional Hotel
+            </Button>
+          </AccordionDetails>
+        </Accordion>
+      </>
+    );
   };
 
-  const removeHotel = (index: number) => {
-    const updatedHotels = currentValue.hotels.filter((_, i) => i !== index);
-    const newData: VenueHotelTabData = { ...currentValue, hotels: updatedHotels };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-  
-  const resetPrimaryVenue = () => {
-    const newData: VenueHotelTabData = { 
-      ...currentValue,
-      primaryVenue: createDefaultVenue(true)
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-
-  const resetPrimaryHotel = () => {
-    const newData: VenueHotelTabData = {
-      ...currentValue,
-      primaryHotelDetails: createDefaultHotel(true)
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-  
-  useEffect(() => {
-    setCurrentValue(prevCurrentValue => {
-      return {
-        ...value,
-        primaryHotelDetails: value.primaryHotelDetails ? 
-          { ...createDefaultHotel(), ...value.primaryHotelDetails, isPrimaryHotel: value.primaryHotelDetails.isPrimaryHotel || false } 
-          : undefined,
-        hotels: value.hotels.map(propHotel => {
-          const existingHotel = prevCurrentValue.hotels.find(prevHotel => 
-            (prevHotel.id && prevHotel.id === propHotel.id) || 
-            (prevHotel.tempId && prevHotel.tempId === propHotel.tempId)
-          );
-          return {
-            ...createDefaultHotel(),
-            ...propHotel,
-            markedForPrimaryPromotion: existingHotel ? existingHotel.markedForPrimaryPromotion || false : false,
-          };
-        }),
-        secondaryVenues: value.secondaryVenues.map(propVenue => {
-            const existingVenue = prevCurrentValue.secondaryVenues.find(prevVenue => 
-                (prevVenue.id && prevVenue.id === propVenue.id) || 
-                (prevVenue.tempId && prevVenue.tempId === propVenue.tempId)
-            );
-            return {
-                ...createDefaultVenue(),
-                ...propVenue,
-                markedForPrimaryPromotion: existingVenue ? existingVenue.markedForPrimaryPromotion || false : false,
-            };
-        })
-      };
-    });
-  }, [value]);
-
-  const guestsStayAtPrimaryVenue = currentValue.guestsStayAtPrimaryVenue ?? false;
-
-  const handleToggleSecondaryVenuePromotion = (targetIndex: number, promote: boolean) => {
-    let alreadyHasAPromotedVenue = false;
-    if (promote) {
-      alreadyHasAPromotedVenue = currentValue.secondaryVenues.some(
-        (venue, index) => index !== targetIndex && venue.markedForPrimaryPromotion
-      );
-    }
-    const newSecondaryVenues = currentValue.secondaryVenues.map((venue, index) => {
-      if (index === targetIndex) {
-        if (promote) {
-          return { ...venue, markedForPrimaryPromotion: alreadyHasAPromotedVenue ? false : true };
-        } else {
-          return { ...venue, markedForPrimaryPromotion: false };
-        }
-      }
-      return venue;
-    });
-    const newData: VenueHotelTabData = { ...currentValue, secondaryVenues: newSecondaryVenues };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
-
-  const handleToggleAdditionalHotelPromotion = (targetHotelIndex: number, promote: boolean) => {
-    let alreadyHasAPromotedHotelInList = false;
-    if (promote) {
-      alreadyHasAPromotedHotelInList = currentValue.hotels.some(
-        (hotel, index) => index !== targetHotelIndex && hotel.markedForPrimaryPromotion
-      );
-    }
-
-    const newAdditionalHotels = currentValue.hotels.map((hotel, index) => {
-      if (index === targetHotelIndex) {
-        if (promote) {
-          return { ...hotel, markedForPrimaryPromotion: alreadyHasAPromotedHotelInList ? false : true };
-        } else {
-          return { ...hotel, markedForPrimaryPromotion: false };
-        }
-      }
-      return hotel;
-    });
-
-    const newData: VenueHotelTabData = {
-      ...currentValue,
-      hotels: newAdditionalHotels,
-    };
-    setCurrentValue(newData);
-    validateDataAndNotifyParent(newData, true);
-  };
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
-      {validationError && (
+    <Box>
+      {zodErrors && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          Please correct the highlighted fields below.
+          Please correct the errors before proceeding.
+          <ul>
+            {zodErrors.map((err, index) => <li key={index}>{err.path.join('.')} - {err.message}</li>)}
+          </ul>
         </Alert>
       )}
 
-      <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6">Primary Venue</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1">Primary Venue Details</Typography>
-            <IconButton onClick={resetPrimaryVenue} color="error" aria-label="Reset primary venue" disabled={disabled}>
-              <DeleteIcon />
-            </IconButton>
-          </Box>
-          <PrimaryVenueForm
-            title=""
-            formData={currentValue.primaryVenue || createDefaultVenue(true)}
-            onFormDataChange={handlePrimaryVenueChange}
-            disabled={disabled}
-            errors={{
-              venueName: getFieldError(['primaryVenue', 'venueName']),
-              websiteUrl: getFieldError(['primaryVenue', 'websiteUrl']),
-              googleMapsUrl: getFieldError(['primaryVenue', 'googleMapsUrl']),
-              contactEmail: getFieldError(['primaryVenue', 'contactEmail']),
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={guestsStayAtPrimaryVenue}
-                onChange={handleGuestsStayAtPrimaryVenueChange}
-                disabled={disabled}
-              />
-            }
-            label="The Venue is also the primary hotel"
-            sx={{ mt: 1, mb: 1 }}
-          />
-        </AccordionDetails>
-      </Accordion>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h5" gutterBottom>Venues</Typography>
+        <Divider sx={{ mb: 2 }} />
+        {renderVenueForms()}
+      </Box>
 
-      <Accordion expanded={expandedAccordion === 'secondaryVenues'} onChange={handleAccordionChange('secondaryVenues')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6">Secondary Venue(s)</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          {currentValue.secondaryVenues.map((venue: VenueData, index: number) => {
-            const baseErrorPath = ['secondaryVenues', index];
-            return (
-              <Paper key={venue.tempId || venue.id || `secondary-venue-${index}`} elevation={2} sx={{ mb: 2, p: { xs: 1, sm: 2 } }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1">Secondary Venue {index + 1}</Typography>
-                  <Box>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={venue.markedForPrimaryPromotion || false}
-                          onChange={(e) => handleToggleSecondaryVenuePromotion(index, e.target.checked)}
-                          disabled={disabled}
-                        />
-                      }
-                      label="Make Primary"
-                      sx={{ mr: 1 }}
-                    />
-                    <IconButton onClick={() => handleRemoveSecondaryVenue(index)} color="error" aria-label={`Remove secondary venue ${index + 1}`} disabled={disabled}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </Box>
-                <PrimaryVenueForm
-                  title={`Secondary Venue ${index + 1} Details`}
-                  formData={venue}
-                  onFormDataChange={(changedData) => handleSecondaryVenueChange(changedData, index)}
-                  disabled={disabled}
-                  errors={{
-                    venueName: getFieldError([...baseErrorPath, 'venueName']),
-                    websiteUrl: getFieldError([...baseErrorPath, 'websiteUrl']),
-                    googleMapsUrl: getFieldError([...baseErrorPath, 'googleMapsUrl']),
-                    contactEmail: getFieldError([...baseErrorPath, 'contactEmail']),
-                  }}
-                />
-              </Paper>
-            );
-          })}
-          <Button 
-            variant="outlined" 
-            startIcon={<AddIcon />} 
-            onClick={handleAddSecondaryVenue} 
-            disabled={disabled}
-            sx={{ mt: 2 }}
-          >
-            Add Secondary Venue
-          </Button>
-        </AccordionDetails>
-      </Accordion>
-
-      {!guestsStayAtPrimaryVenue && (
-        <Accordion 
-          expanded={expandedAccordion === 'primaryHotel'} 
-          onChange={handleAccordionChange('primaryHotel')}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="h6">Primary Hotel</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1">Primary Hotel Details</Typography>
-              <IconButton onClick={resetPrimaryHotel} color="error" aria-label="Reset primary hotel" disabled={disabled}>
-                <DeleteIcon />
-              </IconButton>
-            </Box>
-            <HotelForm
-              title=""
-              formData={currentValue.primaryHotelDetails || createDefaultHotel(true)}
-              onFormDataChange={handlePrimaryHotelChange}
-              disabled={disabled}
-              errors={{
-                hotelName: getFieldError(['primaryHotelDetails', 'hotelName']),
-                websiteUrl: getFieldError(['primaryHotelDetails', 'websiteUrl']),
-                googleMapsUrl: getFieldError(['primaryHotelDetails', 'googleMapsUrl']),
-                contactEmail: getFieldError(['primaryHotelDetails', 'contactEmail']),
-                bookingLink: getFieldError(['primaryHotelDetails', 'bookingLink']),
-              }}
-            />
-          </AccordionDetails>
-        </Accordion>
-      )}
-
-      <Accordion expanded={expandedAccordion === 'hotels'} onChange={handleAccordionChange('hotels')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6">Additional Hotel(s)</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          {currentValue.hotels.length === 0 && (
-            <Typography variant="body2" color="textSecondary" sx={{mb: 2, textAlign: 'center', p:2}}>
-              No additional hotels listed.
-            </Typography>
-          )}
-          {currentValue.hotels.map((hotel: HotelData, index: number) => {
-            const baseErrorPath = ['hotels', index];
-            return (
-              <Paper key={hotel.tempId || hotel.id || `secondary-hotel-${index}`} elevation={2} sx={{ mb: 2, p: { xs: 1, sm: 2 } }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="subtitle1">Hotel {index + 1}</Typography>
-                  <Box>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={hotel.markedForPrimaryPromotion || false}
-                          onChange={(e) => handleToggleAdditionalHotelPromotion(index, e.target.checked)}
-                          disabled={disabled || guestsStayAtPrimaryVenue}
-                        />
-                      }
-                      label="Make Primary"
-                      sx={{ mr: 1 }}
-                    />
-                    <IconButton onClick={() => removeHotel(index)} color="error" aria-label={`Remove hotel ${index + 1}`} disabled={disabled}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </Box>
-                <HotelForm
-                  title={`Hotel ${index + 1} Details`}
-                  formData={hotel}
-                  onFormDataChange={(changedData) => handleHotelChange(index, changedData)}
-                  disabled={disabled}
-                  errors={{
-                    hotelName: getFieldError([...baseErrorPath, 'hotelName']),
-                    websiteUrl: getFieldError([...baseErrorPath, 'websiteUrl']),
-                    googleMapsUrl: getFieldError([...baseErrorPath, 'googleMapsUrl']),
-                    contactEmail: getFieldError([...baseErrorPath, 'contactEmail']),
-                    bookingLink: getFieldError([...baseErrorPath, 'bookingLink']),
-                  }}
-                />
-              </Paper>
-            );
-          })}
-          <Button 
-            variant="outlined" 
-            startIcon={<AddIcon />} 
-            onClick={addHotel} 
-            disabled={disabled}
-            sx={{ mt: 2 }}
-          >
-            Add Hotel
-          </Button>
-        </AccordionDetails>
-      </Accordion>
+      <Box>
+        <Typography variant="h5" gutterBottom>Hotels</Typography>
+        <Divider sx={{ mb: 2 }} />
+        {renderHotelForms()}
+      </Box>
     </Box>
   );
 };
 
-export default VenueHotelTab; 
+export default VenueHotelTab;

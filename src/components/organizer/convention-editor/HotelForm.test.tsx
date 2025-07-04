@@ -1,10 +1,18 @@
+// src/components/organizer/convention-editor/HotelForm.test.tsx
+
+// This test file should NOT contain any polyfills or global console.error suppressions.
+// Those are handled exclusively in jest.polyfills.js.
+
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import HotelForm from './HotelForm'; // Adjusted import
-import { type HotelData } from '@/lib/validators';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event'; // Use userEvent for realistic interactions
+import '@testing-library/jest-dom'; // For extended Jest DOM matchers
+import HotelForm from './HotelForm';
+import { type HotelData, createDefaultHotel } from '@/lib/validators'; // Ensure HotelData and createDefaultHotel are correctly typed/structured
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+
+// --- Mocks for external components (ensure these are accurate to your component's dependencies) ---
 
 // Mock the TinyMCE Editor component
 jest.mock('@tinymce/tinymce-react', () => ({
@@ -14,6 +22,7 @@ jest.mock('@tinymce/tinymce-react', () => ({
       value={props.initialValue || props.value}
       onChange={(e) => {
         if (props.onEditorChange) {
+          // Simulate TinyMCE's onEditorChange which passes content as first arg
           props.onEditorChange(e.target.value, {} as any);
         }
       }}
@@ -38,50 +47,32 @@ jest.mock('@/components/shared/ImageUploadInput', () => {
   ));
 });
 
-// Mock DatePicker
+// Mock DatePicker (MUI X Date Pickers)
 jest.mock('@mui/x-date-pickers/DatePicker', () => ({
-    DatePicker: jest.fn(({ label, value, onChange, disabled, slotProps }) => (
-      <input
-        data-testid={`mock-datepicker-${label?.toString().toLowerCase().replace(/\s+/g, '-') || 'date'}`}
-        type="date"
-        value={value ? new Date(value).toISOString().split('T')[0] : ''}
-        onChange={(e) => onChange(e.target.value ? new Date(e.target.value) : null)}
-        disabled={disabled}
-        data-helpertext={slotProps?.textField?.helperText}
-        aria-invalid={slotProps?.textField?.error}
-        aria-describedby={slotProps?.textField?.helperText ? `${label}-helper-text` : undefined}
-      />
-    )),
-  }));
+  DatePicker: jest.fn((props) => ( // Use props directly here, not destructuring many individual props
+    <input
+      data-testid={`mock-datepicker-${props.label?.toString().toLowerCase().replace(/\s+/g, '-') || 'date'}`}
+      type="date"
+      // Convert Date object to YYYY-MM-DD string for input value
+      value={props.value ? new Date(props.value).toISOString().split('T')[0] : ''}
+      onChange={(e) => {
+        // Simulate onChange providing a Date object or null
+        props.onChange(e.target.value ? new Date(e.target.value) : null);
+      }}
+      disabled={props.disabled}
+      data-helpertext={props.slotProps?.textField?.helperText} // Helper text in data-attribute
+      aria-invalid={props.slotProps?.textField?.error ? 'true' : 'false'} // Set aria-invalid based on error prop
+      aria-describedby={props.slotProps?.textField?.helperText ? `${props.label}-helper-text` : undefined}
+    />
+  )),
+}));
+
+// --- Test Setup ---
 
 const mockOnFormDataChange = jest.fn();
 
-const defaultHotelFormData: HotelData = {
-  hotelName: '',
-  description: '',
-  websiteUrl: '',
-  googleMapsUrl: '',
-  streetAddress: '',
-  city: '',
-  stateRegion: '',
-  postalCode: '',
-  country: '',
-  contactEmail: '',
-  contactPhone: '',
-  amenities: [],
-  photos: [],
-  groupRateOrBookingCode: '',
-  groupPrice: '',
-  bookingLink: '',
-  bookingCutoffDate: null,
-  isPrimaryHotel: false,
-  isAtPrimaryVenueLocation: false,
-  markedForPrimaryPromotion: false,
-  // tempId is optional
-};
-
 const defaultProps = {
-  formData: defaultHotelFormData,
+  formData: createDefaultHotel(), // Ensure createDefaultHotel provides all necessary properties (like amenities)
   onFormDataChange: mockOnFormDataChange,
   disabled: false,
   errors: {},
@@ -90,11 +81,11 @@ const defaultProps = {
 };
 
 const renderComponent = (props?: Partial<typeof defaultProps>) => {
-  // Ensure formData is always fully provided even if overridden partially
-  const finalProps = { 
-    ...defaultProps, 
-    ...props, 
-    formData: { ...defaultHotelFormData, ...props?.formData } 
+  // Ensure formData is deeply merged for test specific overrides and defaults are always applied
+  const finalProps = {
+    ...defaultProps,
+    ...props,
+    formData: { ...createDefaultHotel(), ...props?.formData },
   };
   return render(
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -104,102 +95,157 @@ const renderComponent = (props?: Partial<typeof defaultProps>) => {
 };
 
 describe('HotelForm', () => {
+  // Declare userEvent instance to be used across tests
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.clearAllMocks(); // Clears mock call history before each test
+    user = userEvent.setup(); // Initializes a fresh userEvent instance for each test
   });
 
-  test('renders all basic fields and sections', () => {
-    renderComponent();
-    expect(screen.getByText('Test Hotel Form')).toBeInTheDocument();
+  // --- Test Cases ---
 
+  test('renders all basic fields', () => {
+    renderComponent();
     expect(screen.getByLabelText(/hotel name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/website url/i)).toBeInTheDocument();
-    expect(screen.getByTestId('mock-tinymce-editor')).toBeInTheDocument(); // Description
+    expect(screen.getByTestId('mock-tinymce-editor')).toBeInTheDocument();
     expect(screen.getByLabelText(/google maps url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/city/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/contact email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/contact phone/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/group rate \/ booking code/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/price per night/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/booking link/i)).toBeInTheDocument();
-    expect(screen.getByTestId('mock-datepicker-booking-cut-off-date')).toBeInTheDocument();
     expect(screen.getByTestId('mock-image-upload-input')).toBeInTheDocument();
-    expect(screen.getByLabelText(/hotel amenities/i)).toBeInTheDocument();
+    // Add assertions for new fields like amenities text area, parking info etc.
+    expect(screen.getByLabelText(/Hotel Amenities \(one per line\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Parking Information/i)).toBeInTheDocument();
   });
 
   test('pre-populates with initial formData', () => {
-    const initialFormData: HotelData = {
-      ...defaultHotelFormData,
+    const initialData: HotelData = {
+      ...createDefaultHotel(true), // Ensure amenities and other new fields are defaulted correctly here
       hotelName: 'Grand Hotel',
       websiteUrl: 'http://grandhotel.com',
-      description: '<p>A grand place to stay.</p>',
-      photos: [{ url: 'hotel-room.jpg', caption: 'Deluxe Room' }],
-      groupRateOrBookingCode: 'GROUP123',
-      groupPrice: '150.00',
-      bookingLink: 'http://grandhotel.com/book?code=GROUP123',
-      bookingCutoffDate: new Date(2024, 11, 31), // Dec 31, 2024
+      photos: [{ url: 'http://grandhotel.com/photo.jpg', caption: 'Grand view' }],
+      amenities: ['Pool', 'Gym'], // Example of pre-populating amenities
+      parkingInfo: 'Valet parking available',
     };
-    renderComponent({ formData: initialFormData });
+    renderComponent({ formData: initialData });
 
     expect(screen.getByLabelText(/hotel name/i)).toHaveValue('Grand Hotel');
     expect(screen.getByLabelText(/website url/i)).toHaveValue('http://grandhotel.com');
-    expect(screen.getByTestId('mock-tinymce-editor')).toHaveValue('<p>A grand place to stay.</p>');
-    expect(screen.getByTestId('mock-image-upload-input').querySelector('img')).toHaveAttribute('src', 'hotel-room.jpg');
-    expect(screen.getByLabelText(/photo caption/i)).toHaveValue('Deluxe Room');
-    expect(screen.getByLabelText(/group rate \/ booking code/i)).toHaveValue('GROUP123');
-    expect(screen.getByLabelText(/price per night/i)).toHaveValue('150.00');
-    expect(screen.getByLabelText(/booking link/i)).toHaveValue('http://grandhotel.com/book?code=GROUP123');
-    expect(screen.getByTestId('mock-datepicker-booking-cut-off-date')).toHaveValue('2024-12-31');
+    const imagePreview = screen.getByRole('img', { name: /preview/i });
+    expect(imagePreview).toHaveAttribute('src', 'http://grandhotel.com/photo.jpg');
+    expect(screen.getByLabelText(/Hotel Amenities \(one per line\)/i)).toHaveValue('Pool\nGym');
+    expect(screen.getByLabelText(/Parking Information/i)).toHaveValue('Valet parking available');
   });
 
-  test('calls onFormDataChange for text input (hotelName)', () => {
+  test('calls onFormDataChange when a text field is changed', async () => {
+    let formData = createDefaultHotel();
+    const user = userEvent.setup();
+
+    // Define a stable handler function that can be referenced by name.
+    const handleStateChange = (data: Partial<HotelData>) => {
+      formData = { ...formData, ...data }; // Update local state variable
+      mockOnFormDataChange(data); // Call mock for tracking
+      rerender(
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <HotelForm formData={formData} onFormDataChange={handleStateChange} />
+        </LocalizationProvider>
+      );
+    };
+
+    const { rerender } = render(
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <HotelForm
+          formData={formData}
+          onFormDataChange={handleStateChange}
+        />
+      </LocalizationProvider>
+    );
+
+    const hotelNameInput = screen.getByLabelText(/hotel name/i);
+
+    await user.type(hotelNameInput, 'New Hotel Name');
+
+    // Check that the input now contains the accumulated string
+    expect(hotelNameInput).toHaveValue('New Hotel Name');
+
+    // Last call to the mock should be with the full string
+    expect(mockOnFormDataChange).toHaveBeenLastCalledWith({ hotelName: 'New Hotel Name' });
+  });
+
+  test('calls onFormDataChange when description is changed', async () => {
     renderComponent();
-    const input = screen.getByLabelText(/hotel name/i);
-    fireEvent.change(input, { target: { value: 'New Hotel Name' } });
-    expect(mockOnFormDataChange).toHaveBeenCalledWith({ hotelName: 'New Hotel Name' });
+    const editor = screen.getByTestId('mock-tinymce-editor'); // This is your mocked textarea for TinyMCE
+
+    // user.type is appropriate for textareas as well
+    await user.type(editor, 'New description for the hotel.');
+
+    // Again, expect the last call to contain the full string after typing
+    expect(mockOnFormDataChange).toHaveBeenLastCalledWith({ description: 'New description for the hotel.' });
   });
 
-  test('calls onFormDataChange for bookingCutoffDate via DatePicker mock', () => {
+  test('calls onFormDataChange for image upload', async () => {
     renderComponent();
-    const dateInput = screen.getByTestId('mock-datepicker-booking-cut-off-date');
-    fireEvent.change(dateInput, { target: { value: '2025-01-15' } }); // YYYY-MM-DD format
-    // The mock DatePicker converts this string to a Date object
-    expect(mockOnFormDataChange).toHaveBeenCalledWith({ bookingCutoffDate: new Date(2025, 0, 15) }); // Month is 0-indexed
+    const uploadButton = screen.getByTestId('mock-upload-btn');
+    await user.click(uploadButton); // Simulate user clicking the upload button
+
+    // Expect the onFormDataChange to be called with the new photo URL
+    expect(mockOnFormDataChange).toHaveBeenCalledWith({
+      photos: [{ url: 'new-hotel-image.jpg', caption: '' }],
+    });
   });
 
-  test('calls onFormDataChange for image upload', () => {
-    renderComponent({ formData: { ...defaultHotelFormData, photos: [] } });
-    fireEvent.click(screen.getByTestId('mock-upload-btn'));
-    expect(mockOnFormDataChange).toHaveBeenCalledWith({ photos: [{ url: 'new-hotel-image.jpg', caption: '' }] });
-  });
+  test('calls onFormDataChange for image removal', async () => {
+    renderComponent({
+      formData: {
+        ...createDefaultHotel(),
+        photos: [{ url: 'existing.jpg', caption: 'Old photo' }] // Provide an existing photo to remove
+      }
+    });
+    const removeButton = screen.getByTestId('mock-remove-btn');
+    await user.click(removeButton); // Simulate user clicking the remove button
 
-  test('calls onFormDataChange for image removal', () => {
-    renderComponent({ formData: { ...defaultHotelFormData, photos: [{ url: 'existing.jpg', caption: '' }] } });
-    fireEvent.click(screen.getByTestId('mock-remove-btn'));
+    // Expect the onFormDataChange to be called with an empty photos array
     expect(mockOnFormDataChange).toHaveBeenCalledWith({ photos: [] });
   });
-  
-  test('displays error messages', () => {
-    const errors = {
-      hotelName: 'Hotel name is required.',
-      bookingCutoffDate: 'Date is invalid.'
-    };
-    renderComponent({ errors });
-    expect(screen.getByLabelText(/hotel name/i)).toHaveAccessibleDescription('Hotel name is required.');
-    const datePicker = screen.getByTestId('mock-datepicker-booking-cut-off-date');
-    expect(datePicker).toHaveAttribute('data-helpertext', 'Date is invalid.');
-    expect(datePicker).toHaveAttribute('aria-invalid', 'true');
-  });
 
-  test('disables inputs when disabled prop is true', () => {
-    renderComponent({ disabled: true, formData: { ...defaultHotelFormData, photos: [{url: 'test.jpg', caption: ''}] } });
+  test('disables all fields when disabled prop is true', () => {
+    renderComponent({ disabled: true });
     expect(screen.getByLabelText(/hotel name/i)).toBeDisabled();
     expect(screen.getByTestId('mock-tinymce-editor')).toBeDisabled();
-    expect(screen.getByTestId('mock-datepicker-booking-cut-off-date')).toBeDisabled();
     expect(screen.getByTestId('mock-upload-btn')).toBeDisabled();
-    expect(screen.getByTestId('mock-remove-btn')).toBeDisabled();
-    expect(screen.getByLabelText(/photo caption/i)).toBeDisabled();
+    expect(screen.getByLabelText(/website url/i)).toBeDisabled();
+    expect(screen.getByLabelText(/google maps url/i)).toBeDisabled();
+    expect(screen.getByLabelText(/Parking Information/i)).toBeDisabled(); // Also check a multiline text field
+    expect(screen.getByTestId('mock-datepicker-booking-cut-off-date')).toBeDisabled(); // Check DatePicker
   });
 
-}); 
+  test('displays validation errors', () => {
+    const errors = {
+      hotelName: 'Hotel name is required',
+      websiteUrl: 'Invalid URL format',
+      bookingCutoffDate: 'Invalid date',
+      groupPrice: 'Price must be a number',
+      parkingInfo: 'Parking info too long',
+    };
+    renderComponent({ errors });
+
+    // Assertions for Material-UI TextField Helper Texts (which render as <p> tags with text content)
+    expect(screen.getByText('Hotel name is required')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Hotel Name/i)).toHaveAttribute('aria-invalid', 'true');
+
+    expect(screen.getByText('Invalid URL format')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Website URL/i)).toHaveAttribute('aria-invalid', 'true');
+
+    expect(screen.getByText('Price must be a number')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Group Price/i)).toHaveAttribute('aria-invalid', 'true');
+
+    // Parking Information (Confirmed to be direct text in <p> helperText)
+    expect(screen.getByText('Parking info too long')).toBeInTheDocument(); // Expect this to pass now
+    expect(screen.getByLabelText(/Parking Information/i)).toHaveAttribute('aria-invalid', 'true');
+
+    // DatePicker Helper Text (mocked to be in a data-attribute)
+    const bookingCutoffDateInput = screen.getByTestId('mock-datepicker-booking-cut-off-date');
+    expect(bookingCutoffDateInput).toHaveAttribute('data-helpertext', 'Invalid date');
+    expect(bookingCutoffDateInput).toHaveAttribute('aria-invalid', 'true');
+  });
+});

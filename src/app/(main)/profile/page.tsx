@@ -1,45 +1,57 @@
-'use client';
-
-import { useSession } from 'next-auth/react';
-import { Role } from '@prisma/client';
-import AdminGuard from '@/components/auth/AdminGuard';
-import ProfileForm from '@/components/features/ProfileForm'; // Assuming aliased path
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { Role, ApplicationStatus, RequestedRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
-import OrganizerApplicationButton from '@/components/features/OrganizerApplicationButton'; // Added
-import TalentActivationButton from '@/components/features/TalentActivationButton'; // Added
+import AdminGuard from '@/components/auth/AdminGuard';
+import ProfileForm from '@/components/features/ProfileForm';
+import RoleRequestForm from '@/components/features/RoleRequestForm';
+import TalentActivationButton from '@/components/features/TalentActivationButton';
+import RoleApplicationList from '@/components/admin/RoleApplicationList';
+import Link from 'next/link';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
 
-// Helper component to manage client-side state for displaying updated profile data
-// This is needed because the page is a Server Component, but we want to reflect
-// updates from ProfileForm (Client Component) immediately without a full page reload
-// if revalidatePath alone isn't sufficient or for a smoother UX.
-// For this iteration, we'll rely on revalidatePath and a page refresh if needed,
-// but an alternative is to lift state or use a client component wrapper.
+export default async function ProfilePage() {
+  const session = await getServerSession(authOptions);
 
-// For now, we will make a simpler page component and let ProfileForm handle its state
-// and revalidatePath handle data refresh.
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
 
-interface SessionUser {
-  id: string;
-  email?: string | null;
-  name?: string | null;
-  image?: string | null;
-  roles: Role[];
-}
-
-export default function ProfilePage() {
-  const { data: session } = useSession();
-  const user = session?.user as SessionUser | undefined;
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      bio: true,
+      roles: true,
+    }
+  });
 
   if (!user) {
-    return <div>Loading...</div>;
+    // This should not happen if a session exists, but it's a good safeguard.
+    redirect("/login");
   }
+
+  const roleApplications = await db.roleApplication.findMany({
+    where: { userId: user.id },
+    select: {
+      requestedRole: true,
+      status: true,
+    }
+  });
 
   const isAdmin = user.roles.includes(Role.ADMIN);
   const isOrganizer = user.roles.includes(Role.ORGANIZER);
+  const isBrandCreator = roleApplications.some(app => app.requestedRole === RequestedRole.BRAND_CREATOR && app.status === ApplicationStatus.APPROVED);
   let profileTitle = "Your Profile";
 
   if (isAdmin) {
@@ -48,96 +60,111 @@ export default function ProfilePage() {
     profileTitle = "Your Organizer Profile";
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">{profileTitle}</h1>
+  const pendingApplications = isAdmin ? await db.roleApplication.findMany({
+    where: { status: ApplicationStatus.PENDING },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+        }
+      }
+    },
+  }) : [];
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Account Information</h2>
-        <div className="space-y-2">
-          <p><span className="font-medium">Name:</span> {user.name || 'Not set'}</p>
-          <p><span className="font-medium">Email:</span> {user.email}</p>
-          <p>
-            <span className="font-medium">Roles:</span>{' '}
+  const ownedBrands = await db.brand.findMany({
+    where: { ownerId: user.id },
+    select: { id: true, name: true },
+  });
+
+  // NOTE: The original component was a client component.
+  // ProfileForm needs to be able to work with initial data from the server.
+  // We are passing the full user object to it now.
+  // TalentActivationButton and RoleRequestForm are designed as client components
+  // and will receive the necessary props.
+
+  return (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper sx={{ p: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          {profileTitle}
+        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6">Account Information</Typography>
+          <Typography><strong>Name:</strong> {user.name || 'Not set'}</Typography>
+          <Typography><strong>Email:</strong> {user.email}</Typography>
+          <Typography component="div">
+            <strong>Roles:</strong>{' '}
             {user.roles.map((role: Role) => (
-              <span
-                key={role}
-                className={`inline-block px-2 py-1 rounded text-sm mr-2 ${
-                  role === Role.ADMIN
-                    ? 'bg-purple-100 text-purple-800'
-                    : role === Role.ORGANIZER
-                    ? 'bg-blue-100 text-blue-800'
-                    : role === Role.TALENT
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
+              <Box component="span" key={role} sx={{
+                display: 'inline-block',
+                px: 1.5,
+                py: 0.5,
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                mr: 1,
+                backgroundColor:
+                  role === Role.ADMIN ? 'secondary.light' :
+                    role === Role.ORGANIZER ? 'primary.light' :
+                      role === Role.TALENT ? 'success.light' : 'grey.200',
+                color:
+                  role === Role.ADMIN ? 'secondary.contrastText' :
+                    role === Role.ORGANIZER ? 'primary.contrastText' :
+                      role === Role.TALENT ? 'success.contrastText' : 'text.primary',
+              }}>
                 {role}
-              </span>
+              </Box>
             ))}
-          </p>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+        <Divider sx={{ my: 2 }} />
+        <ProfileForm currentName={user.name} currentBio={user.bio} />
+      </Paper>
 
       {isAdmin && (
         <AdminGuard>
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Admin Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <a
-                href="/admin/dashboard"
-                className="block p-4 border rounded-lg hover:bg-gray-50"
-              >
-                <h3 className="font-medium mb-2">Admin Dashboard</h3>
-                <p className="text-sm text-gray-600">Manage conventions, users, and applications</p>
-              </a>
-              <a
-                href="/admin/applications"
-                className="block p-4 border rounded-lg hover:bg-gray-50"
-              >
-                <h3 className="font-medium mb-2">Role Applications</h3>
-                <p className="text-sm text-gray-600">Review and manage role applications</p>
-              </a>
-              <a
-                href="/admin/users"
-                className="block p-4 border rounded-lg hover:bg-gray-50"
-              >
-                <h3 className="font-medium mb-2">User Management</h3>
-                <p className="text-sm text-gray-600">Manage user accounts and roles</p>
-              </a>
-            </div>
-          </div>
+          <Paper sx={{ p: 4, mb: 4 }}>
+            <Typography variant="h5" gutterBottom>Admin Actions</Typography>
+            <RoleApplicationList applications={pendingApplications} />
+          </Paper>
         </AdminGuard>
       )}
 
       {!isAdmin && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Role Management</h2>
-          <div className="space-y-4">
-            {!isOrganizer && (
-              <div className="p-4 border rounded-lg">
-                <h3 className="font-medium mb-2">Become an Organizer</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Apply to become an organizer and manage your own conventions.
-                </p>
-                <a
-                  href="/organizer/apply"
-                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Apply Now
-                </a>
-              </div>
-            )}
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-medium mb-2">Talent Profile</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Activate your talent profile to be discovered by convention organizers.
-              </p>
-              <TalentActivationButton initialRoles={user.roles} />
-            </div>
-          </div>
-        </div>
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h5" gutterBottom>Role Management</Typography>
+          <Box sx={{ my: 2 }}>
+            <TalentActivationButton initialRoles={user.roles} />
+          </Box>
+          <Divider sx={{ my: 2 }} />
+          <RoleRequestForm
+            currentRoles={user.roles}
+            existingApplications={roleApplications}
+          />
+        </Paper>
       )}
-    </div>
+
+      {/* This link is for the next story task */}
+      {(isAdmin || isBrandCreator) && (
+        <Paper sx={{ p: 4, mt: 4 }}>
+          <Typography variant="h5" gutterBottom>Brand Management</Typography>
+          <Link href="/brands/new">Create a new Brand</Link>
+          {ownedBrands.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>Your Brands:</Typography>
+              <List>
+                {ownedBrands.map((brand) => (
+                  <ListItem key={brand.id} disablePadding>
+                    <Link href={`/brands/${brand.id}/edit`} passHref>
+                      <ListItemText primary={`Edit "${brand.name}"`} />
+                    </Link>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </Paper>
+      )}
+    </Container>
   );
 } 

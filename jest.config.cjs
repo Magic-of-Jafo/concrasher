@@ -1,33 +1,18 @@
 const nextJest = require('next/jest');
 
-const createJestConfig = nextJest({
-  dir: './',
-});
+const createJestConfig = nextJest({ dir: './' });
 
-/** @type {import('jest').Config} */
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testPathIgnorePatterns: [
-    '<rootDir>/node_modules/',
-    '<rootDir>/.next/',
-    '<rootDir>/tests/e2e/', // Ignore Playwright E2E tests in the root tests/e2e folder
-    '<rootDir>/e2e/',       // Ignore Playwright E2E tests in the root e2e folder
-  ],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/tests/'],
   transformIgnorePatterns: [
-    '/node_modules/(?!jest-fetch-mock)/'
+    'node_modules/(?!(preact|@preact|next-auth|@next-auth|@panva|jose|uuid|@auth|node-fetch)/)'
   ],
-  // reporters: [
-  //   'default',
-  //   ['jest-html-reporters', {
-  //     publicPath: './html-report',
-  //     filename: 'report.html',
-  //     expand: true,
-  //   }],
-  // ],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 };
 
-module.exports = createJestConfig(customJestConfig); 
+module.exports = createJestConfig(customJestConfig);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Container,
@@ -60,44 +60,47 @@ const initialPageConventionData: PageConventionData = {
   venueHotel: createDefaultVenueHotelTabData(), // Use factory from validators
 };
 
-interface NewSeriesData extends Omit<ConventionSeries, 'id'> {}
+interface NewSeriesData extends Omit<ConventionSeries, 'id'> { }
 
 // Define local interfaces for how API data might be initially shaped. 
 // These are for mapping the raw API response before transforming to shared validator types.
 interface ApiPhotoData { id?: string; url: string; caption?: string; }
-interface ApiVenueData { 
-  id?: string; conventionId?: string; isPrimaryVenue: boolean; venueName: string; 
-  description?: string; websiteUrl?: string; googleMapsUrl?: string; streetAddress?: string; 
-  city?: string; stateRegion?: string; postalCode?: string; country?: string; 
-  contactEmail?: string; contactPhone?: string; amenities?: string[]; parkingInfo?: string; 
+interface ApiVenueData {
+  id?: string; conventionId?: string; isPrimaryVenue: boolean; venueName: string;
+  description?: string; websiteUrl?: string; googleMapsUrl?: string; streetAddress?: string;
+  city?: string; stateRegion?: string; postalCode?: string; country?: string;
+  contactEmail?: string; contactPhone?: string; amenities?: string[]; parkingInfo?: string;
   publicTransportInfo?: string; overallAccessibilityNotes?: string; photos?: ApiPhotoData[];
 }
-interface ApiHotelData { 
-  id?: string; conventionId?: string; isPrimaryHotel: boolean; isAtPrimaryVenueLocation: boolean; 
-  hotelName: string; description?: string; websiteUrl?: string; googleMapsUrl?: string; 
+interface ApiHotelData {
+  id?: string; conventionId?: string; isPrimaryHotel: boolean; isAtPrimaryVenueLocation: boolean;
+  hotelName: string; description?: string; websiteUrl?: string; googleMapsUrl?: string;
   streetAddress?: string; city?: string; stateRegion?: string; postalCode?: string; country?: string;
   contactEmail?: string; contactPhone?: string; amenities?: string[]; photos?: ApiPhotoData[];
   parkingInfo?: string; publicTransportInfo?: string; overallAccessibilityNotes?: string;
   bookingLink?: string; bookingCutoffDate?: Date | string | null; groupRateOrBookingCode?: string; groupPrice?: string;
 }
 
-export default function ConventionEditPage({ params }: { params: { id: string } }) { // params.id is expected to be a string here
+export default function ConventionEditPage() { // Remove params from props
   const router = useRouter();
+  const params = useParams(); // Use the hook here
+  const conventionId = Array.isArray(params.id) ? params.id[0] : params.id; // Get ID from hook
+
   const { data: session, status: sessionStatus } = useSession();
-  const isEditing = true; // Since params.id is required for this page
-  
+  const isEditing = !!conventionId; // Determine if editing based on conventionId
+
   const [currentStep, setCurrentStep] = useState<'selectSeries' | 'editDetails'>('editDetails');
-  
+
   // Initialize with a fully formed structure
   const [conventionPageData, setConventionPageData] = useState<PageConventionData>(() => ({
     ...initialPageConventionData,
-    id: params.id, // Set current convention ID here
+    id: conventionId, // Set current convention ID here
     venueHotel: {
-        ...createDefaultVenueHotelTabData(), // Ensure a valid default structure
-        // conventionId might not be needed directly on venueHotel, but on individual venues/hotels if required by backend for association
+      ...createDefaultVenueHotelTabData(), // Ensure a valid default structure
+      // conventionId might not be needed directly on venueHotel, but on individual venues/hotels if required by backend for association
     }
   }));
-  
+
   const [isLoading, setIsLoading] = useState(true); // Start true if editing
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,17 +108,17 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
 
   // Load existing convention data if editing
   useEffect(() => {
-    if (params.id) {
+    if (conventionId && isEditing) {
       const loadConvention = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`/api/organizer/conventions/${params.id}`);
+          const response = await fetch(`/api/organizer/conventions/${conventionId}`);
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to load convention');
           }
           const loadedApiConvention = await response.json(); // This is the raw data from your API
-          
+
           let finalPrimaryVenue: VenueData | undefined = undefined;
           const finalSecondaryVenues: VenueData[] = [];
           const finalHotels: HotelData[] = [];
@@ -138,11 +141,11 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
                 country: apiVenue.country || '',
                 contactEmail: apiVenue.contactEmail || '',
                 contactPhone: apiVenue.contactPhone || '',
-                amenities: Array.isArray(apiVenue.amenities) ? apiVenue.amenities.map(String) : [], 
+                amenities: Array.isArray(apiVenue.amenities) ? apiVenue.amenities.map(String) : [],
                 parkingInfo: apiVenue.parkingInfo || '',
                 publicTransportInfo: apiVenue.publicTransportInfo || '',
                 overallAccessibilityNotes: apiVenue.overallAccessibilityNotes || '',
-                photos: Array.isArray(apiVenue.photos) ? apiVenue.photos.map((p: ApiPhotoData) => ({ url: p.url, caption: p.caption, id: p.id })) : [], 
+                photos: Array.isArray(apiVenue.photos) ? apiVenue.photos.map((p: ApiPhotoData) => ({ url: p.url, caption: p.caption, id: p.id })) : [],
               };
               if (venue.isPrimaryVenue) {
                 finalPrimaryVenue = venue;
@@ -196,23 +199,23 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
                 // Otherwise, it's just an additional hotel (or it's the primary hotel but guests ARE at primary venue, so we don't list it separately here)
                 // We only add to finalHotels if it's NOT the primary hotel that we've already assigned to finalPrimaryHotelDetails
                 if (!(actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel)) {
-                     finalHotels.push(commonHotelData);
+                  finalHotels.push(commonHotelData);
                 }
               }
             });
           }
-          
+
           // Construct the VenueHotelTabData object using transformed data
           const transformedVenueHotelData: VenueHotelTabData = {
-            primaryVenue: finalPrimaryVenue, 
+            primaryVenue: finalPrimaryVenue,
             secondaryVenues: finalSecondaryVenues,
             hotels: finalHotels,
             guestsStayAtPrimaryVenue: actualGuestsStayAtPrimaryVenue, // Use the direct value from API
-            primaryHotelDetails: finalPrimaryHotelDetails, 
+            primaryHotelDetails: finalPrimaryHotelDetails,
           };
 
           setConventionPageData({
-            id: params.id,
+            id: conventionId,
             name: loadedApiConvention.name || '',
             slug: loadedApiConvention.slug || '',
             startDate: loadedApiConvention.startDate ? new Date(loadedApiConvention.startDate) : null,
@@ -226,11 +229,11 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
             descriptionShort: loadedApiConvention.descriptionShort || '',
             descriptionMain: loadedApiConvention.descriptionMain || '',
             seriesId: loadedApiConvention.conventionSeriesId || loadedApiConvention.seriesId,
-            priceTiers: loadedApiConvention.priceTiers || [], 
+            priceTiers: loadedApiConvention.priceTiers || [],
             priceDiscounts: loadedApiConvention.priceDiscounts || [],
             venueHotel: transformedVenueHotelData, // Assign the ALIGNED data structure
           });
-          
+
           if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {
             setCurrentStep('editDetails');
           } else {
@@ -239,20 +242,14 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
 
         } catch (err: any) {
           setError(err.message || 'Failed to load convention data.');
-          setCurrentStep('editDetails'); 
+          setCurrentStep('editDetails');
         } finally {
           setIsLoading(false);
         }
       };
       loadConvention();
-    } else {
-      // This case should ideally not be reached if params.id is guaranteed by routing for an edit page.
-      // If it can be reached, redirect or show an error.
-      setError('Convention ID is missing. Cannot edit.');
-      setIsLoading(false);
-      // router.push('/organizer/conventions'); // Or some error page
     }
-  }, [params.id]);
+  }, [conventionId, isEditing]); // Use conventionId from the hook as a dependency
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -275,7 +272,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
   };
 
   const handleNewSeriesCreated = async (newSeriesData: NewSeriesData) => {
-    setIsSaving(true); 
+    setIsSaving(true);
     setSeriesError(null);
     try {
       const response = await fetch('/api/convention-series', {
@@ -308,7 +305,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
     let finalPrimaryVenueForApi: VenueData | undefined | null = dataFromTabs.venueHotel?.primaryVenue;
     let allOtherVenuesForApi: VenueData[] = [];
     let finalPrimaryHotelDetailsForApi: HotelData | undefined | null = dataFromTabs.venueHotel?.primaryHotelDetails;
-    
+
     // Initialize allOtherHotelsForApi, ensuring isPrimaryHotel is false and stripping any UI-only flags like markedForPrimaryPromotion
     let allOtherHotelsForApi: HotelData[] = (dataFromTabs.venueHotel?.hotels || []).map(hotel => {
       const { markedForPrimaryPromotion, ...restOfHotel } = hotel as any; // Cast to access and then remove UI flag
@@ -345,7 +342,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
         // allOtherVenuesForApi are just the non-promoted secondary venues.
         finalPrimaryVenueForApi = currentPrimaryVenue; // Already set at initialization, ensure isPrimary:true if it exists
         if (finalPrimaryVenueForApi) finalPrimaryVenueForApi.isPrimaryVenue = true;
-        
+
         allOtherVenuesForApi = secondaryVenues.map(venue => ({ ...venue, isPrimaryVenue: false, markedForPrimaryPromotion: false }));
       }
       allOtherVenuesForApi.forEach(v => delete (v as any).markedForPrimaryPromotion); // Clean UI field
@@ -363,9 +360,9 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
       if (dataFromTabs.venueHotel) {
         const currentPrimaryHotelInForm = dataFromTabs.venueHotel.primaryHotelDetails;
         const additionalHotelsFromForm = dataFromTabs.venueHotel.hotels || [];
-        
+
         console.log('[EditPage] handleSubmitConvention: Raw additionalHotelsFromForm from tabs:', JSON.stringify(additionalHotelsFromForm, null, 2));
-        additionalHotelsFromForm.forEach(h => console.log(`[EditPage] Hotel: ${h.hotelName}, Marked for promotion: ${(h as any).markedForPrimaryPromotion}` ));
+        additionalHotelsFromForm.forEach(h => console.log(`[EditPage] Hotel: ${h.hotelName}, Marked for promotion: ${(h as any).markedForPrimaryPromotion}`));
 
         let promotedHotelFromAdditionals: HotelData | undefined = undefined;
         let promotedHotelIndexInAdditionals = -1;
@@ -464,7 +461,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
     // console.log('[EditPage] All other venues collected (API might not use this array directly for updates):', JSON.stringify(allOtherVenuesForApi, null, 2));
 
     try {
-      const url = `/api/organizer/conventions/${params.id}`;
+      const url = `/api/organizer/conventions/${conventionId}`;
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -478,7 +475,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
 
       const conventionResult = await response.json();
       // Optionally, update conventionPageData with conventionResult if API returns full updated object
-      // setConventionPageData(prev => ({...prev, ...conventionResult, id: params.id }));
+      // setConventionPageData(prev => ({...prev, ...conventionResult, id: conventionId }));
 
       // START OF MODIFICATION: Update local state before navigating
       // First, transform the API response (conventionResult) to match PageConventionData structure
@@ -504,11 +501,11 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
             country: apiVenue.country || '',
             contactEmail: apiVenue.contactEmail || '',
             contactPhone: apiVenue.contactPhone || '',
-            amenities: Array.isArray(apiVenue.amenities) ? apiVenue.amenities.map(String) : [], 
+            amenities: Array.isArray(apiVenue.amenities) ? apiVenue.amenities.map(String) : [],
             parkingInfo: apiVenue.parkingInfo || '',
             publicTransportInfo: apiVenue.publicTransportInfo || '',
             overallAccessibilityNotes: apiVenue.overallAccessibilityNotes || '',
-            photos: Array.isArray(apiVenue.photos) ? apiVenue.photos.map((p: ApiPhotoData) => ({ url: p.url, caption: p.caption, id: p.id })) : [], 
+            photos: Array.isArray(apiVenue.photos) ? apiVenue.photos.map((p: ApiPhotoData) => ({ url: p.url, caption: p.caption, id: p.id })) : [],
           };
           if (venue.isPrimaryVenue) {
             transformedPrimaryVenue = venue;
@@ -552,23 +549,23 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
             transformedPrimaryHotelDetails = commonHotelData;
           } else {
             if (!(actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel)) {
-                transformedHotels.push(commonHotelData);
+              transformedHotels.push(commonHotelData);
             }
           }
         });
       }
 
       const transformedVenueHotelData: VenueHotelTabData = {
-        primaryVenue: transformedPrimaryVenue, 
+        primaryVenue: transformedPrimaryVenue,
         secondaryVenues: transformedSecondaryVenues,
         hotels: transformedHotels,
         guestsStayAtPrimaryVenue: actualGuestsStayAtPrimaryVenue,
-        primaryHotelDetails: transformedPrimaryHotelDetails, 
+        primaryHotelDetails: transformedPrimaryHotelDetails,
       };
 
       setConventionPageData(prevData => ({
         ...prevData, // Keep existing data not directly from conventionResult (like non-API fields or UI state)
-        id: conventionResult.id || params.id, // Ensure ID is from result or params
+        id: conventionResult.id || conventionId, // Ensure ID is from result or params
         name: conventionResult.name || '',
         slug: conventionResult.slug || '',
         startDate: conventionResult.startDate ? new Date(conventionResult.startDate) : null,
@@ -582,7 +579,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
         descriptionShort: conventionResult.descriptionShort || '',
         descriptionMain: conventionResult.descriptionMain || '',
         seriesId: conventionResult.seriesId, // API should return seriesId
-        priceTiers: conventionResult.priceTiers || [], 
+        priceTiers: conventionResult.priceTiers || [],
         priceDiscounts: conventionResult.priceDiscounts || [],
         venueHotel: transformedVenueHotelData,
       }));
@@ -610,9 +607,9 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
   }
 
   if (sessionStatus === 'loading') {
-    return <p>Loading session...</p>; 
+    return <p>Loading session...</p>;
   }
-  
+
   if (sessionStatus === 'unauthenticated' || (sessionStatus === 'authenticated' && !session?.user?.roles?.includes('ORGANIZER'))) {
     return <p>Redirecting...</p>;
   }
@@ -628,7 +625,7 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
           {conventionPageData?.name ? `Edit ${conventionPageData.name}` : 'Edit Convention'}
         </Typography>
         {currentStep === 'selectSeries' && conventionPageData && (
-          <ConventionSeriesSelector 
+          <ConventionSeriesSelector
             onSeriesSelect={handleExistingSeriesSelected}
             onNewSeriesCreate={handleNewSeriesCreated}
             initialSeriesId={conventionPageData?.seriesId}
@@ -636,14 +633,14 @@ export default function ConventionEditPage({ params }: { params: { id: string } 
         )}
         {currentStep === 'editDetails' && conventionPageData && (
           <ConventionEditorTabs
-            initialConventionData={conventionPageData} 
+            initialConventionData={conventionPageData}
             isEditing={isEditing}
-            onSave={handleSubmitConvention} 
+            onSave={handleSubmitConvention}
             isSaving={isSaving}
             onCancel={handleCancel}
           />
         )}
-         {error && currentStep === 'editDetails' && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>} 
+        {error && currentStep === 'editDetails' && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </Paper>
     </Container>
   );

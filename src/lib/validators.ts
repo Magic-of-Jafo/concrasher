@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ConventionStatus as PrismaConventionStatusEnum } from '@prisma/client';
+import { ConventionStatus as PrismaConventionStatusEnum, ProfileType as PrismaProfileTypeEnum } from '@prisma/client';
 
 // List of valid US states
 const US_STATES = [
@@ -75,6 +75,21 @@ export const ProfileSchema = z.object({
 });
 
 export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;
+
+export const BrandCreateSchema = z.object({
+  name: z.string().min(3, { message: "Brand name must be at least 3 characters." }).max(50, { message: "Brand name must be 50 characters or less." }),
+  description: z.string().max(500, { message: "Description must be 500 characters or less." }).optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url({ message: "Please enter a valid URL for the website." }).optional().or(z.literal('')),
+});
+
+export type BrandCreateInput = z.infer<typeof BrandCreateSchema>;
+
+export const BrandUpdateSchema = BrandCreateSchema.extend({
+  id: z.string().cuid(),
+});
+
+export type BrandUpdateInput = z.infer<typeof BrandUpdateSchema>;
 
 // Use the Prisma generated enum for ConventionStatus
 export const ConventionStatusEnum = z.nativeEnum(PrismaConventionStatusEnum);
@@ -191,6 +206,20 @@ export type PriceTier = z.infer<typeof PriceTierSchema>;
 export type PriceDiscount = z.infer<typeof PriceDiscountSchema>;
 export type PricingTabData = z.infer<typeof PricingTabSchema>;
 
+// --- Dealers Tab Schemas ---
+
+export const ProfileTypeEnum = z.nativeEnum(PrismaProfileTypeEnum);
+
+export const DealerLinkSchema = z.object({
+  conventionId: z.string().cuid(),
+  linkedProfileId: z.string().cuid(),
+  profileType: ProfileTypeEnum,
+  displayNameOverride: z.string().optional(),
+  descriptionOverride: z.string().optional(),
+});
+
+export type DealerLinkData = z.infer<typeof DealerLinkSchema>;
+
 // --- Venue & Hotel Tab Schemas ---
 
 export const VenuePhotoSchema = z.object({
@@ -198,6 +227,8 @@ export const VenuePhotoSchema = z.object({
   url: z.string().url({ message: "Invalid photo URL" }).min(1, "Photo URL is required"),
   caption: z.string().optional(),
 });
+
+export type VenuePhotoData = z.infer<typeof VenuePhotoSchema>;
 
 export const VenueSchema = z.object({
   id: z.string().uuid().optional(),
@@ -223,11 +254,15 @@ export const VenueSchema = z.object({
   photos: z.array(VenuePhotoSchema).max(1, { message: "Only one photo is allowed." }).optional().default([]),
 });
 
+export type VenueData = z.infer<typeof VenueSchema>;
+
 export const HotelPhotoSchema = z.object({
   id: z.string().uuid().optional(),
   url: z.string().url({ message: "Invalid photo URL" }).min(1, "Photo URL is required"),
   caption: z.string().optional(),
 });
+
+export type HotelPhotoData = z.infer<typeof HotelPhotoSchema>;
 
 export const HotelSchema = z.object({
   id: z.string().uuid().optional(),
@@ -248,9 +283,19 @@ export const HotelSchema = z.object({
   contactEmail: z.string().email({ message: "Invalid contact email" }).optional().or(z.literal('')),
   contactPhone: z.string().optional(),
   groupRateOrBookingCode: z.string().optional(),
+  groupPrice: z.string().optional(),
+  bookingLink: z.string().url({ message: "Invalid booking link URL" }).optional().or(z.literal('')),
+  bookingCutoffDate: z.coerce.date().optional().nullable(),
   cutOffDate: z.coerce.date().optional().nullable(),
   openingDate: z.coerce.date().optional().nullable(),
   photos: z.array(HotelPhotoSchema).max(1, { message: "Only one photo is allowed." }).optional().default([]),
+  parkingInfo: z.string().optional(),
+  publicTransportInfo: z.string().optional(),
+  overallAccessibilityNotes: z.string().optional(),
+
+  // >>>>>> ADD THIS LINE HERE <<<<<<
+  amenities: z.array(z.string()).optional().default([]),
+
 }).refine((data) => {
   if (data.isPrimaryHotel) {
     return !!data.hotelName && !!data.streetAddress && !!data.city && !!data.country;
@@ -261,10 +306,28 @@ export const HotelSchema = z.object({
   path: ['hotelName'], // Arbitrarily pick one field for the error path
 });
 
+export type HotelData = z.infer<typeof HotelSchema>;
+
 export const VenueHotelTabSchema = z.object({
   venues: z.array(VenueSchema),
   hotels: z.array(HotelSchema),
+  guestsStayAtPrimaryVenue: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  // Only validate if guests are *not* staying at the primary venue
+  if (!data.guestsStayAtPrimaryVenue) {
+    // Require at least one hotel with isPrimaryHotel === true
+    if (!data.hotels.some(h => h.isPrimaryHotel)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A primary hotel is required if the venue is not serving as the hotel.',
+        path: ['hotels'],
+      });
+    }
+  }
 });
+
+
+export type VenueHotelTabData = z.infer<typeof VenueHotelTabSchema>;
 
 export const createDefaultVenue = (isPrimary: boolean = false): VenueData => ({
   id: undefined,
@@ -286,24 +349,18 @@ export const createDefaultHotel = (isPrimaryHotelFlag: boolean = false): HotelDa
   markedForPrimaryPromotion: false,
   hotelName: '',
   photos: [],
+  // >>>>>> ADD THIS LINE HERE <<<<<<
+  amenities: [], // Initialize with an empty array
 });
 
 // Helper function to create a default structure for the tab data
 export function createDefaultVenueHotelTabData(): VenueHotelTabData {
-  const primaryVenue = createDefaultVenue(true);
   return {
-    venues: [primaryVenue],
+    venues: [createDefaultVenue(true)], // Start with one primary venue
     hotels: [],
+    guestsStayAtPrimaryVenue: false,
   };
 }
-
-
-export type VenuePhotoData = z.infer<typeof VenuePhotoSchema>;
-export type VenueData = z.infer<typeof VenueSchema>;
-export type HotelPhotoData = z.infer<typeof HotelPhotoSchema>;
-export type HotelData = z.infer<typeof HotelSchema>;
-export type VenueHotelTabData = z.infer<typeof VenueHotelTabSchema>;
-
 
 // --- Schedule Tab Schemas ---
 
@@ -351,7 +408,6 @@ export const ConventionScheduleItemBulkInputSchema = z.object({
   conventionId: z.string().cuid(),
   scheduleItems: z.array(ConventionScheduleItemBulkItemSchema),
 });
-
 
 // Type exports
 export type ScheduleEventFeeTierInput = z.infer<typeof ScheduleEventFeeTierSchema>;

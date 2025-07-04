@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ConventionGrid from './ConventionGrid';
 import { Convention, ConventionStatus } from '@prisma/client';
 import { useRouter } from 'next/navigation';
@@ -7,6 +8,17 @@ import { useRouter } from 'next/navigation';
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
+
+// Create a theme for Material-UI
+const theme = createTheme();
+
+const renderWithProviders = (ui: React.ReactElement) => {
+  return render(
+    <ThemeProvider theme={theme}>
+      {ui}
+    </ThemeProvider>
+  );
+};
 
 describe('ConventionGrid', () => {
   const mockRouter = {
@@ -34,7 +46,8 @@ describe('ConventionGrid', () => {
       status: ConventionStatus.PUBLISHED,
       coverImageUrl: null,
       profileImageUrl: null,
-      galleryImageUrls: [],
+      guestsStayAtPrimaryVenue: false,
+      timezone: 'America/Los_Angeles',
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
@@ -59,7 +72,8 @@ describe('ConventionGrid', () => {
       status: ConventionStatus.PUBLISHED,
       coverImageUrl: null,
       profileImageUrl: null,
-      galleryImageUrls: [],
+      guestsStayAtPrimaryVenue: false,
+      timezone: 'America/Los_Angeles',
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
@@ -72,79 +86,33 @@ describe('ConventionGrid', () => {
   });
 
   it('renders loading state', () => {
-    render(
-      <ConventionGrid
-        conventions={[]}
-        totalPages={1}
-        currentPage={1}
-        loading={true}
-        onPageChange={() => {}}
-      />
-    );
-    
-    // Check for loading skeletons. MUI Skeletons don't have an explicit role="img".
-    // They are often spans or divs. We can look for a number of them.
-    // The component renders 3 skeletons based on the new implementation.
-    const skeletons = screen.getAllByLabelText('loading'); // MUI Skeleton has aria-label="loading" by default
-    expect(skeletons.length).toBeGreaterThanOrEqual(3); // Check for at least 3 skeletons
+    renderWithProviders(<ConventionGrid conventions={[]} loading={true} />);
+    // Material-UI Skeleton components render as spans with specific styling
+    const skeletons = document.querySelectorAll('.MuiSkeleton-root');
+    expect(skeletons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders empty state', () => {
-    render(
-      <ConventionGrid
-        conventions={[]}
-        totalPages={1}
-        currentPage={1}
-        loading={false}
-        onPageChange={() => {}}
-      />
-    );
-    
-    expect(screen.getByText('No conventions found')).toBeInTheDocument(); // Adjusted text
+    renderWithProviders(<ConventionGrid conventions={[]} loading={false} />);
+    expect(screen.getByText('No conventions found')).toBeInTheDocument();
   });
 
   it('renders convention cards', () => {
-    render(
-      <ConventionGrid
-        conventions={mockConventions}
-        totalPages={1}
-        currentPage={1}
-        loading={false}
-        onPageChange={() => {}}
-      />
-    );
-    
+    renderWithProviders(<ConventionGrid conventions={mockConventions} loading={false} />);
     expect(screen.getByText('Test Convention 1')).toBeInTheDocument();
     expect(screen.getByText('Test Convention 2')).toBeInTheDocument();
-    expect(screen.getByText('San Francisco, CA')).toBeInTheDocument(); // Adjusted text
-    expect(screen.getByText('Los Angeles, CA')).toBeInTheDocument(); // Adjusted text
+    expect(screen.getByText('San Francisco, CA')).toBeInTheDocument();
+    expect(screen.getByText('Los Angeles, CA')).toBeInTheDocument();
   });
 
   it('navigates to convention detail page when card is clicked', () => {
-    render(
-      <ConventionGrid
-        conventions={mockConventions}
-        totalPages={1}
-        currentPage={1}
-        loading={false}
-        onPageChange={() => {}}
-      />
-    );
-    
+    renderWithProviders(<ConventionGrid conventions={mockConventions} loading={false} />);
     fireEvent.click(screen.getByText('Test Convention 1'));
     expect(mockRouter.push).toHaveBeenCalledWith('/conventions/test-convention-1');
   });
 
   it('does not render pagination elements itself', () => {
-    render(
-      <ConventionGrid
-        conventions={mockConventions}
-        totalPages={1} // or 3, doesn't matter for this component
-        currentPage={1}
-        loading={false}
-        onPageChange={() => {}}
-      />
-    );
+    renderWithProviders(<ConventionGrid conventions={mockConventions} loading={false} />);
     // ConventionGrid itself should not render a <nav> or MUI Pagination specific roles
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });

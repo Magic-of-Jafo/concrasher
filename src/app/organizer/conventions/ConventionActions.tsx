@@ -29,31 +29,20 @@ import {
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ConventionStatus } from "@prisma/client";
+import { ConventionStatus, Convention } from "@prisma/client";
 
-interface ConventionActionsProps {
-  conventionId: string;
-  conventionName: string;
-  currentStatus: ConventionStatus;
-  deletedAt?: Date | null;
-  onActionComplete?: () => void;
-  slug: string;
+export interface ConventionActionsProps {
+  convention: Convention;
+  onConventionUpdated?: () => void;
 }
 
-export default function ConventionActions({
-  conventionId,
-  conventionName,
-  currentStatus,
-  deletedAt,
-  onActionComplete,
-  slug,
-}: ConventionActionsProps) {
+export default function ConventionActions({ convention, onConventionUpdated = () => { } }: ConventionActionsProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<ConventionStatus>(currentStatus);
+  const [selectedStatus, setSelectedStatus] = useState<ConventionStatus>(convention?.status || "DRAFT");
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -74,15 +63,12 @@ export default function ConventionActions({
 
   const handleEdit = () => {
     handleMenuClose();
-    // Edit link should now be relative to /organizer/conventions/
-    router.push(`/organizer/conventions/${conventionId}/edit`);
+    router.push(`/organizer/conventions/${convention?.id}/edit`);
   };
 
   const duplicateMutation = useMutation({
     mutationFn: async () => {
-      // API route for duplication might need review if it was /api/conventions/
-      // Assuming it's general enough or already correct.
-      const response = await fetch(`/api/conventions/${conventionId}/duplicate`, {
+      const response = await fetch(`/api/conventions/${convention?.id}/duplicate`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -97,9 +83,7 @@ export default function ConventionActions({
         message: "Convention duplicated successfully",
         severity: "success",
       });
-      if (onActionComplete) {
-        onActionComplete();
-      }
+      onConventionUpdated();
       router.push(`/organizer/conventions/${data.id}/edit`);
     },
     onError: () => {
@@ -118,18 +102,19 @@ export default function ConventionActions({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/organizer/conventions/${conventionId}`, {
+      const response = await fetch(`/api/organizer/conventions/${convention?.id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-          error: "Delete operation failed", 
-          message: "Failed to delete convention. Please try again."
-        }));
-        const error = new Error(errorData.message || "Failed to delete convention");
-        (error as any).status = response.status;
-        (error as any).data = errorData;
-        throw error;
+        // Try to get more specific error from response body
+        let errorMessage = "Failed to delete convention. Please try again.";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          // Ignore if response is not json
+        }
+        throw new Error(errorMessage);
       }
     },
     onSuccess: () => {
@@ -141,9 +126,7 @@ export default function ConventionActions({
         message: "Convention moved to trash successfully",
         severity: "success",
       });
-      if (onActionComplete) {
-        onActionComplete();
-      }
+      onConventionUpdated();
     },
     onError: (error: any) => {
       setSnackbar({
@@ -165,9 +148,7 @@ export default function ConventionActions({
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: ConventionStatus) => {
-      // API route for status update might need review if it was /api/conventions/
-      // Assuming it's general enough or already correct.
-      const response = await fetch(`/api/organizer/conventions/${conventionId}`, {
+      const response = await fetch(`/api/organizer/conventions/${convention?.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -175,8 +156,7 @@ export default function ConventionActions({
         body: JSON.stringify({ status: newStatus }),
       });
       if (!response.ok) {
-        // Attempt to parse error from backend if available
-        const errorData = await response.json().catch(() => ({})); 
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Failed to update convention status");
       }
       return response.json();
@@ -189,9 +169,7 @@ export default function ConventionActions({
         message: "Convention status updated successfully",
         severity: "success",
       });
-      if (onActionComplete) {
-        onActionComplete();
-      }
+      onConventionUpdated();
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -213,12 +191,12 @@ export default function ConventionActions({
 
   const restoreMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/organizer/conventions/${conventionId}/restore`, {
+      const response = await fetch(`/api/organizer/conventions/${convention?.id}/restore`, {
         method: "PATCH",
       });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-          error: "Restore operation failed", 
+        const errorData = await response.json().catch(() => ({
+          error: "Restore operation failed",
           message: "Failed to restore convention. Please try again."
         }));
         const error = new Error(errorData.message || "Failed to restore convention");
@@ -236,9 +214,7 @@ export default function ConventionActions({
         message: "Convention restored successfully",
         severity: "success",
       });
-      if (onActionComplete) {
-        onActionComplete();
-      }
+      onConventionUpdated();
     },
     onError: (error: any) => {
       let message = "Failed to restore convention. Please try again.";
@@ -262,7 +238,7 @@ export default function ConventionActions({
 
   const handleView = () => {
     handleMenuClose();
-    router.push(`/conventions/${slug}`);
+    router.push(`/conventions/${convention?.slug}`);
   };
 
   return (
@@ -280,7 +256,7 @@ export default function ConventionActions({
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        {deletedAt ? (
+        {convention?.deletedAt ? (
           <MenuItem onClick={handleRestore} disabled={restoreMutation.isPending}>
             <ListItemIcon>
               <RestoreIcon fontSize="small" />
@@ -308,7 +284,7 @@ export default function ConventionActions({
               <ListItemText>Duplicate</ListItemText>
             </MenuItem>,
             <MenuItem key="status" onClick={handleStatusChange} disabled={statusMutation.isPending}>
-               <ListItemIcon>
+              <ListItemIcon>
                 <PublishIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Change Status</ListItemText>
@@ -326,7 +302,7 @@ export default function ConventionActions({
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Move to Trash?</DialogTitle>
         <DialogContent>
-          Are you sure you want to move the convention "{conventionName}" to the
+          Are you sure you want to move the convention "{convention?.name}" to the
           trash? It can be restored later.
         </DialogContent>
         <DialogActions>
