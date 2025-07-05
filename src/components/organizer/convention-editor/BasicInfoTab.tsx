@@ -430,6 +430,35 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             </Box>
           </Paper>
 
+          {/* Section: Website */}
+          <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
+            <Typography variant="h6" gutterBottom>Website & Registration</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                name="websiteUrl"
+                label="Convention Website"
+                type="url"
+                value={value.websiteUrl || ''}
+                onChange={handleTextChange}
+                error={!!errors.websiteUrl}
+                helperText={errors.websiteUrl || 'Official convention website (optional)'}
+                placeholder="https://example.com"
+                sx={{ maxWidth: '400px' }}
+              />
+              <TextField
+                name="registrationUrl"
+                label="Registration URL"
+                type="url"
+                value={value.registrationUrl || ''}
+                onChange={handleTextChange}
+                error={!!errors.registrationUrl}
+                helperText={errors.registrationUrl || 'Direct link to registration page (optional)'}
+                placeholder="https://registration.example.com"
+                sx={{ maxWidth: '400px' }}
+              />
+            </Box>
+          </Paper>
+
           {/* Section: Descriptions */}
           <Box sx={{ width: '100%', mt: 2 }}>
             <Typography variant="h6" gutterBottom>Descriptions</Typography>

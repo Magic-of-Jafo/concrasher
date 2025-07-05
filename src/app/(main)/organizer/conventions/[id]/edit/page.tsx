@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import ConventionSeriesSelector from '@/components/ConventionSeriesSelector';
 import ConventionEditorTabs from '@/components/organizer/convention-editor/ConventionEditorTabs';
-import { type BasicInfoFormData, type PriceTier, type PriceDiscount, type VenueHotelTabData, type VenueData, type HotelData, createDefaultVenueHotelTabData } from '@/lib/validators';
+import { type BasicInfoFormData, type PriceTier, type PriceDiscount, type VenueHotelTabData, type VenueData, type HotelData, type ConventionMediaData, createDefaultVenueHotelTabData } from '@/lib/validators';
 
 // Define ConventionSeries interface locally
 interface ConventionSeries {
@@ -30,6 +30,9 @@ interface PageConventionData extends BasicInfoFormData {
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
   venueHotel: VenueHotelTabData; // USE IMPORTED TYPE
+  media?: ConventionMediaData[]; // Add media field
+  coverImageUrl?: string; // Add cover image URL
+  profileImageUrl?: string; // Add profile image URL
   // Add other top-level fields if the API for fetching a single convention returns more
 }
 
@@ -47,6 +50,8 @@ const initialBasicInfoValues: BasicInfoFormData = {
   country: '',
   descriptionShort: undefined,
   descriptionMain: undefined,
+  websiteUrl: '',
+  registrationUrl: '',
   seriesId: undefined,
   newSeriesName: '',
 };
@@ -214,6 +219,9 @@ export default function ConventionEditPage() { // Remove params from props
             primaryHotelDetails: finalPrimaryHotelDetails,
           };
 
+          console.log('[EditPage] loadedApiConvention.coverImageUrl:', loadedApiConvention.coverImageUrl);
+          console.log('[EditPage] loadedApiConvention.profileImageUrl:', loadedApiConvention.profileImageUrl);
+
           setConventionPageData({
             id: conventionId,
             name: loadedApiConvention.name || '',
@@ -228,10 +236,15 @@ export default function ConventionEditPage() { // Remove params from props
             country: loadedApiConvention.country || '',
             descriptionShort: loadedApiConvention.descriptionShort || '',
             descriptionMain: loadedApiConvention.descriptionMain || '',
+            websiteUrl: loadedApiConvention.websiteUrl || '',
+            registrationUrl: loadedApiConvention.registrationUrl || '',
             seriesId: loadedApiConvention.conventionSeriesId || loadedApiConvention.seriesId,
             priceTiers: loadedApiConvention.priceTiers || [],
             priceDiscounts: loadedApiConvention.priceDiscounts || [],
             venueHotel: transformedVenueHotelData, // Assign the ALIGNED data structure
+            media: loadedApiConvention.media || [], // Add media data
+            coverImageUrl: loadedApiConvention.coverImageUrl || '', // Add cover image URL
+            profileImageUrl: loadedApiConvention.profileImageUrl || '', // Add profile image URL
           });
 
           if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {
@@ -440,6 +453,8 @@ export default function ConventionEditPage() { // Remove params from props
       country: dataFromTabs.country,
       descriptionShort: dataFromTabs.descriptionShort,
       descriptionMain: dataFromTabs.descriptionMain,
+      websiteUrl: dataFromTabs.websiteUrl,
+      registrationUrl: dataFromTabs.registrationUrl,
       seriesId: dataFromTabs.seriesId,
       // Price tiers and discounts from dataFromTabs
       priceTiers: dataFromTabs.priceTiers,

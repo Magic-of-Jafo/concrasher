@@ -50,6 +50,7 @@
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.3.8",
+    "react-easy-crop": "^5.4.2",
     "react-image-crop": "^11.0.10",
     "slugify": "^1.6.6",
     "user-event": "^3.0.3",

@@ -19,6 +19,8 @@ import {
   type BrandCreateInput,
   BrandUpdateSchema,
   type BrandUpdateInput,
+  ConventionMediaSchema,
+  type ConventionMediaData,
   // ConventionScheduleItemBulkUploadSchema, // Corrected: Removed the problematic one, this is the main schema for the array - THIS LINE IS THE CULPRIT
 } from './validators';
 
@@ -1451,25 +1453,204 @@ export async function approveRoleApplication(applicationId: string): Promise<{ s
 }
 
 export async function rejectRoleApplication(applicationId: string): Promise<{ success: boolean; error?: string }> {
-  "use server";
-
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-  if (!session.user.roles || !session.user.roles.includes(Role.ADMIN)) {
-    return { success: false, error: "Unauthorized" };
-  }
-
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { roles: true },
+    });
+
+    if (!user?.roles.includes(Role.ADMIN)) {
+      return { success: false, error: "Insufficient permissions" };
+    }
+
     await db.roleApplication.update({
       where: { id: applicationId },
       data: { status: ApplicationStatus.REJECTED },
     });
-    revalidatePath("/profile");
+
+    revalidatePath('/admin/applications');
     return { success: true };
+
   } catch (error) {
-    console.error("Error rejecting role application:", error);
-    return { success: false, error: "Failed to reject application." };
+    console.error('Error rejecting role application:', error);
+    return { success: false, error: "Failed to reject application" };
+  }
+}
+
+export async function updateConventionMedia(
+  conventionId: string,
+  mediaData: ConventionMediaData[]
+): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: any;
+}> {
+  "use server";
+
+  // console.log('[updateConventionMedia] Called with conventionId:', conventionId);
+  // console.log('[updateConventionMedia] Media data count:', mediaData.length);
+
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    // Verify user has permission to edit this convention
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      include: {
+        series: {
+          select: { organizerUserId: true }
+        }
+      }
+    });
+
+    if (!convention) {
+      return { success: false, error: "Convention not found." };
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { roles: true },
+    });
+
+    const isAdmin = user?.roles.includes(Role.ADMIN);
+    const isOrganizer = convention.series?.organizerUserId === session.user.id;
+
+    if (!isAdmin && !isOrganizer) {
+      return { success: false, error: "Authorization failed. You don't have permission to edit this convention." };
+    }
+
+    // Validate media data
+    const validatedMediaData: ConventionMediaData[] = [];
+    for (const [index, media] of mediaData.entries()) {
+      const validationResult = ConventionMediaSchema.safeParse(media);
+      if (!validationResult.success) {
+        console.error(`[updateConventionMedia] Validation failed for media item ${index}:`, validationResult.error);
+        console.error(`[updateConventionMedia] Detailed validation issues:`, validationResult.error.issues);
+        console.error(`[updateConventionMedia] Failed media item:`, media);
+        return {
+          success: false,
+          error: "Invalid media data provided.",
+          fieldErrors: validationResult.error.flatten().fieldErrors,
+        };
+      }
+      validatedMediaData.push(validationResult.data);
+    }
+
+    // Update media in transaction
+    await db.$transaction(async (prisma) => {
+      // Delete existing media for this convention
+      await prisma.conventionMedia.deleteMany({
+        where: { conventionId }
+      });
+
+      // Create new media records
+      if (validatedMediaData.length > 0) {
+        await prisma.conventionMedia.createMany({
+          data: validatedMediaData.map((media, index) => ({
+            conventionId,
+            type: media.type,
+            url: media.url,
+            caption: media.caption || null,
+            order: media.order ?? index,
+          }))
+        });
+      }
+    });
+
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    return {
+      success: true,
+      message: "Media updated successfully!",
+    };
+
+  } catch (error) {
+    console.error("Error updating convention media:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while updating media.",
+    };
+  }
+}
+
+export async function updateConventionImages(
+  conventionId: string,
+  coverImageUrl?: string,
+  profileImageUrl?: string
+): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  "use server";
+
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    // Verify user has permission to edit this convention
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      include: {
+        series: {
+          select: { organizerUserId: true }
+        }
+      }
+    });
+
+    if (!convention) {
+      return { success: false, error: "Convention not found." };
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { roles: true },
+    });
+
+    const isAdmin = user?.roles.includes(Role.ADMIN);
+    const isOrganizer = convention.series?.organizerUserId === session.user.id;
+
+    if (!isAdmin && !isOrganizer) {
+      return { success: false, error: "Authorization failed. You don't have permission to edit this convention." };
+    }
+
+    // Update the convention's cover and profile image URLs
+    const updateData: { coverImageUrl?: string | null; profileImageUrl?: string | null } = {};
+
+    if (coverImageUrl !== undefined) {
+      updateData.coverImageUrl = coverImageUrl || null;
+    }
+
+    if (profileImageUrl !== undefined) {
+      updateData.profileImageUrl = profileImageUrl || null;
+    }
+
+    await db.convention.update({
+      where: { id: conventionId },
+      data: updateData
+    });
+
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    return {
+      success: true,
+      message: "Convention images updated successfully!",
+    };
+
+  } catch (error) {
+    console.error("Error updating convention images:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while updating images.",
+    };
   }
 }

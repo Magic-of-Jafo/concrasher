@@ -31,8 +31,14 @@ interface ImageUploaderProps {
   enableCropping?: boolean;
   cropAspect?: number;
   onCropComplete?: (croppedAreaPixels: PixelCrop | null) => void;
-  uploadPathIdentifier?: string;
+  conventionId?: string;
+  mediaType?: string;
   finalImageTargetSize?: { width: number; height: number };
+  resetAfterUpload?: boolean;
+  autoUpload?: boolean;
+  multiple?: boolean;
+  maxFiles?: number;
+  onBulkUploadSuccess?: (imageUrls: string[]) => void;
 }
 
 function centerAspectCrop(
@@ -69,8 +75,8 @@ async function getCroppedImg(
       return;
     }
     if (!(pixelCrop.width > 0 && pixelCrop.height > 0)) {
-        reject(new Error('Crop dimensions must be greater than 0.'));
-        return;
+      reject(new Error('Crop dimensions must be greater than 0.'));
+      return;
     }
 
     const image = new Image();
@@ -149,8 +155,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   enableCropping = false,
   cropAspect,
   onCropComplete,
-  uploadPathIdentifier,
+  conventionId,
+  mediaType,
   finalImageTargetSize = { width: 500, height: 500 },
+  resetAfterUpload = false,
+  autoUpload = false,
+  multiple = false,
+  maxFiles = 10,
+  onBulkUploadSuccess,
 }) => {
   const [file, setFile] = useState<FileWithPath | null>(null);
   const [preview, setPreview] = useState<string | null>(initialImageUrl || null);
@@ -159,6 +171,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [dimensionError, setDimensionError] = useState<string | null>(null);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop | undefined>();
@@ -167,15 +180,15 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   useEffect(() => {
     setPreview(initialImageUrl || null);
     if (!initialImageUrl) {
-        setFile(null);
-        setCrop(undefined);
-        setCompletedCrop(undefined);
-        setUploadSuccessMessage(null);
-        setError(null);
-        setDimensionError(null);
-        if (onCropComplete) {
-          onCropComplete(null);
-        }
+      setFile(null);
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+      setUploadSuccessMessage(null);
+      setError(null);
+      setDimensionError(null);
+      if (onCropComplete) {
+        onCropComplete(null);
+      }
     }
   }, [initialImageUrl, onCropComplete]);
 
@@ -207,59 +220,237 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           resolve({ valid: false, message: 'Could not load image to check dimensions.' });
         };
         if (e.target?.result) {
-            img.src = e.target.result as string;
+          img.src = e.target.result as string;
         } else {
-            resolve({ valid: false, message: 'Could not read image data for dimension check.' });
+          resolve({ valid: false, message: 'Could not read image data for dimension check.' });
         }
-        
+
       };
       reader.onerror = () => {
-         resolve({ valid: false, message: 'Could not read file to check dimensions.' });
+        resolve({ valid: false, message: 'Could not read file to check dimensions.' });
       };
       reader.readAsDataURL(imageFile);
     });
   };
 
+  const uploadFile = useCallback(async (fileToUpload: File) => {
+    setIsUploading(true);
+    setError(null);
+    setDimensionError(null);
+    setUploadSuccessMessage(null);
+    if (onUploadStart) onUploadStart();
+
+    const formData = new FormData();
+    formData.append('file', fileToUpload);
+
+    if (conventionId && mediaType) {
+      formData.append('conventionId', conventionId);
+      formData.append('mediaType', mediaType);
+    }
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed with status: ' + response.status }));
+        throw new Error(errorData.message || 'Upload failed');
+      }
+      const data = await response.json();
+      onUploadSuccess(data.url);
+
+      if (resetAfterUpload) {
+        // Reset all state for multiple uploads
+        setPreview(null);
+        setFile(null);
+        setCrop(undefined);
+        setCompletedCrop(undefined);
+        setUploadSuccessMessage('Image uploaded successfully!');
+        setTimeout(() => setUploadSuccessMessage(null), 3000);
+      } else {
+        // Keep preview for single image uploads
+        setPreview(data.url);
+        setFile(null);
+        setCrop(undefined);
+        setCompletedCrop(undefined);
+        setUploadSuccessMessage('Image uploaded successfully!');
+        setTimeout(() => setUploadSuccessMessage(null), 3000);
+      }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred during upload.');
+      if (onUploadError) onUploadError(err.message || 'An unexpected error occurred during upload.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onUploadStart, conventionId, mediaType, onUploadSuccess, resetAfterUpload, onUploadError]);
+
+  const uploadMultipleFiles = useCallback(async (filesToUpload: File[]) => {
+    setIsUploading(true);
+    setError(null);
+    setDimensionError(null);
+    setUploadSuccessMessage(null);
+    setUploadProgress({ current: 0, total: filesToUpload.length });
+    if (onUploadStart) onUploadStart();
+
+    const uploadedUrls: string[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < filesToUpload.length; i++) {
+      const fileToUpload = filesToUpload[i];
+      setUploadProgress({ current: i + 1, total: filesToUpload.length });
+
+      try {
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+
+        if (conventionId && mediaType) {
+          formData.append('conventionId', conventionId);
+          formData.append('mediaType', mediaType);
+        }
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Upload failed with status: ' + response.status }));
+          throw new Error(errorData.message || 'Upload failed');
+        }
+
+        const data = await response.json();
+        uploadedUrls.push(data.url);
+
+        // Call individual success callback for each upload
+        onUploadSuccess(data.url);
+      } catch (err: any) {
+        errors.push(`${fileToUpload.name}: ${err.message || 'Upload failed'}`);
+      }
+    }
+
+    // Handle completion
+    if (errors.length === 0) {
+      setUploadSuccessMessage(`Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length === 1 ? '' : 's'}!`);
+      if (onBulkUploadSuccess) {
+        onBulkUploadSuccess(uploadedUrls);
+      }
+    } else if (uploadedUrls.length > 0) {
+      setUploadSuccessMessage(`Uploaded ${uploadedUrls.length} image${uploadedUrls.length === 1 ? '' : 's'}, ${errors.length} failed.`);
+      setError(`Failed uploads: ${errors.join(', ')}`);
+      if (onBulkUploadSuccess) {
+        onBulkUploadSuccess(uploadedUrls);
+      }
+    } else {
+      setError(`All uploads failed: ${errors.join(', ')}`);
+      if (onUploadError) onUploadError(`All uploads failed: ${errors.join(', ')}`);
+    }
+
+    // Reset state
+    setPreview(null);
+    setFile(null);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    setUploadProgress(null);
+    setIsUploading(false);
+
+    // Clear success message after delay
+    setTimeout(() => setUploadSuccessMessage(null), 5000);
+  }, [onUploadStart, conventionId, mediaType, onUploadSuccess, onBulkUploadSuccess, onUploadError]);
+
   const onDrop = useCallback(async (acceptedFiles: FileWithPath[]) => {
     if (acceptedFiles.length === 0) return;
-    const currentFile = acceptedFiles[0];
+
     setError(null);
     setDimensionError(null);
     setUploadSuccessMessage(null);
     setCrop(undefined);
     setCompletedCrop(undefined);
     if (onCropComplete) {
-        onCropComplete(null);
+      onCropComplete(null);
     }
 
-    const validationResult = await handleImageValidation(currentFile);
-    if (!validationResult.valid) {
-      setDimensionError(validationResult.message || 'Image dimensions are not suitable.');
-      setFile(null);
-      setPreview(initialImageUrl || null);
-      return;
+    if (multiple) {
+      // Handle multiple files
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+
+      for (const file of acceptedFiles) {
+        const validationResult = await handleImageValidation(file);
+        if (validationResult.valid) {
+          validFiles.push(file);
+        } else {
+          invalidFiles.push(`${file.name}: ${validationResult.message || 'Invalid dimensions'}`);
+        }
+      }
+
+      if (invalidFiles.length > 0) {
+        setDimensionError(`Some files were rejected: ${invalidFiles.join(', ')}`);
+      }
+
+      if (validFiles.length === 0) {
+        setFile(null);
+        setPreview(initialImageUrl || null);
+        return;
+      }
+
+      // Auto-upload if enabled
+      if (autoUpload) {
+        await uploadMultipleFiles(validFiles);
+      } else {
+        // For manual upload, we'd need to store multiple files - for now, just take first valid file
+        setFile(validFiles[0]);
+        setPreview(URL.createObjectURL(validFiles[0]));
+      }
+    } else {
+      // Handle single file (existing logic)
+      const currentFile = acceptedFiles[0];
+      const validationResult = await handleImageValidation(currentFile);
+
+      if (!validationResult.valid) {
+        setDimensionError(validationResult.message || 'Image dimensions are not suitable.');
+        setFile(null);
+        setPreview(initialImageUrl || null);
+        return;
+      }
+
+      setFile(currentFile);
+      setPreview(URL.createObjectURL(currentFile));
+
+      // Auto-upload if enabled
+      if (autoUpload) {
+        await uploadFile(currentFile);
+      }
     }
-    
-    setFile(currentFile);
-    setPreview(URL.createObjectURL(currentFile));
-  }, [initialImageUrl, handleImageValidation, enableCropping, onCropComplete]);
+  }, [initialImageUrl, handleImageValidation, enableCropping, onCropComplete, autoUpload, uploadFile, uploadMultipleFiles, multiple]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif'] },
     maxSize: maxFileSizeMB * 1024 * 1024,
-    multiple: false,
+    multiple: multiple,
+    maxFiles: multiple ? maxFiles : 1,
     onDropRejected: (fileRejections) => {
-      const firstError = fileRejections[0]?.errors[0];
-      if (firstError) {
-        if (firstError.code === 'file-too-large') {
-          setError(`File is larger than ${maxFileSizeMB}MB.`);
-        } else if (firstError.code === 'file-invalid-type') {
-          setError('Invalid file type. Please upload an image (png, jpg, jpeg, gif).');
-        } else {
-          setError(firstError.message);
-        }
+      const errors: string[] = [];
+
+      fileRejections.forEach(({ file, errors: fileErrors }) => {
+        fileErrors.forEach(error => {
+          if (error.code === 'file-too-large') {
+            errors.push(`${file.name}: File is larger than ${maxFileSizeMB}MB`);
+          } else if (error.code === 'file-invalid-type') {
+            errors.push(`${file.name}: Invalid file type`);
+          } else if (error.code === 'too-many-files') {
+            errors.push(`Too many files. Maximum ${maxFiles} files allowed.`);
+          } else {
+            errors.push(`${file.name}: ${error.message}`);
+          }
+        });
+      });
+
+      if (errors.length > 0) {
+        setError(errors.join(', '));
       }
+
       setFile(null);
       setPreview(initialImageUrl || null);
       setCrop(undefined);
@@ -273,15 +464,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const handleUpload = async () => {
     if (!file && !initialImageUrl) {
-        setError('No image selected to upload.');
-        return;
+      setError('No image selected to upload.');
+      return;
     }
-
-    setIsUploading(true);
-    setError(null);
-    setDimensionError(null);
-    setUploadSuccessMessage(null);
-    if(onUploadStart) onUploadStart();
 
     let fileToUpload: File | null = file;
 
@@ -299,55 +484,23 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           );
         } catch (cropError: any) {
           setError(`Cropping failed: ${cropError.message}`);
-          setIsUploading(false);
-          if(onUploadError) onUploadError(`Cropping failed: ${cropError.message}`);
+          if (onUploadError) onUploadError(`Cropping failed: ${cropError.message}`);
           return;
         }
       } else {
         setError('Cannot crop, preview image source or image reference is missing.');
-        setIsUploading(false);
-        if(onUploadError) onUploadError('Cannot crop, preview image source or image reference is missing.');
+        if (onUploadError) onUploadError('Cannot crop, preview image source or image reference is missing.');
         return;
       }
     }
 
     if (!fileToUpload) {
-        setError('No valid image file to upload after processing.');
-        setIsUploading(false);
-        if(onUploadError) onUploadError('No valid image file to upload after processing.');
-        return;
+      setError('No valid image file to upload after processing.');
+      if (onUploadError) onUploadError('No valid image file to upload after processing.');
+      return;
     }
 
-    const formData = new FormData();
-    formData.append('file', fileToUpload);
-    
-    if (uploadPathIdentifier) {
-      formData.append('pathIdentifier', uploadPathIdentifier);
-    }
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Upload failed with status: ' + response.status }));
-        throw new Error(errorData.message || 'Upload failed');
-      }
-      const data = await response.json();
-      onUploadSuccess(data.url);
-      setPreview(data.url);
-      setFile(null);
-      setCrop(undefined);
-      setCompletedCrop(undefined);
-      setUploadSuccessMessage('Image uploaded successfully!');
-      setTimeout(() => setUploadSuccessMessage(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during upload.');
-      if(onUploadError) onUploadError(err.message || 'An unexpected error occurred during upload.');
-    } finally {
-      setIsUploading(false);
-    }
+    await uploadFile(fileToUpload);
   };
 
   const handleRemoveImage = async () => {
@@ -400,7 +553,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     borderRadius: '4px',
     ...imagePreviewStyle,
   };
-  
+
   const effectiveDropzoneHeight = (preview && !enableCropping) ? 'auto' : dropzoneHeight;
 
   function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -409,7 +562,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setCrop(centerAspectCrop(width, height, cropAspect));
     }
   }
-  
+
   const generateTooltipTitle = () => {
     let messages = [];
     if (recommendedWidth && recommendedHeight) {
@@ -420,20 +573,23 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
     const ar = enableCropping ? cropAspect : aspectRatio;
     if (ar) {
-        if (recommendedWidth && recommendedHeight && ar === recommendedWidth/recommendedHeight) {
-             messages.push(`Ideal Aspect Ratio: ${recommendedWidth}:${recommendedHeight}`);
-        } else {
-            messages.push(`Ideal Aspect Ratio: ~${ar.toFixed(2)}:1`);
-            if (ar === 1) messages.push("(Square)");
-            else if (ar === 16/9) messages.push("(16:9 Landscape)");
-            else if (ar === 4/3) messages.push("(4:3 Standard)");
-        }
+      if (recommendedWidth && recommendedHeight && ar === recommendedWidth / recommendedHeight) {
+        messages.push(`Ideal Aspect Ratio: ${recommendedWidth}:${recommendedHeight}`);
+      } else {
+        messages.push(`Ideal Aspect Ratio: ~${ar.toFixed(2)}:1`);
+        if (ar === 1) messages.push("(Square)");
+        else if (ar === 16 / 9) messages.push("(16:9 Landscape)");
+        else if (ar === 4 / 3) messages.push("(4:3 Standard)");
+      }
     }
     if (maxFileSizeMB) {
-      messages.push(`Max file size: ${maxFileSizeMB}MB`);
+      messages.push(`Max file size: ${maxFileSizeMB}MB${multiple ? ' per file' : ''}`);
+    }
+    if (multiple) {
+      messages.push(`Upload up to ${maxFiles} images at once`);
     }
     if (enableCropping) {
-        messages.push(`Output: ${finalImageTargetSize.width}x${finalImageTargetSize.height}px`);
+      messages.push(`Output: ${finalImageTargetSize.width}x${finalImageTargetSize.height}px`);
     }
     return messages.length > 0 ? messages.join(' | ') : 'Image specifications';
   };
@@ -454,50 +610,50 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
         <Typography variant="subtitle1" gutterBottom sx={{ mb: 0 }}>{label}</Typography>
         {(recommendedWidth || minWidth || (enableCropping ? cropAspect : aspectRatio) || maxFileSizeMB || (enableCropping && finalImageTargetSize)) && (
-            <Tooltip title={generateTooltipTitle()} placement={tooltipPlacement}>
-                <IconButton size="small" sx={{ ml: 0.5, mb: 0.5 }} aria-label="image specifications">
-                    <HelpOutlineIcon fontSize="small" />
-                </IconButton>
-            </Tooltip>
+          <Tooltip title={generateTooltipTitle()} placement={tooltipPlacement}>
+            <IconButton size="small" sx={{ ml: 0.5, mb: 0.5 }} aria-label="image specifications">
+              <HelpOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         )}
       </Box>
       {(!file && preview && !enableCropping) ? null : (
-         (!preview || enableCropping || !file) && (
-            <Box
+        (!preview || enableCropping || !file) && (
+          <Box
             {...getRootProps()}
             sx={{
-                border: `2px dashed ${isDragActive ? 'primary.main' : 'grey.400'}`,
-                borderRadius: 1,
-                p: 2,
-                textAlign: 'center',
-                cursor: 'pointer',
-                minHeight: (preview && enableCropping && file) ? 'auto' : effectiveDropzoneHeight, 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: isDragActive ? 'action.hover' : 'transparent',
-                mb: 1,
-                transition: 'background-color 0.2s ease-in-out, border-color 0.2s ease-in-out',
+              border: `2px dashed ${isDragActive ? 'primary.main' : 'grey.400'}`,
+              borderRadius: 1,
+              p: 2,
+              textAlign: 'center',
+              cursor: 'pointer',
+              minHeight: (preview && enableCropping && file) ? 'auto' : effectiveDropzoneHeight,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isDragActive ? 'action.hover' : 'transparent',
+              mb: 1,
+              transition: 'background-color 0.2s ease-in-out, border-color 0.2s ease-in-out',
             }}
-            >
+          >
             <input {...getInputProps()} />
             {isDragActive ? (
-                <Typography>Drop the image here...</Typography>
+              <Typography>Drop the {multiple ? 'images' : 'image'} here...</Typography>
             ) : (preview && enableCropping && file) ? (
-                <Typography color="textSecondary" variant="body2">
+              <Typography color="textSecondary" variant="body2">
                 Drag & drop to change image, or click to select.
-                </Typography>
+              </Typography>
             ) : !preview ? (
-                <Typography color="textSecondary" variant="body2">
-                Drag & drop an image here, or click to select.
-                <br />Max {maxFileSizeMB}MB.
-                </Typography>
+              <Typography color="textSecondary" variant="body2">
+                Drag & drop {multiple ? `up to ${maxFiles} images` : 'an image'} here, or click to select.
+                <br />Max {maxFileSizeMB}MB {multiple ? 'per file' : ''}.
+              </Typography>
             ) : null}
-            </Box>
+          </Box>
         )
       )}
-      
+
       {preview && (
         <Box sx={{
           mt: 1,
@@ -506,13 +662,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           justifyContent: 'center',
           alignItems: 'center',
           flexDirection: 'column',
-          width: '100%', 
-          minHeight: 300, 
+          width: '100%',
+          minHeight: 300,
         }}>
           {(enableCropping && file) ? (
             <ReactCrop
               crop={crop}
-              onChange={(_, percentCrop) => setCrop(percentCrop)} 
+              onChange={(_, percentCrop) => setCrop(percentCrop)}
               onComplete={(c) => {
                 setCompletedCrop(c);
                 if (onCropComplete) {
@@ -520,26 +676,26 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 }
               }}
               aspect={cropAspect}
-              style={{ maxWidth: 500 }} 
+              style={{ maxWidth: 500 }}
             >
               <img
                 ref={imgRef}
                 alt="Crop me"
-                src={preview} 
+                src={preview}
                 onLoad={onImageLoad}
-                style={{ 
-                  display: 'block', 
-                  maxWidth: '100%', 
+                style={{
+                  display: 'block',
+                  maxWidth: '100%',
                   maxHeight: '500px',
-                  objectFit: 'contain', 
-                }} 
+                  objectFit: 'contain',
+                }}
               />
             </ReactCrop>
           ) : (
-            <Box sx={{ width: '100%', display:'flex', justifyContent:'center', alignItems:'center' }}>
-              <img 
-                src={preview} 
-                alt="Preview" 
+            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img
+                src={preview}
+                alt="Preview"
                 style={finalPreviewStyle}
               />
             </Box>
@@ -551,19 +707,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       {dimensionError && <Alert severity="warning" sx={{ mb: 1 }}>{dimensionError}</Alert>}
       {uploadSuccessMessage && <Alert severity="success" sx={{ mb: 1 }}>{uploadSuccessMessage}</Alert>}
 
-      {(file || preview) && (
-        <Box sx={{ display: 'flex', justifyContent: file ? 'space-between' : 'flex-end' , alignItems: 'center', mt:1 }}>
+      {(file || preview) && !autoUpload && (
+        <Box sx={{ display: 'flex', justifyContent: file ? 'space-between' : 'flex-end', alignItems: 'center', mt: 1 }}>
           {file && !isUploading && !isRemoving && (
             <Button variant="contained" onClick={handleUpload} size="small">
-              Upload Image 
+              Upload Image
             </Button>
           )}
-           {(isUploading || isRemoving) && <CircularProgress size={24} />}
+          {(isUploading || isRemoving) && <CircularProgress size={24} />}
           {preview && !isUploading && (
             <Button variant="outlined" color="secondary" onClick={handleRemoveImage} size="small" disabled={isRemoving}>
               {isRemoving ? 'Removing...' : 'Remove Image'}
             </Button>
           )}
+        </Box>
+      )}
+
+      {autoUpload && (isUploading || isRemoving) && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 1 }}>
+          <CircularProgress size={24} sx={{ mr: 1 }} />
+          <Typography variant="body2" color="textSecondary">
+            {isUploading ? (
+              uploadProgress ?
+                `Uploading ${uploadProgress.current} of ${uploadProgress.total}...` :
+                'Uploading...'
+            ) : 'Removing...'}
+          </Typography>
         </Box>
       )}
     </Paper>

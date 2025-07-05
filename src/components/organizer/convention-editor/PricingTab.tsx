@@ -42,7 +42,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
   const [tiersSaved, setTiersSaved] = useState(false);
   const [isSavingTiers, setIsSavingTiers] = useState(false);
   const [isSavingDiscounts, setIsSavingDiscounts] = useState(false);
-  
+
   const [discountDatePickers, setDiscountDatePickers] = useState<
     Array<{
       date: Date | null;
@@ -61,8 +61,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     console.log('[PricingTab] useEffect - using value.priceDiscounts:', JSON.stringify(value.priceDiscounts));
 
     if (value.priceTiers.length === 0) {
-        setDiscountDatePickers([]); 
-        return;
+      setDiscountDatePickers([]);
+      return;
     }
 
     const groupedByDate: Record<string, PriceDiscount[]> = {};
@@ -71,7 +71,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         const utcDateFromDB = new Date(discount.cutoffDate); // This is a UTC timestamp
         // Use UTC components to form the key, ensuring consistency
         const dateKey = `${utcDateFromDB.getUTCFullYear()}-${String(utcDateFromDB.getUTCMonth() + 1).padStart(2, '0')}-${String(utcDateFromDB.getUTCDate()).padStart(2, '0')}`;
-        
+
         if (!groupedByDate[dateKey]) {
           groupedByDate[dateKey] = [];
         }
@@ -81,11 +81,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
     const newUIDiscountGroups = Object.entries(groupedByDate).map(([dateStrKey_YYYY_MM_DD_UTC, discountsOnDate], index) => {
       const [year, month_1_indexed, day] = dateStrKey_YYYY_MM_DD_UTC.split('-').map(Number);
-      // Create a Date object representing midnight UTC for the DatePicker
-      const dateForPicker = new Date(Date.UTC(year, month_1_indexed - 1, day)); // month for Date.UTC is 0-indexed
+      // Create a Date object in local timezone for the DatePicker
+      // DatePicker expects local timezone dates for proper display
+      const dateForPicker = new Date(year, month_1_indexed - 1, day); // month is 0-indexed
 
       return {
-        date: dateForPicker, // DatePicker receives a date object representing midnight UTC of that day.
+        date: dateForPicker, // DatePicker receives a date object representing the correct day in local timezone
         tempId: `loaded-dategroup-${dateStrKey_YYYY_MM_DD_UTC}-${index}`,
         tierDiscounts: value.priceTiers.filter(t => t.id).map(tier => {
           const existingDiscount = discountsOnDate.find(d => d.priceTierId === tier.id);
@@ -123,8 +124,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     const removedTierId = value.priceTiers[idx]?.id;
     const newTiers = value.priceTiers.filter((_, i) => i !== idx).map((tier, i) => ({ ...tier, order: i }));
     let newMasterDiscounts = value.priceDiscounts;
-    if(removedTierId){
-        newMasterDiscounts = value.priceDiscounts.filter(d => d.priceTierId !== removedTierId);
+    if (removedTierId) {
+      newMasterDiscounts = value.priceDiscounts.filter(d => d.priceTierId !== removedTierId);
     }
     onChange({ ...value, priceTiers: newTiers, priceDiscounts: newMasterDiscounts });
   };
@@ -145,8 +146,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
   const handleAddDiscountDateGroup = () => {
     if (!value.priceTiers.every(t => t.id)) {
-        setErrors(prev => ({...prev, global: "All tiers must be saved before adding discount dates."}));
-        return;
+      setErrors(prev => ({ ...prev, global: "All tiers must be saved before adding discount dates." }));
+      return;
     }
     setDiscountDatePickers(prev => [
       ...prev,
@@ -172,8 +173,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
     if (groupToRemove.date && conventionId) {
       // groupToRemove.date is now a Date object representing midnight UTC of the selected day
-      const dateForAPI = groupToRemove.date; 
-      
+      const dateForAPI = groupToRemove.date;
+
       const year = dateForAPI.getUTCFullYear();
       const month = (dateForAPI.getUTCMonth() + 1).toString().padStart(2, '0');
       const day = dateForAPI.getUTCDate().toString().padStart(2, '0');
@@ -204,13 +205,13 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         console.log('[PricingTab] BEFORE filtering value.priceDiscounts:', JSON.stringify(value.priceDiscounts));
         const updatedPriceDiscounts = value.priceDiscounts.filter(discount => {
           if (!discount.cutoffDate) return true;
-          
+
           const dbDateUTC = new Date(discount.cutoffDate);
           const dbYear = dbDateUTC.getUTCFullYear();
           const dbMonth = (dbDateUTC.getUTCMonth() + 1).toString().padStart(2, '0');
           const dbDay = dbDateUTC.getUTCDate().toString().padStart(2, '0');
           const dbDateStringToCompare = `${dbYear}-${dbMonth}-${dbDay}`;
-          
+
           console.log(`[PricingTab] Comparing dates - Target for API: ${cutoffDateStringForAPI}, DB Date for comparison: ${dbDateStringToCompare}`);
           const shouldKeep = dbDateStringToCompare !== cutoffDateStringForAPI;
           return shouldKeep;
@@ -233,10 +234,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       // For consistency, this local-only removal should also be handled by the useEffect if possible,
       // but a new, empty group with no date wouldn't have discounts in value.priceDiscounts to filter out.
       // So, if it's a purely UI-only new group (no date set), direct removal from discountDatePickers is fine.
-      if (!groupToRemove.date) { 
-         setDiscountDatePickers(prev => prev.filter((_, idx) => idx !== groupIndex));
-         enqueueSnackbar('New discount date entry removed locally.', { variant: 'info' });
-         console.log('[PricingTab] Removed new, date-less group locally.');
+      if (!groupToRemove.date) {
+        setDiscountDatePickers(prev => prev.filter((_, idx) => idx !== groupIndex));
+        enqueueSnackbar('New discount date entry removed locally.', { variant: 'info' });
+        console.log('[PricingTab] Removed new, date-less group locally.');
       } else {
         // This case (groupToRemove.date exists but no conventionId) should ideally not happen for a delete action.
         // If it does, a local removal might be okay, but it implies an inconsistent state.
@@ -260,11 +261,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       prev.map((group, gIdx) =>
         gIdx === groupIndex
           ? {
-              ...group,
-              tierDiscounts: group.tierDiscounts.map((td, tdIdx) =>
-                tdIdx === tierDiscountIndex ? { ...td, amount } : td
-              ),
-            }
+            ...group,
+            tierDiscounts: group.tierDiscounts.map((td, tdIdx) =>
+              tdIdx === tierDiscountIndex ? { ...td, amount } : td
+            ),
+          }
           : group
       )
     );
@@ -280,7 +281,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       return;
     }
 
-    setIsSavingDiscounts(true); 
+    setIsSavingDiscounts(true);
     try {
       const response = await fetch(`/api/conventions/${conventionId}/pricing/discounts/${originalDiscountId}`, {
         method: 'DELETE',
@@ -305,8 +306,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     } catch (error) {
       // Error already enqueued if it's an API error parsed above
       if (!(error instanceof Error && error.message.includes('Failed to delete discount'))) {
-         console.error('Error in handleDeleteIndividualDiscount:', error); // Log other errors
-         enqueueSnackbar('An unexpected error occurred while deleting the discount.', { variant: 'error' });
+        console.error('Error in handleDeleteIndividualDiscount:', error); // Log other errors
+        enqueueSnackbar('An unexpected error occurred while deleting the discount.', { variant: 'error' });
       }
     } finally {
       setIsSavingDiscounts(false);
@@ -329,7 +330,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     setErrors(prev => { const { global, ...rest } = prev; return rest; });
 
     try {
-      const tiersToSave = value.priceTiers.filter(isTierValid).map(tier => ({...tier, amount: Number(tier.amount)})); 
+      const tiersToSave = value.priceTiers.filter(isTierValid).map(tier => ({ ...tier, amount: Number(tier.amount) }));
       const response = await fetch(`/api/conventions/${conventionId}/pricing/tiers`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -343,8 +344,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         throw new Error(errorData.message || 'Failed to save price tiers');
       }
       const savedTiersWithIds: PriceTier[] = await response.json();
-      onChange({ 
-        ...value, 
+      onChange({
+        ...value,
         priceTiers: savedTiersWithIds.map((tier, index) => ({ ...tier, order: tier.order ?? index }))
       });
       setTiersSaved(true);
@@ -367,7 +368,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
     if (!tiersSaved) {
       console.warn('Tiers must be saved before saving discounts.');
-      setErrors(prev => ({ ...prev, global: 'Please save Price Tiers before saving discounts.'}));
+      setErrors(prev => ({ ...prev, global: 'Please save Price Tiers before saving discounts.' }));
       return;
     }
 
@@ -379,7 +380,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         // We must convert this to UTC midnight for storage.
         const localDateFromPicker = new Date(group.date);
         const dateToSendToDB = new Date(Date.UTC(localDateFromPicker.getFullYear(), localDateFromPicker.getMonth(), localDateFromPicker.getDate()));
-        
+
         group.tierDiscounts.forEach(td => {
           const amountNum = parseFloat(td.amount);
           if (td.amount.trim() !== '' && !isNaN(amountNum) && amountNum >= 0 && td.priceTierId) {
@@ -393,11 +394,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       }
     });
 
-    if (discountsToSaveApi.length === 0 && value.priceDiscounts.filter(d => discountDatePickers.flatMap(ddp => ddp.tierDiscounts).find(td => td.originalDiscountId === d.id)).length === 0 ) {
-        if (value.priceDiscounts.length === 0) {
-            console.log('No discounts to save or clear.');
-            return;
-        }
+    if (discountsToSaveApi.length === 0 && value.priceDiscounts.filter(d => discountDatePickers.flatMap(ddp => ddp.tierDiscounts).find(td => td.originalDiscountId === d.id)).length === 0) {
+      if (value.priceDiscounts.length === 0) {
+        console.log('No discounts to save or clear.');
+        return;
+      }
     }
 
     setIsSavingDiscounts(true);
@@ -423,9 +424,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         setErrors(prev => ({ ...prev, global: responseData.message || responseData.error || 'An error occurred while saving discounts.' }));
         throw new Error(responseData.message || responseData.error || 'Failed to save price discounts');
       }
-      onChange({ ...value, priceDiscounts: responseData }); 
+      onChange({ ...value, priceDiscounts: responseData });
       console.log('Price discounts saved successfully (client-side):', responseData);
-    } catch (error:any) {
+    } catch (error: any) {
       if (!(error instanceof Error && error.message.includes('Failed to save'))) {
         console.error('Error in handleSaveDiscounts:', error);
         setErrors(prev => ({ ...prev, global: 'An unexpected network error occurred while saving discounts.' }));
@@ -435,9 +436,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
-  const canSaveDiscounts = discountDatePickers.some(group => 
+  const canSaveDiscounts = discountDatePickers.some(group =>
     group.date && group.tierDiscounts.some(td => td.amount.trim() !== '' && !isNaN(parseFloat(td.amount)))
-  ) || (discountDatePickers.length > 0 && value.priceDiscounts.length > 0 && !discountDatePickers.some(group => group.date && group.tierDiscounts.some(td => td.amount.trim() !== '' && !isNaN(parseFloat(td.amount)) ) ) ); // True if there are entered discounts OR if there are saved discounts and UI implies clearing them
+  ) || (discountDatePickers.length > 0 && value.priceDiscounts.length > 0 && !discountDatePickers.some(group => group.date && group.tierDiscounts.some(td => td.amount.trim() !== '' && !isNaN(parseFloat(td.amount))))); // True if there are entered discounts OR if there are saved discounts and UI implies clearing them
 
   const validate = () => {
     try {
@@ -473,8 +474,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
                         <span {...dragProvided.dragHandleProps} aria-label="Drag to reorder" style={{ cursor: 'grab' }}>
                           <DragIndicatorIcon />
                         </span>
-                        <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} error={!!errors[`priceTiers.${idx}.label`]} helperText={errors[`priceTiers.${idx}.label`]} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }}/>
-                        <TextField label="Amount" value={tier.amount} onChange={e => { const val = e.target.value; if (/^\d*(\.\d{0,2})?$/.test(val) || val === '') { handleTierChange(idx, 'amount', val);}}} disabled={disabled} error={!!errors[`priceTiers.${idx}.amount`]} helperText={errors[`priceTiers.${idx}.amount`]} type="text" InputProps={{ startAdornment: <span>{currency}</span>, inputMode: 'decimal' }} sx={{ minWidth: 100 }} inputProps={{ 'aria-label': `Tier amount ${idx + 1}`, pattern: '\\d+(\\.\\d{1,2})?' }}/>
+                        <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} error={!!errors[`priceTiers.${idx}.label`]} helperText={errors[`priceTiers.${idx}.label`]} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }} />
+                        <TextField label="Amount" value={tier.amount} onChange={e => { const val = e.target.value; if (/^\d*(\.\d{0,2})?$/.test(val) || val === '') { handleTierChange(idx, 'amount', val); } }} disabled={disabled} error={!!errors[`priceTiers.${idx}.amount`]} helperText={errors[`priceTiers.${idx}.amount`]} type="text" InputProps={{ startAdornment: <span>{currency}</span>, inputMode: 'decimal' }} sx={{ minWidth: 100 }} inputProps={{ 'aria-label': `Tier amount ${idx + 1}`, pattern: '\\d+(\\.\\d{1,2})?' }} />
                         <Tooltip title="Remove Tier">
                           <span>
                             <IconButton aria-label="Remove tier" onClick={() => handleRemoveTier(idx)} disabled={disabled || value.priceTiers.length === 0}>
@@ -506,25 +507,25 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         <>
           <Divider sx={{ my: 4 }} />
           <Typography variant="h6" gutterBottom>Price Discounts</Typography>
-          
+
           {discountDatePickers.map((discountGroup, groupIdx) => (
             <Card key={discountGroup.tempId} sx={{ mb: 2, opacity: disabled ? 0.7 : 1 }}>
               <CardContent>
-                <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: discountGroup.date ? 2 : 0}}>
-                    <DatePicker
-                        label="Discount Cutoff Date"
-                        value={discountGroup.date}
-                        onChange={date => handleDiscountDateChange(groupIdx, date)}
-                        disabled={disabled}
-                        slotProps={{ textField: { error: false, helperText: null } }}
-                    />
-                    <Tooltip title="Remove Discount Date Group">
-                        <IconButton aria-label="Remove discount date group" onClick={() => handleRemoveDiscountDateGroup(groupIdx)} disabled={disabled}>
-                            <DeleteIcon />
-                        </IconButton>
-                    </Tooltip>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: discountGroup.date ? 2 : 0 }}>
+                  <DatePicker
+                    label="Discount Cutoff Date"
+                    value={discountGroup.date}
+                    onChange={date => handleDiscountDateChange(groupIdx, date)}
+                    disabled={disabled}
+                    slotProps={{ textField: { error: false, helperText: null } }}
+                  />
+                  <Tooltip title="Remove Discount Date Group">
+                    <IconButton aria-label="Remove discount date group" onClick={() => handleRemoveDiscountDateGroup(groupIdx)} disabled={disabled}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
-                
+
                 {discountGroup.date && (
                   <Box sx={{ mt: 2 }}>
                     {discountGroup.tierDiscounts.map((tierDiscount, tdIdx) => (
@@ -554,18 +555,18 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
               </CardContent>
             </Card>
           ))}
-          
+
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={handleAddDiscountDateGroup}
-            disabled={disabled || !value.priceTiers.every(t=>t.id)}
+            disabled={disabled || !value.priceTiers.every(t => t.id)}
             sx={{ mt: 1 }}
           >
             Add Discount Date
           </Button>
 
-          {(discountDatePickers.length > 0 || value.priceDiscounts.length > 0 ) && (
+          {(discountDatePickers.length > 0 || value.priceDiscounts.length > 0) && (
             <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
               <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !canSaveDiscounts || !conventionId}>
                 {isSavingDiscounts ? 'Saving Discounts...' : 'Save Price Discounts'}
@@ -573,9 +574,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
             </Box>
           )}
           {discountDatePickers.length === 0 && value.priceTiers.length > 0 && (
-             <Typography variant="body2" color="text.secondary" sx={{ mt:1, mb: 2 }}>
-                No discount dates added yet. Click "Add Discount Date" to create one.
-              </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+              No discount dates added yet. Click "Add Discount Date" to create one.
+            </Typography>
           )}
         </>
       )}

@@ -109,6 +109,7 @@ export async function GET(
         // For now, including them to see if it works for the page load.
         venues: true, // Include venues
         hotels: true, // Include hotels
+        media: true, // Include media
       }
     });
 
@@ -132,6 +133,8 @@ export async function PUT(
 ) {
   // #############################################################################
   console.log("--- CORRECT ORGANIZER PUT HANDLER HIT --- SRC/APP/API/ORGANIZER/CONVENTIONS/[ID]/ROUTE.TS ---");
+  console.log(`[API PUT /organizer/conventions/${params.id}] Request URL:`, request.url);
+  console.log(`[API PUT /organizer/conventions/${params.id}] Method:`, request.method);
   // #############################################################################
   const session = await getServerSession(authOptions);
 
@@ -167,11 +170,22 @@ export async function PUT(
       seriesId,
       descriptionShort,
       descriptionMain,
+      websiteUrl,
+      registrationUrl,
       isOneDayEvent,
       isTBD,
       priceTiers,
-      priceDiscounts
+      priceDiscounts,
+      coverImageUrl,
+      profileImageUrl
     } = body;
+
+    // Check if this is an image-only update
+    const isImageOnlyUpdate = (coverImageUrl !== undefined || profileImageUrl !== undefined) &&
+      Object.keys(body).length <= 2 && // Only cover/profile image fields
+      !venueHotel && !name && !slug; // No other major fields
+
+    console.log(`[API PUT /organizer/conventions/${conventionId}] Is image-only update:`, isImageOnlyUpdate);
 
     let primaryVenueData = venueHotel?.primaryVenue;
     let secondaryVenuesData = venueHotel?.secondaryVenues || [];
@@ -206,44 +220,83 @@ export async function PUT(
     console.log(`[API PUT /organizer/conventions/${conventionId}] After promotion - primaryVenueData:`, JSON.stringify(primaryVenueData, null, 2));
     console.log(`[API PUT /organizer/conventions/${conventionId}] After promotion - secondaryVenuesData:`, JSON.stringify(secondaryVenuesData, null, 2));
 
+    // Build update data based on what's being updated
     const conventionDataForUpdate: any = {
-      name, slug, city, stateAbbreviation, stateName, country, status, seriesId,
-      descriptionShort, descriptionMain, isOneDayEvent, isTBD,
-      guestsStayAtPrimaryVenue, // Make sure this is part of the convention update
       updatedAt: new Date(),
     };
 
-    let finalStartDate: Date | null = null;
-    let finalEndDate: Date | null = null;
-    conventionDataForUpdate.isOneDayEvent = isOneDayEvent;
+    console.log(`[API PUT /organizer/conventions/${conventionId}] coverImageUrl from body:`, coverImageUrl);
+    console.log(`[API PUT /organizer/conventions/${conventionId}] profileImageUrl from body:`, profileImageUrl);
 
-    if (isTBD) {
-      finalStartDate = rawStartDate ? new Date(rawStartDate) : null;
-      finalEndDate = rawEndDate ? new Date(rawEndDate) : null;
-      if (finalStartDate && isNaN(finalStartDate.getTime())) return NextResponse.json({ error: 'Invalid start date format when TBD' }, { status: 400 });
-      if (finalEndDate && isNaN(finalEndDate.getTime())) return NextResponse.json({ error: 'Invalid end date format when TBD' }, { status: 400 });
-      if (finalStartDate && finalEndDate && finalStartDate > finalEndDate) return NextResponse.json({ error: 'Start date must be before end date, even if TBD' }, { status: 400 });
-      conventionDataForUpdate.isOneDayEvent = false;
+    if (isImageOnlyUpdate) {
+      // For image-only updates, only include the image fields
+      if (coverImageUrl !== undefined) {
+        conventionDataForUpdate.coverImageUrl = coverImageUrl;
+        console.log(`[API PUT /organizer/conventions/${conventionId}] Added coverImageUrl to update data:`, coverImageUrl);
+      }
+      if (profileImageUrl !== undefined) {
+        conventionDataForUpdate.profileImageUrl = profileImageUrl;
+        console.log(`[API PUT /organizer/conventions/${conventionId}] Added profileImageUrl to update data:`, profileImageUrl);
+      }
     } else {
-      if (!rawStartDate || !rawEndDate) return NextResponse.json({ error: 'Start date and end date are required when not TBD' }, { status: 400 });
-      finalStartDate = new Date(rawStartDate);
-      finalEndDate = new Date(rawEndDate);
-      if (isNaN(finalStartDate.getTime()) || isNaN(finalEndDate.getTime())) return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
-      if (finalStartDate > finalEndDate) return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 });
-      if (conventionDataForUpdate.isOneDayEvent) finalEndDate = finalStartDate;
-    }
-    conventionDataForUpdate.startDate = finalStartDate;
-    conventionDataForUpdate.endDate = finalEndDate;
+      // For full updates, include all fields
+      Object.assign(conventionDataForUpdate, {
+        name, slug, city, stateAbbreviation, stateName, country, status, seriesId,
+        descriptionShort, descriptionMain, isOneDayEvent, isTBD,
+        websiteUrl, registrationUrl,
+        guestsStayAtPrimaryVenue,
+      });
 
-    if (!seriesId) return NextResponse.json({ error: 'Series ID is required for an update.' }, { status: 400 });
-    if (body.hasOwnProperty('name') && (typeof name !== 'string' || name.trim() === '')) return NextResponse.json({ error: 'Convention name, if provided, cannot be empty.' }, { status: 400 });
-    if (body.hasOwnProperty('slug')) {
-      if (typeof slug !== 'string' || slug.trim() === '') return NextResponse.json({ error: 'Convention slug, if provided, cannot be empty.' }, { status: 400 });
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return NextResponse.json({ error: 'Invalid slug format.' }, { status: 400 });
+      // Add cover and profile image URLs if provided
+      if (coverImageUrl !== undefined) {
+        conventionDataForUpdate.coverImageUrl = coverImageUrl;
+        console.log(`[API PUT /organizer/conventions/${conventionId}] Added coverImageUrl to update data:`, coverImageUrl);
+      }
+      if (profileImageUrl !== undefined) {
+        conventionDataForUpdate.profileImageUrl = profileImageUrl;
+        console.log(`[API PUT /organizer/conventions/${conventionId}] Added profileImageUrl to update data:`, profileImageUrl);
+      }
     }
-    if (body.hasOwnProperty('status')) {
-      const validStatuses = Object.values(ConventionStatus);
-      if (typeof status !== 'string' || !validStatuses.includes(status as ConventionStatus)) return NextResponse.json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` }, { status: 400 });
+
+    console.log(`[API PUT /organizer/conventions/${conventionId}] Final conventionDataForUpdate:`, JSON.stringify(conventionDataForUpdate, null, 2));
+
+    if (!isImageOnlyUpdate) {
+      // Only validate dates and other fields for full updates, not image-only updates
+      let finalStartDate: Date | null = null;
+      let finalEndDate: Date | null = null;
+      conventionDataForUpdate.isOneDayEvent = isOneDayEvent;
+
+      if (isTBD) {
+        finalStartDate = rawStartDate ? new Date(rawStartDate) : null;
+        finalEndDate = rawEndDate ? new Date(rawEndDate) : null;
+        if (finalStartDate && isNaN(finalStartDate.getTime())) return NextResponse.json({ error: 'Invalid start date format when TBD' }, { status: 400 });
+        if (finalEndDate && isNaN(finalEndDate.getTime())) return NextResponse.json({ error: 'Invalid end date format when TBD' }, { status: 400 });
+        if (finalStartDate && finalEndDate && finalStartDate > finalEndDate) return NextResponse.json({ error: 'Start date must be before end date, even if TBD' }, { status: 400 });
+        conventionDataForUpdate.isOneDayEvent = false;
+      } else {
+        if (!rawStartDate || !rawEndDate) return NextResponse.json({ error: 'Start date and end date are required when not TBD' }, { status: 400 });
+        finalStartDate = new Date(rawStartDate);
+        finalEndDate = new Date(rawEndDate);
+        if (isNaN(finalStartDate.getTime()) || isNaN(finalEndDate.getTime())) return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+        if (finalStartDate > finalEndDate) return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 });
+        if (conventionDataForUpdate.isOneDayEvent) finalEndDate = finalStartDate;
+      }
+      conventionDataForUpdate.startDate = finalStartDate;
+      conventionDataForUpdate.endDate = finalEndDate;
+    }
+
+    if (!isImageOnlyUpdate) {
+      // Only validate these fields for full updates, not image-only updates
+      if (!seriesId) return NextResponse.json({ error: 'Series ID is required for an update.' }, { status: 400 });
+      if (body.hasOwnProperty('name') && (typeof name !== 'string' || name.trim() === '')) return NextResponse.json({ error: 'Convention name, if provided, cannot be empty.' }, { status: 400 });
+      if (body.hasOwnProperty('slug')) {
+        if (typeof slug !== 'string' || slug.trim() === '') return NextResponse.json({ error: 'Convention slug, if provided, cannot be empty.' }, { status: 400 });
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return NextResponse.json({ error: 'Invalid slug format.' }, { status: 400 });
+      }
+      if (body.hasOwnProperty('status')) {
+        const validStatuses = Object.values(ConventionStatus);
+        if (typeof status !== 'string' || !validStatuses.includes(status as ConventionStatus)) return NextResponse.json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` }, { status: 400 });
+      }
     }
 
     const existingConvention = await prisma.convention.findFirst({ where: { id: conventionId, deletedAt: null } });

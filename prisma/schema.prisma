@@ -2,6 +2,7 @@ generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
 }
+
 datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
@@ -23,12 +24,11 @@ model User {
   resetTokenExpiry DateTime?
   timezone         String?
   accounts         Account[]
+  ownedBrands      Brand[]            @relation("BrandOwner")
+  brandMemberships BrandUser[]
   conventionSeries ConventionSeries[]
   roleApplications RoleApplication[]
   sessions         Session[]
-  ownedBrands      Brand[]           @relation("BrandOwner")
-  brandMemberships BrandUser[]
-
 }
 
 model Account {
@@ -126,9 +126,8 @@ model Convention {
   country                  String?
   venueName                String?
   websiteUrl               String?
+  registrationUrl          String?
   status                   ConventionStatus         @default(DRAFT)
-  media                    ConventionMedia[]
-  dealerLinks              ConventionDealerLink[]
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
   stateAbbreviation        String?
@@ -144,6 +143,8 @@ model Convention {
   timezone                 String?
   guestsStayAtPrimaryVenue Boolean?                 @default(false)
   series                   ConventionSeries?        @relation(fields: [seriesId], references: [id])
+  dealerLinks              ConventionDealerLink[]
+  media                    ConventionMedia[]
   scheduleItems            ConventionScheduleItem[]
   hotels                   Hotel[]
   priceDiscounts           PriceDiscount[]
@@ -292,8 +293,6 @@ model Brand {
   websiteUrl  String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
-  // --- RELATIONS ---
   ownerId     String
   owner       User        @relation("BrandOwner", fields: [ownerId], references: [id])
   members     BrandUser[]
@@ -303,41 +302,35 @@ model BrandUser {
   brandId String
   userId  String
   role    BrandUserRole
-
-  // --- RELATIONS ---
-  brand   Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand   Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([brandId, userId])
 }
 
 model ConventionMedia {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   conventionId String
-  type         MediaType // Uses the new enum
+  type         MediaType
   url          String
   caption      String?
   order        Int
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // --- RELATIONS ---
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
 }
 
 model ConventionDealerLink {
-  id                    String      @id @default(cuid())
-  conventionId          String
-  profileType           ProfileType // Uses the new enum
-  linkedProfileId       String      // ID of the User, Talent, or Brand
-  displayNameOverride   String?
-  descriptionOverride   String?
-  order                 Int
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  
-  // --- RELATIONS ---
-  convention            Convention  @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  id                  String      @id @default(cuid())
+  conventionId        String
+  profileType         ProfileType
+  linkedProfileId     String
+  displayNameOverride String?
+  descriptionOverride String?
+  order               Int
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  convention          Convention  @relation(fields: [conventionId], references: [id], onDelete: Cascade)
 
   @@unique([conventionId, profileType, linkedProfileId])
   @@index([conventionId])

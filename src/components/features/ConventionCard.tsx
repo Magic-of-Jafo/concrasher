@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardMedia, Typography, Box, Chip, Button, Stack } from '@mui/material';
 import Link from 'next/link';
+import { getProfileImageUrl } from '@/lib/defaults';
 
 interface ConventionCardProps {
   convention: any; // TODO: Replace with proper type
@@ -17,6 +18,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
     endDate,
     tags = [],
     imageUrl,
+    profileImageUrl,
     slug,
   } = convention;
 
@@ -45,14 +47,12 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
         minHeight: 140,
       }}
     >
-      {imageUrl && (
-        <CardMedia
-          component="img"
-          image={imageUrl}
-          alt={name}
-          sx={{ width: { xs: '100%', sm: 120 }, height: 120, borderRadius: 2, objectFit: 'cover', mr: { sm: 2 }, mb: { xs: 2, sm: 0 } }}
-        />
-      )}
+      <CardMedia
+        component="img"
+        image={getProfileImageUrl(profileImageUrl || imageUrl)}
+        alt={name}
+        sx={{ width: { xs: '100%', sm: 120 }, height: 120, borderRadius: 2, objectFit: 'cover', mr: { sm: 2 }, mb: { xs: 2, sm: 0 } }}
+      />
       <CardContent sx={{ flex: 1, p: 0, pr: 2, pb: 1 }}>
         <Typography variant="h6" fontWeight={700} gutterBottom>
           {name}

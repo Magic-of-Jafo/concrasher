@@ -8,6 +8,8 @@ import VenueHotelTab from './VenueHotelTab';
 import { type VenueHotelTabData, createDefaultVenueHotelTabData } from '@/lib/validators';
 import ScheduleTab from './ScheduleTab';
 import DealersTab from './DealersTab';
+import { MediaTab } from './MediaTab';
+import { type ConventionMediaData } from '@/lib/validators';
 import { useRouter } from 'next/navigation';
 
 interface TabPanelProps {
@@ -60,6 +62,9 @@ interface ConventionDataForEditor extends BasicInfoFormData {
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
   venueHotel?: VenueHotelTabData;
+  media?: ConventionMediaData[];
+  coverImageUrl?: string;
+  profileImageUrl?: string;
 }
 
 interface ConventionEditorTabsProps {
@@ -87,7 +92,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     const storedTab = localStorage.getItem(localStorageKey);
     if (storedTab) {
       const tabIndex = parseInt(storedTab, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 4) {
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 5) {
         setActiveTab(tabIndex);
         // console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
       }
@@ -106,9 +111,6 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     priceTiers: initialConventionData?.priceTiers || [],
     priceDiscounts: initialConventionData?.priceDiscounts || [],
   }));
-
-  const conventionId = initialConventionData?.id;
-  // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
 
   // Memoize the default venue hotel data
   const defaultVenueHotelData = useMemo(() => createDefaultVenueHotelTabData(), []);
@@ -133,6 +135,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     return defaultSettings;
   });
 
+  const [mediaData, setMediaData] = useState<ConventionMediaData[]>(() =>
+    initialConventionData?.media || []
+  );
+
+  const conventionId = initialConventionData?.id;
+  // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
+
   useEffect(() => {
     console.log('[ConventionEditorTabs - useEffect] Fired. initialConventionData present?', !!initialConventionData);
     if (initialConventionData) {
@@ -147,16 +156,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         priceDiscounts: initialConventionData.priceDiscounts || [],
       });
 
+      // Restore Media Tab update
+      setMediaData(initialConventionData.media || []);
+
       // Corrected Venue/Hotel Tab update
-      const defaultSettings = defaultVenueHotelData;
       const loadedVH = venueHotel; // 'venueHotel' was destructured above from initialConventionData
-      console.log('[ConventionEditorTabs - useEffect] defaultSettings.guestsStayAtPrimaryVenue:', defaultSettings.guestsStayAtPrimaryVenue);
       console.log('[ConventionEditorTabs - useEffect] initialConventionData.venueHotel (loadedVH):', loadedVH);
       console.log('[ConventionEditorTabs - useEffect] loadedVH?.guestsStayAtPrimaryVenue:', loadedVH?.guestsStayAtPrimaryVenue);
       const finalValue = loadedVH?.guestsStayAtPrimaryVenue ?? false;
       console.log('[ConventionEditorTabs - useEffect] resolved guestsStayAtPrimaryVenue for existing:', finalValue);
       setVenueHotelData({
-        ...defaultSettings,
+        ...defaultVenueHotelData,
         ...(loadedVH || {}),
         guestsStayAtPrimaryVenue: finalValue
       });
@@ -203,6 +213,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     // Here you could, for example, disable the save button if a tab reports invalid data
   }, []);
 
+  const handleMediaSave = useCallback((success: boolean, message?: string) => {
+    // Handle media save feedback - could show toast or update state
+    console.log('Media save result:', success, message);
+  }, []);
+
+
+
   const [localIsSaving, setLocalIsSaving] = useState(false);
   const router = useRouter();
 
@@ -214,6 +231,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       priceTiers: pricingTabData.priceTiers,
       priceDiscounts: pricingTabData.priceDiscounts,
       venueHotel: venueHotelData,
+      media: mediaData,
     };
     await onSave(fullDataToSave);
     setLocalIsSaving(false);
@@ -224,11 +242,12 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     <Box sx={{ width: '100%' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="Convention editor tabs">
-          <Tab label="Basic Info & Series" {...allyProps(0)} />
+          <Tab label="Basic Info" {...allyProps(0)} />
           <Tab label="Pricing" {...allyProps(1)} />
           <Tab label="Venue/Hotel" {...allyProps(2)} />
           <Tab label="Schedule" {...allyProps(3)} />
-          <Tab label="Dealers" {...allyProps(4)} />
+          <Tab label="Media" {...allyProps(4)} />
+          <Tab label="Dealers" {...allyProps(5)} />
         </Tabs>
       </Box>
 
@@ -276,6 +295,23 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       </TabPanel>
 
       <TabPanel value={activeTab} index={4}>
+        {conventionId ? (
+          <MediaTab
+            conventionId={conventionId}
+            initialMedia={mediaData}
+            initialCoverImageUrl={initialConventionData?.coverImageUrl}
+            initialProfileImageUrl={initialConventionData?.profileImageUrl}
+            onSave={handleMediaSave}
+          />
+        ) : (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <CircularProgress />
+            <p>Loading media information...</p>
+          </Box>
+        )}
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={5}>
         <DealersTab conventionId={conventionId!} />
       </TabPanel>
 

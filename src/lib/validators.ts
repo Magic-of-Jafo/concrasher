@@ -132,6 +132,8 @@ export const BasicInfoFormSchema = z.object({
   country: z.string().optional(),
   descriptionShort: z.string().optional(),
   descriptionMain: z.string().optional(),
+  websiteUrl: z.string().url({ message: "Please enter a valid website URL" }).optional().or(z.literal('')),
+  registrationUrl: z.string().url({ message: "Please enter a valid registration URL" }).optional().or(z.literal('')),
   seriesId: z.string().optional(),
   newSeriesName: z.string().optional(),
 }).refine((data) => {
@@ -414,4 +416,25 @@ export type ScheduleEventFeeTierInput = z.infer<typeof ScheduleEventFeeTierSchem
 export type ConventionScheduleItemCreateInput = z.infer<typeof ConventionScheduleItemCreateSchema>;
 export type ConventionScheduleItemUpdateInput = z.infer<typeof ConventionScheduleItemUpdateSchema>;
 export type ConventionScheduleItemBulkItemInput = z.infer<typeof ConventionScheduleItemBulkItemSchema>;
-export type ConventionScheduleItemBulkInput = z.infer<typeof ConventionScheduleItemBulkInputSchema>; 
+export type ConventionScheduleItemBulkInput = z.infer<typeof ConventionScheduleItemBulkInputSchema>;
+
+// --- Convention Media Tab Schemas ---
+
+export const ConventionMediaSchema = z.object({
+  id: z.string().cuid().optional(), // New media may not have an id yet
+  conventionId: z.string().cuid().optional(),
+  type: z.enum(['IMAGE', 'VIDEO_LINK']),
+  url: z.string().min(1, 'URL is required').refine((val) => {
+    // Accept full URLs (for video links) or relative paths starting with /uploads/ (for images)
+    return val.startsWith('/uploads/') || val.startsWith('http://') || val.startsWith('https://');
+  }, 'Invalid URL format'),
+  caption: z.string().optional().nullable().transform((val) => val || undefined),
+  order: z.number().int().min(0),
+});
+
+export const ConventionMediaTabSchema = z.object({
+  media: z.array(ConventionMediaSchema),
+});
+
+export type ConventionMediaData = z.infer<typeof ConventionMediaSchema>;
+export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>; 
