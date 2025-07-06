@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Tabs, Tab, Box, Button, CircularProgress } from '@mui/material';
+import { Tabs, Tab, Box, Button, CircularProgress, Typography } from '@mui/material';
 import { BasicInfoTab } from './BasicInfoTab';
 import { type BasicInfoFormData } from '@/lib/validators';
 import { PricingTab } from './PricingTab';
@@ -59,7 +59,7 @@ const initialBasicFormData: BasicInfoFormData = {
   newSeriesName: '',
 };
 
-interface ConventionDataForEditor extends BasicInfoFormData {
+export interface ConventionDataForEditor extends BasicInfoFormData {
   id?: string;
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
@@ -148,50 +148,34 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   }));
 
   const conventionId = initialConventionData?.id;
+  const conventionName = initialConventionData?.name || 'this convention';
   // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
 
   useEffect(() => {
-    console.log('[ConventionEditorTabs - useEffect] Fired. initialConventionData present?', !!initialConventionData);
-    if (initialConventionData) {
-      // Restore Basic Info update
-      const { priceTiers, priceDiscounts, id, venueHotel, ...basicDataFromInitial } = initialConventionData;
-      // setBasicInfoData(prev => ({ ...initialBasicFormData, ...prev, ...basicDataFromInitial }));
-      setBasicInfoData({ ...initialBasicFormData, ...basicDataFromInitial }); // Simplified update
+    // This effect synchronizes the component's internal state with the initialConventionData prop.
+    // This is crucial for populating the form when editing an existing convention.
+    const {
+      priceTiers,
+      priceDiscounts,
+      id,
+      venueHotel,
+      media,
+      settings,
+      ...basicDataFromInitial
+    } = initialConventionData || {};
 
-      // Restore Pricing Tab update
-      setPricingTabData({
-        priceTiers: initialConventionData.priceTiers || [],
-        priceDiscounts: initialConventionData.priceDiscounts || [],
-      });
+    setBasicInfoData({ ...initialBasicFormData, ...basicDataFromInitial });
+    setPricingTabData({
+      priceTiers: priceTiers || [],
+      priceDiscounts: priceDiscounts || [],
+    });
+    setMediaData(media || []);
+    setSettingsData({
+      currency: settings?.currency || 'USD',
+      timezone: settings?.timezone || '',
+    });
+    setVenueHotelData(venueHotel || defaultVenueHotelData);
 
-      // Restore Media Tab update
-      setMediaData(initialConventionData.media || []);
-
-      // Restore Settings Tab update
-      setSettingsData({
-        currency: initialConventionData.settings?.currency || 'USD',
-        timezone: initialConventionData.settings?.timezone || '',
-      });
-
-      // Corrected Venue/Hotel Tab update
-      const loadedVH = venueHotel; // 'venueHotel' was destructured above from initialConventionData
-      console.log('[ConventionEditorTabs - useEffect] initialConventionData.venueHotel (loadedVH):', loadedVH);
-      console.log('[ConventionEditorTabs - useEffect] loadedVH?.guestsStayAtPrimaryVenue:', loadedVH?.guestsStayAtPrimaryVenue);
-      const finalValue = loadedVH?.guestsStayAtPrimaryVenue ?? false;
-      console.log('[ConventionEditorTabs - useEffect] resolved guestsStayAtPrimaryVenue for existing:', finalValue);
-      setVenueHotelData({
-        ...defaultVenueHotelData,
-        ...(loadedVH || {}),
-        guestsStayAtPrimaryVenue: finalValue
-      });
-    } else {
-      console.log('[ConventionEditorTabs - useEffect] initialConventionData is null/undefined. Resetting forms.');
-      // If initialConventionData is cleared (e.g., switching from edit to new), revert to full defaults
-      setBasicInfoData(initialBasicFormData); // Reset basic info
-      setPricingTabData({ priceTiers: [], priceDiscounts: [] }); // Reset pricing
-      setVenueHotelData(defaultVenueHotelData); // Reset venue/hotel
-      setSettingsData({ currency: 'USD', timezone: '' }); // Reset settings
-    }
   }, [initialConventionData, defaultVenueHotelData]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -272,9 +256,9 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           <Tab label="Pricing" {...allyProps(1)} />
           <Tab label="Venue/Hotel" {...allyProps(2)} />
           <Tab label="Schedule" {...allyProps(3)} />
-          <Tab label="Media" {...allyProps(4)} />
-          <Tab label="Dealers" {...allyProps(5)} />
-          <Tab label="Settings" {...allyProps(6)} />
+          <Tab label="Dealers" {...allyProps(4)} disabled={!isEditing} />
+          <Tab label="Media" {...allyProps(5)} disabled={!isEditing} />
+          <Tab label="Settings" {...allyProps(6)} disabled={!isEditing} />
         </Tabs>
       </Box>
 
@@ -324,31 +308,35 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
       <TabPanel value={activeTab} index={4}>
         {conventionId ? (
-          <MediaTab
+          <DealersTab
             conventionId={conventionId}
-            initialMedia={mediaData}
-            initialCoverImageUrl={initialConventionData?.coverImageUrl}
-            initialProfileImageUrl={initialConventionData?.profileImageUrl}
-            onSave={handleMediaSave}
           />
         ) : (
           <Box sx={{ p: 3, textAlign: 'center' }}>
-            <CircularProgress />
-            <p>Loading media information...</p>
+            <Typography color="text.secondary">
+              Dealers can be managed after the convention is created.
+            </Typography>
           </Box>
         )}
       </TabPanel>
 
       <TabPanel value={activeTab} index={5}>
-        <DealersTab conventionId={conventionId!} />
+        <MediaTab
+          conventionId={conventionId as string}
+          initialMedia={mediaData}
+          initialCoverImageUrl={initialConventionData?.coverImageUrl}
+          initialProfileImageUrl={initialConventionData?.profileImageUrl}
+          onSave={handleMediaSave}
+        />
       </TabPanel>
 
       <TabPanel value={activeTab} index={6}>
         <SettingsTab
+          conventionId={conventionId as string}
+          conventionName={conventionName}
           value={settingsData}
           onFormChange={handleSettingsChange}
           isEditing={isEditing}
-          conventionId={conventionId}
         />
       </TabPanel>
 

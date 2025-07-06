@@ -4,9 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from 'next/navigation';
 import ConventionActions, { ConventionActionsProps } from "../ConventionActions";
 import { ConventionStatus, Convention } from "@prisma/client";
+import * as actions from '@/lib/actions';
 
 jest.mock('next/navigation', () => ({
     useRouter: jest.fn(),
+}));
+
+jest.mock('@/lib/actions', () => ({
+    ...jest.requireActual('@/lib/actions'), // import and retain all actual implementations
+    deleteConvention: jest.fn(), // mock only deleteConvention
 }));
 
 global.fetch = jest.fn();
@@ -49,8 +55,9 @@ const mockConvention: Convention = {
     stateAbbreviation: 'TS',
     stateName: 'Test State',
     country: 'Testland',
-    timezone: 'America/New_York',
+    timezoneId: 'America/New_York',
     websiteUrl: 'http://testcon.com',
+    registrationUrl: null,
     coverImageUrl: null,
     profileImageUrl: null,
     venueName: 'Test Venue',
@@ -91,29 +98,27 @@ describe("ConventionActions", () => {
     });
 
     it("handles delete action and shows success", async () => {
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: () => Promise.resolve({ message: "Convention deleted successfully" }),
+        (actions.deleteConvention as jest.Mock).mockResolvedValueOnce({
+            success: true,
+            message: "Convention has been permanently deleted.",
         });
+
         const onActionComplete = jest.fn();
         renderWithProviders(<ConventionActions convention={mockConvention} onConventionUpdated={onActionComplete} />);
 
         fireEvent.click(screen.getByRole("button", { name: /convention actions/i }));
         fireEvent.click(screen.getByText(/Delete/));
 
-        expect(await screen.findByText(/move to trash\?/i)).toBeInTheDocument();
-        expect(screen.getByText(/are you sure you want to move/i)).toBeInTheDocument();
+        expect(await screen.findByText("Permanently Delete Convention")).toBeInTheDocument();
+        expect(screen.getByText(/Are you absolutely sure/i)).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: /move to trash/i }));
+        fireEvent.click(screen.getByRole('button', { name: "Permanently Delete" }));
 
         await waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith(
-                `/api/organizer/conventions/${mockConvention.id}`,
-                { method: 'DELETE' }
-            );
+            expect(actions.deleteConvention).toHaveBeenCalledWith(mockConvention.id);
         });
 
-        expect(await screen.findByText(/convention moved to trash/i)).toBeInTheDocument();
+        expect(await screen.findByText(/Convention has been permanently deleted/i)).toBeInTheDocument();
         expect(onActionComplete).toHaveBeenCalled();
     });
 
@@ -170,18 +175,18 @@ describe("ConventionActions", () => {
 
     it("shows error message when action fails", async () => {
         const errorMessage = "This is a test failure";
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: false,
-            json: () => Promise.resolve({ message: errorMessage }),
+        (actions.deleteConvention as jest.Mock).mockResolvedValueOnce({
+            success: false,
+            error: errorMessage,
         });
 
         renderWithProviders(<ConventionActions convention={mockConvention} />);
         fireEvent.click(screen.getByRole("button", { name: /convention actions/i }));
         fireEvent.click(screen.getByText(/Delete/));
 
-        fireEvent.click(await screen.findByRole('button', { name: /move to trash/i }));
+        fireEvent.click(await screen.findByRole('button', { name: "Permanently Delete" }));
 
         expect(await screen.findByText(errorMessage)).toBeInTheDocument();
-        expect(screen.queryByText(/convention moved to trash/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Convention has been permanently deleted/i)).not.toBeInTheDocument();
     });
 }); 

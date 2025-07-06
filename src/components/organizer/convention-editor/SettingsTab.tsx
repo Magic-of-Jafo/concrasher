@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText } from '@mui/material';
+import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText, Button, Divider } from '@mui/material';
 import { Grid } from '@mui/material';
 import { ConventionSettingData } from '@/lib/validators';
 import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { deleteConvention } from '@/lib/actions';
+import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
+import { useSnackbar } from 'notistack';
 
 // Currency options commonly used in magic conventions
 const CURRENCIES = [
@@ -22,7 +27,8 @@ interface SettingsTabProps {
     onFormChange: (field: keyof ConventionSettingData, value: any) => void;
     errors?: Record<string, string>;
     isEditing: boolean;
-    conventionId?: string; // Add convention ID for auto-save
+    conventionId: string; // Made required for delete functionality
+    conventionName: string; // For the confirmation dialog
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -30,14 +36,43 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onFormChange,
     errors = {},
     isEditing,
-    conventionId
+    conventionId,
+    conventionName,
 }) => {
     const [localValue, setLocalValue] = useState<ConventionSettingData>(value);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    const router = useRouter();
+    const { enqueueSnackbar } = useSnackbar();
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         setLocalValue(value);
     }, [value]);
+
+    const { mutate: performDelete, isPending: isDeleting } = useMutation({
+        mutationFn: async () => {
+            if (!conventionId) throw new Error("Convention ID is missing.");
+            const result = await deleteConvention(conventionId);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to delete convention.");
+            }
+            return result;
+        },
+        onSuccess: (data) => {
+            enqueueSnackbar(data.message || "Convention permanently deleted.", { variant: 'success' });
+            queryClient.invalidateQueries({ queryKey: ["organizer-conventions"] });
+            queryClient.invalidateQueries({ queryKey: ["conventions"] });
+            // Redirect to the organizer's dashboard after successful deletion
+            router.push('/organizer/conventions');
+        },
+        onError: (error: Error) => {
+            enqueueSnackbar(error.message, { variant: 'error' });
+        },
+        onSettled: () => {
+            setDeleteModalOpen(false);
+        },
+    });
 
     const handleChange = (field: keyof ConventionSettingData) => async (event: any) => {
         const newValue = event.target.value;
@@ -188,6 +223,41 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <strong>Timezone:</strong> This will be used for displaying schedule times and handling time-sensitive operations.
                 </Typography>
             </Paper>
+
+            {/* Danger Zone */}
+            <Box sx={{ mt: 4 }}>
+                <Typography variant="h6" color="error" gutterBottom>
+                    Danger Zone
+                </Typography>
+                <Paper elevation={1} sx={{ p: 3, mt: 2, border: '1px solid', borderColor: 'error.main' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                            <Typography variant="subtitle1" fontWeight="bold">Delete this convention</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Once you delete a convention, there is no going back. Please be certain.
+                            </Typography>
+                        </Box>
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={() => setDeleteModalOpen(true)}
+                            disabled={!isEditing || isDeleting}
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete Convention'}
+                        </Button>
+                    </Box>
+                </Paper>
+            </Box>
+
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                onConfirm={performDelete}
+                title="Delete Convention Permanently?"
+                description={`Are you sure you want to permanently delete "${conventionName}"? This action is irreversible and will remove all associated data.`}
+                confirmButtonText="Delete Permanently"
+                isConfirming={isDeleting}
+            />
         </Box>
     );
 }; 

@@ -18,7 +18,6 @@ import { v4 as uuidv4 } from 'uuid';
 import PrimaryVenueForm from './PrimaryVenueForm';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import DebugKeyboardEvents from './debug-keyboard-events';
 
 interface VenueHotelTabProps {
   conventionId: string | null;
@@ -32,7 +31,8 @@ interface VenueHotelTabProps {
 const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawValue, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>('primaryVenue');
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
-  const [debugMode, setDebugMode] = useState(false);
+
+  const isNewConvention = !conventionId;
 
   const structuredErrors = useMemo(() => {
     const errors: {
@@ -82,11 +82,19 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
   const primaryHotel = useMemo(() => value.hotels.find(h => h.isPrimaryHotel), [value.hotels]);
 
   const validateAndNotify = useCallback((data: VenueHotelTabData) => {
+    // For a new convention, don't validate this tab until it has been interacted with.
+    // We can check if a primary venue has a name yet.
+    if (isNewConvention && !data.primaryVenue?.venueName) {
+      onValidationChange(true); // Consider it valid
+      setZodErrors(null);
+      onChange(data, true); // Pass data up
+      return;
+    }
+
     const result = schema.safeParse(data);
     const isValid = result.success;
     setZodErrors(isValid ? null : result.error.issues);
 
-    // Don't auto-show validation alerts - let users edit freely
     // Individual field errors will still show inline where needed
 
     onValidationChange(isValid);
@@ -103,7 +111,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
     };
 
     onChange(legacyPayload as VenueHotelTabData & { venues: VenueData[] }, isValid);
-  }, [onChange, onValidationChange, schema]);
+  }, [onChange, onValidationChange, schema, isNewConvention]);
 
   useEffect(() => {
     validateAndNotify(value);
@@ -328,38 +336,17 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
     );
   };
 
-
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" gutterBottom>
-          Venue/Hotel Configuration
-        </Typography>
-        <Button
-          variant="outlined"
-          color="error"
-          onClick={() => setDebugMode(!debugMode)}
-          size="small"
-        >
-          {debugMode ? 'Disable Debug' : 'Enable Debug Mode'}
-        </Button>
-      </Box>
-
-      {debugMode && (
-        <DebugKeyboardEvents onClose={() => setDebugMode(false)} />
+    <Box sx={{ p: 1, position: 'relative' }}>
+      {zodErrors && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          There are validation issues that need your attention. Please review the highlighted fields.
+        </Alert>
       )}
 
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" gutterBottom>Venues</Typography>
-        <Divider sx={{ mb: 2 }} />
-        {renderVenueForms()}
-      </Box>
+      {renderVenueForms()}
+      {renderHotelForms()}
 
-      <Box>
-        <Typography variant="h5" gutterBottom>Hotels</Typography>
-        <Divider sx={{ mb: 2 }} />
-        {renderHotelForms()}
-      </Box>
     </Box>
   );
 };

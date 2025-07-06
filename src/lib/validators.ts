@@ -116,6 +116,20 @@ export const ConventionUpdateSchema = ConventionCreateSchema.partial().extend({
   // slug: z.string().min(1, { message: 'Slug is required' }).optional(), 
 });
 
+export type ConventionUpdateData = z.infer<typeof ConventionUpdateSchema>;
+
+// This is the shared type needed by the editor and its parent page
+export type ConventionDataForEditor = BasicInfoFormData & {
+  id?: string;
+  priceTiers?: PriceTier[];
+  priceDiscounts?: PriceDiscount[];
+  venueHotel?: VenueHotelTabData;
+  media?: ConventionMediaData[];
+  coverImageUrl?: string;
+  profileImageUrl?: string;
+  settings?: ConventionSettingData;
+}
+
 export type ConventionCreateInput = z.infer<typeof ConventionCreateSchema>;
 export type ConventionUpdateInput = z.infer<typeof ConventionUpdateSchema>;
 
@@ -316,20 +330,7 @@ export const VenueHotelTabSchema = z.object({
   primaryHotelDetails: HotelSchema.optional(),
   hotels: z.array(HotelSchema).default([]),
   guestsStayAtPrimaryVenue: z.boolean().default(false),
-}).superRefine((data, ctx) => {
-  // Only validate if guests are *not* staying at the primary venue
-  if (!data.guestsStayAtPrimaryVenue) {
-    // Require primary hotel details if not staying at venue
-    if (!data.primaryHotelDetails?.hotelName) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'A primary hotel is required if the venue is not serving as the hotel.',
-        path: ['primaryHotelDetails'],
-      });
-    }
-  }
 });
-
 
 export type VenueHotelTabData = z.infer<typeof VenueHotelTabSchema>;
 

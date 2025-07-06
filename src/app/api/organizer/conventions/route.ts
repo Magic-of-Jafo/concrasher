@@ -34,7 +34,7 @@ export async function GET() {
     console.log(`[API /api/organizer/conventions] Processing GET request for user ID: ${session.user.id}`);
 
     let conventions: ConventionWithSeries[] = [];
-    
+
     // If user is an admin, show all conventions
     if (session.user.roles?.includes(Role.ADMIN)) {
       conventions = await prisma.convention.findMany({
@@ -60,10 +60,10 @@ export async function GET() {
         }
       });
       console.log(`[API /api/organizer/conventions] Found userSeries:`, JSON.stringify(userSeries, null, 2));
-      
+
       const seriesIds = userSeries.map(series => series.id);
       console.log(`[API /api/organizer/conventions] seriesIds for user ${session.user.id}:`, JSON.stringify(seriesIds, null, 2));
-      
+
       // Then get all conventions belonging to those series
       if (seriesIds.length > 0) {
         conventions = await prisma.convention.findMany({
@@ -135,11 +135,11 @@ export async function POST(request: Request) {
       seriesId,
     } = body;
 
-    // Basic validation for required fields from BasicInfoFormData
-    // Note: descriptionShort, descriptionMain, venueName, websiteUrl are optional
-    if (!name || !slug || !city || !country || !seriesId) {
+    // Basic validation for required fields.
+    // The slug is generated client-side and passed in.
+    if (!name || !slug || !seriesId) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, slug, city, country, seriesId are required.' },
+        { error: 'Missing required fields: name, slug, and seriesId are required.' },
         { status: 400 }
       );
     }
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
         );
       }
       if (isOneDayEvent && finalStartDate.getTime() !== finalEndDate.getTime()) {
-         return NextResponse.json(
+        return NextResponse.json(
           { error: 'For one-day events, start and end dates must be the same.' },
           { status: 400 }
         );
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
       // We ensure it here for data integrity if client didn't.
       // Dates sent by client (even if TBD) are preserved in finalStartDate/finalEndDate for DB storage.
     }
-    
+
     // Verify seriesId ownership if user is not an admin
     if (!session.user.roles.includes(Role.ADMIN)) {
       const series = await prisma.conventionSeries.findFirst({
@@ -193,31 +193,31 @@ export async function POST(request: Request) {
     }
 
     const newConventionData: any = {
-        name,
-        slug,
-        startDate: finalStartDate, // Will be null if body's startDate was null, or actual date
-        endDate: finalEndDate,   // Will be null if body's endDate was null, or actual date
-        isOneDayEvent: isTBD ? false : isOneDayEvent, // If TBD, it cannot be a one-day event
-        isTBD,
-        descriptionShort: descriptionShort,
-        descriptionMain: descriptionMain, 
-        websiteUrl,
-        venueName,
-        city,
-        stateAbbreviation,
-        stateName,
-        country,
-        seriesId,
-        status: ConventionStatus.DRAFT, 
-      };
-      
+      name,
+      slug,
+      startDate: finalStartDate, // Will be null if body's startDate was null, or actual date
+      endDate: finalEndDate,   // Will be null if body's endDate was null, or actual date
+      isOneDayEvent: isTBD ? false : isOneDayEvent, // If TBD, it cannot be a one-day event
+      isTBD,
+      descriptionShort: descriptionShort,
+      descriptionMain: descriptionMain,
+      websiteUrl,
+      venueName,
+      city,
+      stateAbbreviation,
+      stateName,
+      country,
+      seriesId,
+      status: ConventionStatus.DRAFT,
+    };
+
     // Ensure optional fields are not set to undefined if they are missing in body, prisma handles missing fields as undefined by default
     // For example, if websiteUrl is not in body, newConventionData.websiteUrl will be undefined, which is fine.
 
     const newConvention = await prisma.convention.create({
       data: newConventionData,
       include: {
-        series: true, 
+        series: true,
       },
     });
 
@@ -226,18 +226,18 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating convention:', error);
     if (error instanceof Error && 'code' in error && (error as any).code === 'P2002') {
-        // Check for unique constraint on slug. Adjust if other fields are unique.
-        const target = (error as any).meta?.target;
-        if (target && target.includes('slug')) {
-            return NextResponse.json(
-                { error: 'A convention with this slug already exists.' },
-                { status: 409 } 
-            );
-        }
-         return NextResponse.json(
-                { error: 'A unique constraint violation occurred.' },
-                { status: 409 } 
-            );
+      // Check for unique constraint on slug. Adjust if other fields are unique.
+      const target = (error as any).meta?.target;
+      if (target && target.includes('slug')) {
+        return NextResponse.json(
+          { error: 'A convention with this slug already exists.' },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'A unique constraint violation occurred.' },
+        { status: 409 }
+      );
     }
     return NextResponse.json(
       { error: 'Failed to create convention' },

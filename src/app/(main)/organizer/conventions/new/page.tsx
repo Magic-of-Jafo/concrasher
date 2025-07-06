@@ -12,7 +12,7 @@ import {
   Alert,
 } from '@mui/material';
 import ConventionSeriesSelector from '@/components/ConventionSeriesSelector';
-import ConventionEditorTabs from '@/components/organizer/convention-editor/ConventionEditorTabs';
+import ConventionEditorTabs, { type ConventionDataForEditor } from '@/components/organizer/convention-editor/ConventionEditorTabs';
 import { type BasicInfoFormData } from '@/lib/validators';
 
 // Define ConventionSeries interface locally
@@ -26,16 +26,16 @@ interface ConventionSeries {
 
 // Minimal initial data for the page, seriesId will be populated by selector
 const pageInitialConventionData: Partial<BasicInfoFormData> = {
-  seriesId: null,
+  seriesId: undefined,
 };
 
 // This can be Omit<ConventionSeries, 'id'> if ConventionSeries is defined as above
-interface NewSeriesData extends Omit<ConventionSeries, 'id'> {}
+interface NewSeriesData extends Omit<ConventionSeries, 'id'> { }
 
 export default function NewConventionPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  
+
   const [currentStep, setCurrentStep] = useState<'selectSeries' | 'editDetails'>('selectSeries');
   // This state will hold the seriesId and any other top-level data not in BasicInfoTab
   const [topLevelConventionData, setTopLevelConventionData] = useState<Partial<BasicInfoFormData>>(pageInitialConventionData);
@@ -67,7 +67,7 @@ export default function NewConventionPage() {
     setIsSaving(true);
     setSeriesError(null);
     try {
-      const response = await fetch('/api/convention-series', {
+      const response = await fetch('/api/organizer/series', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSeriesData),
@@ -91,13 +91,14 @@ export default function NewConventionPage() {
   };
 
   // This is the onSave handler for ConventionEditorTabs
-  const handleSubmitConvention = async (dataFromTabs: BasicInfoFormData) => {
+  const handleSubmitConvention = async (dataFromTabs: Partial<ConventionDataForEditor>) => {
     setIsSaving(true);
     setError(null);
-    
-    let dataToSubmit: any = { 
-      ...dataFromTabs, 
-      seriesId: topLevelConventionData.seriesId 
+
+    let dataToSubmit: any = {
+      ...dataFromTabs,
+      // On initial creation, dates are not set, so it's always TBD.
+      isTBD: true,
     };
 
     // If isTBD is true, isOneDayEvent must be false.
@@ -108,7 +109,7 @@ export default function NewConventionPage() {
     }
     // No longer nullifying startDate and endDate here if isTBD is true.
 
-    dataToSubmit.status = 'DRAFT'; 
+    dataToSubmit.status = 'DRAFT';
 
     try {
       const response = await fetch('/api/organizer/conventions', {
@@ -122,7 +123,7 @@ export default function NewConventionPage() {
         throw new Error(errorData.error || 'Failed to create convention');
       }
       const newConvention = await response.json();
-      router.push('/organizer/conventions'); 
+      router.push('/organizer/conventions');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
@@ -141,13 +142,13 @@ export default function NewConventionPage() {
       </Container>
     );
   }
-  
+
   if (sessionStatus !== 'authenticated' || !session?.user?.roles?.includes('ORGANIZER')) {
     return (
-        <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-            <Typography>Loading session or redirecting...</Typography>
-            <CircularProgress />
-        </Container>
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+        <Typography>Loading session or redirecting...</Typography>
+        <CircularProgress />
+      </Container>
     );
   }
 
@@ -173,8 +174,8 @@ export default function NewConventionPage() {
             Create New Convention
           </Typography>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          
-          <ConventionEditorTabs 
+
+          <ConventionEditorTabs
             initialConventionData={{ seriesId: topLevelConventionData.seriesId }} // Pass only necessary initial data like seriesId
             isEditing={false} // This is the new page
             onSave={handleSubmitConvention}

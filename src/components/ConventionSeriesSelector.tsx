@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { 
-  Box, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+import {
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   TextField,
   Typography,
   Button,
@@ -28,10 +28,10 @@ interface ConventionSeriesSelectorProps {
   onNewSeriesCreate: (series: Omit<ConventionSeries, 'id'>) => void;
 }
 
-export default function ConventionSeriesSelector({ 
+export default function ConventionSeriesSelector({
   initialSeriesId,
-  onSeriesSelect, 
-  onNewSeriesCreate 
+  onSeriesSelect,
+  onNewSeriesCreate
 }: ConventionSeriesSelectorProps) {
   const { data: session } = useSession();
   const [series, setSeries] = useState<ConventionSeries[]>([]);
@@ -49,25 +49,21 @@ export default function ConventionSeriesSelector({
   // Fetch user's series
   useEffect(() => {
     const fetchSeries = async () => {
-      setLoading(true); 
+      setLoading(true);
       try {
         const response = await fetch('/api/organizer/series');
         if (!response.ok) throw new Error('Failed to fetch series');
         const data = await response.json();
         setSeries(data.series);
 
-        // Prioritize initialSeriesId for the FIRST load if selectedSeries isn't already set by user action or a previous run.
-        if (initialSeriesId && !selectedSeries && data.series.some((s: ConventionSeries) => s.id === initialSeriesId)) {
-            setSelectedSeries(initialSeriesId);
-            // No need to call onSeriesSelect here if it's just reflecting an initial prop.
-            // The parent (ConventionForm) already knows this seriesId.
-            // onSeriesSelect will be called by handleSeriesChange if the user manually changes it.
-        } else if (data.series.length > 0 && !selectedSeries && !isCreatingNew) {
-          // Fallback: if no valid initialSeriesId and nothing selected, select first in list.
-          const firstSeriesId = data.series[0].id;
-          setSelectedSeries(firstSeriesId); 
-          onSeriesSelect(firstSeriesId); // Notify parent for create mode default selection   
+        // If an initialSeriesId is provided (e.g., editing an existing convention),
+        // and it exists in the fetched list, set it as the selected value.
+        // This does not trigger onSeriesSelect, which is correct for initial state setting.
+        if (initialSeriesId && data.series.some((s: ConventionSeries) => s.id === initialSeriesId)) {
+          setSelectedSeries(initialSeriesId);
         }
+        // We no longer automatically select the first series to force the user to make a choice.
+
       } catch (error) {
         console.error('Error fetching series:', error);
       } finally {
@@ -78,19 +74,22 @@ export default function ConventionSeriesSelector({
     if (session?.user) {
       fetchSeries();
     }
-  }, [session, initialSeriesId, isCreatingNew, onSeriesSelect]); // Removed selectedSeries, added initialSeriesId properly
+  }, [session, initialSeriesId]);
 
   // Handle series selection
   const handleSeriesChange = (event: any) => {
     const value = event.target.value;
-    if (value === 'new') {
-      setIsCreatingNew(true);
+    setSelectedSeries(value);
+    onSeriesSelect(value);
+  };
+
+  const handleToggleCreateNew = () => {
+    const switchingToCreate = !isCreatingNew;
+    setIsCreatingNew(switchingToCreate);
+    if (switchingToCreate) {
+      // Clear selection when entering create mode
       setSelectedSeries('');
       onSeriesSelect(null);
-    } else {
-      setIsCreatingNew(false);
-      setSelectedSeries(value);
-      onSeriesSelect(value);
     }
   };
 
@@ -112,7 +111,7 @@ export default function ConventionSeriesSelector({
     maxSize: 5 * 1024 * 1024, // 5MB
     onDrop: async (acceptedFiles) => {
       if (acceptedFiles.length === 0) return;
-      
+
       const file = acceptedFiles[0];
       setLogoFile(file);
       setUploading(true);
@@ -127,7 +126,7 @@ export default function ConventionSeriesSelector({
         });
 
         if (!response.ok) throw new Error('Upload failed');
-        
+
         const data = await response.json();
         setNewSeries(prev => ({ ...prev, logoUrl: data.url }));
       } catch (error) {
@@ -141,7 +140,7 @@ export default function ConventionSeriesSelector({
   // Handle new series creation
   const handleCreateSeries = () => {
     if (!newSeries.name) return;
-    
+
     onNewSeriesCreate({
       name: newSeries.name,
       slug: slugify(newSeries.name),
@@ -156,12 +155,13 @@ export default function ConventionSeriesSelector({
 
   return (
     <Box sx={{ mb: 4 }}>
-      {series.length > 0 ? (
+      {/* Show selector only if not creating and series exist */}
+      {!isCreatingNew && series.length > 0 && (
         <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Convention Series</InputLabel>
+          <InputLabel>Select an Existing Series</InputLabel>
           <Select
             value={selectedSeries}
-            label="Convention Series"
+            label="Select an Existing Series"
             onChange={handleSeriesChange}
           >
             {series.map((s) => (
@@ -169,17 +169,31 @@ export default function ConventionSeriesSelector({
                 {s.name}
               </MenuItem>
             ))}
-            <MenuItem value="new">Create New Series</MenuItem>
+            {/* "Create New" is now a button */}
           </Select>
         </FormControl>
-      ) : (
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Create Your First Convention Series
-        </Typography>
       )}
 
+      {/* Toggler Button and Title Logic */}
+      <Box sx={{ my: 2, textAlign: 'center' }}>
+        {series.length > 0 && !isCreatingNew && <Typography>— OR —</Typography>}
+
+        {series.length > 0 && (
+          <Button variant="outlined" onClick={handleToggleCreateNew} sx={{ mt: 1 }}>
+            {isCreatingNew ? 'Cancel Creation' : 'Create a New Series'}
+          </Button>
+        )}
+
+        {(isCreatingNew || series.length === 0) && (
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            {series.length === 0 ? 'Create Your First Convention Series' : 'Create a New Series'}
+          </Typography>
+        )}
+      </Box>
+
+      {/* New Series Form */}
       {(isCreatingNew || series.length === 0) && (
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <TextField
             fullWidth
             label="Series Name"
@@ -187,7 +201,7 @@ export default function ConventionSeriesSelector({
             onChange={handleNewSeriesChange('name')}
             sx={{ mb: 2 }}
           />
-          
+
           <TextField
             fullWidth
             label="Description"

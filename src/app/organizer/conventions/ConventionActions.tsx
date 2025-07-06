@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import {
   Edit as EditIcon,
-  Delete as DeleteIcon,
+  DeleteForever as DeleteForeverIcon,
   ContentCopy as DuplicateIcon,
   MoreVert as MoreIcon,
   Publish as PublishIcon,
@@ -30,6 +30,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ConventionStatus, Convention } from "@prisma/client";
+import { deleteConvention } from "@/lib/actions";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 
 export interface ConventionActionsProps {
   convention: Convention;
@@ -40,7 +42,7 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
   const router = useRouter();
   const queryClient = useQueryClient();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<ConventionStatus>(convention?.status || "DRAFT");
   const [snackbar, setSnackbar] = useState<{
@@ -100,50 +102,34 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
     duplicateMutation.mutate();
   };
 
-  const deleteMutation = useMutation({
+  const { mutate: performDelete, isPending: isDeleting } = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/organizer/conventions/${convention?.id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        // Try to get more specific error from response body
-        let errorMessage = "Failed to delete convention. Please try again.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (e) {
-          // Ignore if response is not json
-        }
-        throw new Error(errorMessage);
+      const result = await deleteConvention(convention.id);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete convention.");
       }
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setSnackbar({ open: true, message: data.message || "Convention deleted.", severity: "success" });
+      queryClient.invalidateQueries({ queryKey: ["organizer-conventions"] });
       queryClient.invalidateQueries({ queryKey: ["conventions"] });
-      queryClient.invalidateQueries({ queryKey: ["deletedConventions"] }); // Ensure both views can be refreshed
-      setDeleteDialogOpen(false);
-      setSnackbar({
-        open: true,
-        message: "Convention moved to trash successfully",
-        severity: "success",
-      });
-      onConventionUpdated();
     },
-    onError: (error: any) => {
-      setSnackbar({
-        open: true,
-        message: error.message || "Failed to delete convention",
-        severity: "error",
-      });
+    onError: (error: Error) => {
+      setSnackbar({ open: true, message: error.message, severity: "error" });
+    },
+    onSettled: () => {
+      setDeleteModalOpen(false);
+      handleMenuClose();
     },
   });
 
-  const handleDelete = () => {
-    handleMenuClose();
-    setDeleteDialogOpen(true);
+  const handleDeleteClick = () => {
+    setDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    deleteMutation.mutate();
+  const handleConfirmDelete = () => {
+    performDelete();
   };
 
   const statusMutation = useMutation({
@@ -241,6 +227,8 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
     router.push(`/conventions/${convention?.slug}`);
   };
 
+  const isDeleted = !!convention.deletedAt;
+
   return (
     <>
       <IconButton
@@ -256,14 +244,7 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        {convention?.deletedAt ? (
-          <MenuItem onClick={handleRestore} disabled={restoreMutation.isPending}>
-            <ListItemIcon>
-              <RestoreIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Restore</ListItemText>
-          </MenuItem>
-        ) : (
+        {!isDeleted ? (
           [
             <MenuItem key="view" onClick={handleView}>
               <ListItemIcon>
@@ -277,7 +258,7 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
               </ListItemIcon>
               <ListItemText>Edit</ListItemText>
             </MenuItem>,
-            <MenuItem key="duplicate" onClick={handleDuplicate} disabled={duplicateMutation.isPending}>
+            <MenuItem key="duplicate" onClick={handleDuplicate}>
               <ListItemIcon>
                 <DuplicateIcon fontSize="small" />
               </ListItemIcon>
@@ -289,29 +270,22 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
               </ListItemIcon>
               <ListItemText>Change Status</ListItemText>
             </MenuItem>,
-            <MenuItem key="delete" onClick={handleDelete} sx={{ color: "error.main" }}>
+            <MenuItem key="delete" onClick={handleDeleteClick}>
               <ListItemIcon>
-                <DeleteIcon fontSize="small" sx={{ color: "error.main" }} />
+                <DeleteForeverIcon fontSize="small" color="error" />
               </ListItemIcon>
-              <ListItemText>Delete (Trash)</ListItemText>
-            </MenuItem>,
+              <ListItemText primary="Delete" sx={{ color: "error.main" }} />
+            </MenuItem>
           ]
+        ) : (
+          <MenuItem onClick={handleRestore}>
+            <ListItemIcon>
+              <RestoreIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Restore</ListItemText>
+          </MenuItem>
         )}
       </Menu>
-
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Move to Trash?</DialogTitle>
-        <DialogContent>
-          Are you sure you want to move the convention "{convention?.name}" to the
-          trash? It can be restored later.
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={confirmDelete} color="error" disabled={deleteMutation.isPending}>
-            Move to Trash
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)}>
         <DialogTitle>Change Convention Status</DialogTitle>
@@ -339,6 +313,16 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Permanently Delete Convention"
+        description={`Are you absolutely sure you want to permanently delete "${convention.name}"? This action is irreversible.`}
+        confirmButtonText="Permanently Delete"
+        isConfirming={isDeleting}
+      />
 
       <Snackbar
         open={snackbar.open}

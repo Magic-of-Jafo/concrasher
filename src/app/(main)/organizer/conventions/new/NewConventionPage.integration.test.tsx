@@ -38,14 +38,11 @@ jest.mock('@/components/organizer/convention-editor/ConventionEditorTabs', () =>
   // Simulate form input and save
   return (
     <div data-testid="mock-convention-editor-tabs">
-      <button 
-        onClick={() => props.onSave({ 
-          name: 'Test Convention from Tabs', 
+      <button
+        onClick={() => props.onSave({
+          name: 'Test Convention from Tabs',
           slug: 'test-convention-from-tabs',
-          // Add other BasicInfoFormData fields as needed by the page's handleSubmitConvention
-          startDate: new Date(2024, 7, 1), // Aug 1, 2024
-          endDate: new Date(2024, 7, 3),
-          isTBD: false,
+          isTBD: true,
           isOneDayEvent: false,
           city: 'Tab City',
           stateName: 'Tab State',
@@ -112,7 +109,7 @@ describe('NewConventionPage Integration Tests', () => {
     });
 
     renderNewConventionPage({ data: { user: { roles: ['ORGANIZER'] } }, status: 'authenticated' });
-    
+
     // Step 1: Select series to show editor
     fireEvent.click(screen.getByText('Select Existing Series'));
     expect(screen.getByTestId('mock-convention-editor-tabs')).toBeInTheDocument();
@@ -128,9 +125,7 @@ describe('NewConventionPage Integration Tests', () => {
         body: JSON.stringify({
           name: 'Test Convention from Tabs',
           slug: 'test-convention-from-tabs',
-          startDate: new Date(2024, 7, 1).toISOString(), // Dates will be stringified
-          endDate: new Date(2024, 7, 3).toISOString(),
-          isTBD: false,
+          isTBD: true,
           isOneDayEvent: false,
           city: 'Tab City',
           stateName: 'Tab State',
@@ -138,14 +133,13 @@ describe('NewConventionPage Integration Tests', () => {
           country: 'Tab Country',
           descriptionShort: 'Short tab desc',
           descriptionMain: 'Main tab desc',
-          seriesId: 'series-123', // From initial selection
           status: 'DRAFT',
         }),
       });
     });
-    
+
     await waitFor(() => {
-        expect(mockRouterPush).toHaveBeenCalledWith('/organizer/conventions');
+      expect(mockRouterPush).toHaveBeenCalledWith('/organizer/conventions');
     });
   });
 
@@ -178,7 +172,7 @@ describe('NewConventionPage Integration Tests', () => {
     });
 
     test('redirects to /unauthorized if user is not an ORGANIZER', () => {
-      renderNewConventionPage({ 
+      renderNewConventionPage({
         data: { user: { roles: ['USER'] } }, // User without ORGANIZER role
         status: 'authenticated',
       });

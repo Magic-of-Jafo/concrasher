@@ -14,6 +14,11 @@ jest.mock('./db', () => ({
   db: {
     user: {
       update: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    convention: {
+      findUnique: jest.fn(),
+      delete: jest.fn(),
     },
     roleApplication: {
       findUnique: jest.fn(),
@@ -29,7 +34,7 @@ jest.mock('next/cache', () => ({
 }));
 
 // Now import the modules after mocks are set up
-import { updateUserProfile } from './actions';
+import { updateUserProfile, deleteConvention } from './actions';
 import { getServerSession } from 'next-auth/next';
 import { db } from './db';
 import { revalidatePath } from 'next/cache';
@@ -47,6 +52,9 @@ const mockRoleApplicationFindUnique = db.roleApplication.findUnique as jest.Mock
 const mockRoleApplicationUpdate = db.roleApplication.update as jest.MockedFunction<typeof db.roleApplication.update>;
 const mockRoleApplicationFindMany = db.roleApplication.findMany as jest.MockedFunction<typeof db.roleApplication.findMany>;
 const mockTransaction = db.$transaction as jest.MockedFunction<typeof db.$transaction>;
+const mockUserFindUnique = db.user.findUnique as jest.MockedFunction<typeof db.user.findUnique>;
+const mockConventionFindUnique = db.convention.findUnique as jest.MockedFunction<typeof db.convention.findUnique>;
+const mockConventionDelete = db.convention.delete as jest.MockedFunction<typeof db.convention.delete>;
 
 describe('updateUserProfile Server Action', () => {
   beforeEach(() => {
@@ -397,5 +405,92 @@ describe('getPendingOrganizerApplicationsAction', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe('Unauthorized: Admin role required.');
     expect(mockRoleApplicationFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteConvention Server Action', () => {
+  const ownerSession = { user: { id: 'owner-user-id', roles: [Role.USER, Role.ORGANIZER] as Role[] } };
+  const adminSession = { user: { id: 'admin-user-id', roles: [Role.ADMIN] as Role[] } };
+  const otherUserSession = { user: { id: 'other-user-id', roles: [Role.USER, Role.ORGANIZER] as Role[] } };
+  const conventionId = 'test-convention-id';
+  const conventionOwnedByOwner = {
+    id: conventionId,
+    series: {
+      organizerUserId: 'owner-user-id',
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return authentication error if no session', async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const result = await deleteConvention(conventionId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Authentication required.');
+    expect(mockConventionDelete).not.toHaveBeenCalled();
+  });
+
+  it('should return error if convention not found', async () => {
+    mockGetServerSession.mockResolvedValue(ownerSession as any);
+    mockConventionFindUnique.mockResolvedValue(null);
+    const result = await deleteConvention(conventionId);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Convention not found.');
+    expect(mockConventionDelete).not.toHaveBeenCalled();
+  });
+
+  it('should return authorization error if user is not owner or admin', async () => {
+    mockGetServerSession.mockResolvedValue(otherUserSession as any);
+    mockConventionFindUnique.mockResolvedValue(conventionOwnedByOwner as any);
+    mockUserFindUnique.mockResolvedValue({ roles: [Role.ORGANIZER] } as any);
+
+    const result = await deleteConvention(conventionId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Authorization failed. You do not have permission to delete this convention.');
+    expect(mockConventionDelete).not.toHaveBeenCalled();
+  });
+
+  it('should successfully delete convention if user is owner', async () => {
+    mockGetServerSession.mockResolvedValue(ownerSession as any);
+    mockConventionFindUnique.mockResolvedValue(conventionOwnedByOwner as any);
+    mockUserFindUnique.mockResolvedValue({ roles: [Role.ORGANIZER] } as any);
+    mockConventionDelete.mockResolvedValue({} as any);
+
+    const result = await deleteConvention(conventionId);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Convention has been permanently deleted.');
+    expect(mockConventionDelete).toHaveBeenCalledWith({ where: { id: conventionId } });
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/organizer/conventions');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/conventions');
+  });
+
+  it('should successfully delete convention if user is admin', async () => {
+    mockGetServerSession.mockResolvedValue(adminSession as any);
+    mockConventionFindUnique.mockResolvedValue(conventionOwnedByOwner as any); // Admin deleting a convention owned by someone else
+    mockUserFindUnique.mockResolvedValue({ roles: [Role.ADMIN] } as any);
+    mockConventionDelete.mockResolvedValue({} as any);
+
+    const result = await deleteConvention(conventionId);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Convention has been permanently deleted.');
+    expect(mockConventionDelete).toHaveBeenCalledWith({ where: { id: conventionId } });
+  });
+
+  it('should handle database deletion errors gracefully', async () => {
+    mockGetServerSession.mockResolvedValue(ownerSession as any);
+    mockConventionFindUnique.mockResolvedValue(conventionOwnedByOwner as any);
+    mockUserFindUnique.mockResolvedValue({ roles: [Role.ORGANIZER] } as any);
+    mockConventionDelete.mockRejectedValue(new Error('DB delete failed'));
+
+    const result = await deleteConvention(conventionId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('An unexpected error occurred. Please try again.');
+    expect(mockConventionDelete).toHaveBeenCalledWith({ where: { id: conventionId } });
   });
 }); 

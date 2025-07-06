@@ -1844,3 +1844,62 @@ export async function getConventionSettings(
     return null;
   }
 }
+
+export async function deleteConvention(conventionId: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  try {
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      select: {
+        series: {
+          select: {
+            organizerUserId: true,
+          },
+        },
+      },
+    });
+
+    if (!convention) {
+      return { success: false, error: "Convention not found." };
+    }
+
+    const user = await db.user.findUnique({ where: { id: session.user.id }, select: { roles: true } });
+    const isOwner = convention.series?.organizerUserId === session.user.id;
+    const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "Authorization failed. You do not have permission to delete this convention." };
+    }
+
+    await db.convention.delete({
+      where: { id: conventionId },
+    });
+
+    revalidatePath('/organizer/conventions');
+    revalidatePath('/conventions'); // Revalidate public listing
+
+    return {
+      success: true,
+      message: 'Convention has been permanently deleted.',
+    };
+
+  } catch (error) {
+    console.error("Error deleting convention:", error);
+    // Using a property check instead of `instanceof` for better testability with mocks
+    if (error && typeof error === 'object' && 'code' in error) {
+      // Handle specific Prisma errors if necessary
+      return { success: false, error: "A database error occurred while deleting the convention." };
+    }
+    return { success: false, error: 'An unexpected error occurred. Please try again.' };
+  }
+}
