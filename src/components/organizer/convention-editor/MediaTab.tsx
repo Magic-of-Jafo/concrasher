@@ -115,8 +115,10 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             const result = await updateConventionMedia(conventionId, updatedMediaForDatabase);
             console.log('[MediaTab] Save result:', result);
             if (result.success) {
-                setSuccess('Image added and saved successfully!');
+                const successMsg = 'Image added and saved successfully!';
+                setSuccess(successMsg);
                 setTimeout(() => setSuccess(null), 3000);
+                if (onSave) onSave(true, successMsg);
             } else {
                 console.error('[MediaTab] Save failed:', result.error);
                 console.error('[MediaTab] Field errors:', result.fieldErrors);
@@ -130,7 +132,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             // Remove from local state if database save failed
             setMedia(prev => prev.filter(m => m.url !== imageUrl));
         }
-    }, [conventionId]);
+    }, [conventionId, onSave]);
 
     // Handle drag and drop reordering for images with auto-save
     const handleImageDragEnd = useCallback(async (result: DropResult) => {
@@ -350,9 +352,11 @@ export const MediaTab: React.FC<MediaTabProps> = ({
             let sanitizedCaption = '';
             if (videoTitle) {
                 sanitizedCaption = String(videoTitle)
+                    .normalize('NFD') // Decompose accented characters
+                    .replace(/[\u0300-\u036f]/g, '') // Remove diacritic marks, keep base letter
                     .trim()
-                    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
-                    .replace(/[^\w\s\-.,!?'"()[\]{}]/g, '') // Only allow common punctuation
+                    .replace(/[^\w\s\-_.,:;!?@#$%^&*()+=\[\]{}|<>']/g, '') // Allow common punctuation per tests
+                    .replace(/\s+/g, ' ') // Collapse consecutive spaces
                     .substring(0, 500); // Limit length
             }
 

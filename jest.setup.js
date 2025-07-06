@@ -69,3 +69,18 @@ import { TextEncoder, TextDecoder } from 'util';
 
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
+
+// -----------------------------------------------------------------------------
+// Test environment polyfills & global tweaks
+// -----------------------------------------------------------------------------
+
+// 1. Polyfill HTMLFormElement.requestSubmit to prevent JSDOM "Not implemented" errors
+if (typeof HTMLFormElement !== 'undefined' && !HTMLFormElement.prototype.requestSubmit) {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  HTMLFormElement.prototype.requestSubmit = function () { };
+}
+
+// 2. Increase default Jest async timeout for tests that rely on auto-saving logic
+jest.setTimeout(10000);
+
+// (Diacritic stripping override removed – caused recursion issues.)

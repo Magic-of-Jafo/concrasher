@@ -41,6 +41,13 @@ export default function RootLayout({
             <QueryProvider>
               <NotificationProvider>
                 <ErrorHandler />
+                {/* Skip link for keyboard users */}
+                <a
+                  href="#main-content"
+                  className="skip-link"
+                >
+                  Skip to main content
+                </a>
                 <Header />
                 {children}
               </NotificationProvider>

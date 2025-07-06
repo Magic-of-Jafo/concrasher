@@ -1530,12 +1530,15 @@ export async function updateConventionMedia(
       return { success: false, error: "Authorization failed. You don't have permission to edit this convention." };
     }
 
+    // Normalize order (assign index when missing) BEFORE validation
+    const mediaDataWithOrder = mediaData.map((m, idx) => ({ ...m, order: m.order ?? idx }));
+
     // Validate media data
     const validatedMediaData: ConventionMediaData[] = [];
-    for (const [index, media] of mediaData.entries()) {
+    for (const [idx, media] of mediaDataWithOrder.entries()) {
       const validationResult = ConventionMediaSchema.safeParse(media);
       if (!validationResult.success) {
-        console.error(`[updateConventionMedia] Validation failed for media item ${index}:`, validationResult.error);
+        console.error(`[updateConventionMedia] Validation failed for media item ${idx}:`, validationResult.error);
         console.error(`[updateConventionMedia] Detailed validation issues:`, validationResult.error.issues);
         console.error(`[updateConventionMedia] Failed media item:`, media);
         return {
@@ -1673,8 +1676,13 @@ export async function updateConventionSettings(
     return { success: false, error: "Authentication required." };
   }
 
+  console.log('[updateConventionSettings] Input settings:', settings);
+
   const validatedData = ConventionSettingSchema.safeParse(settings);
+  console.log('[updateConventionSettings] Validation result:', validatedData.success);
+
   if (!validatedData.success) {
+    console.error('[updateConventionSettings] Validation failed:', validatedData.error);
     return {
       success: false,
       error: "Invalid data provided.",
@@ -1684,6 +1692,8 @@ export async function updateConventionSettings(
 
   try {
     // Check if user has permission to update this convention
+    console.log('[updateConventionSettings] Checking convention:', conventionId);
+
     const convention = await db.convention.findUnique({
       where: { id: conventionId },
       select: {
@@ -1694,6 +1704,9 @@ export async function updateConventionSettings(
       },
     });
 
+    console.log('[updateConventionSettings] Convention found:', !!convention);
+    console.log('[updateConventionSettings] Convention series organizer:', convention?.series?.organizerUserId);
+
     if (!convention) {
       return { success: false, error: "Convention not found." };
     }
@@ -1702,48 +1715,68 @@ export async function updateConventionSettings(
     const isOrganizer = convention.series?.organizerUserId === session.user.id;
     const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
 
+    console.log('[updateConventionSettings] User ID:', session.user.id);
+    console.log('[updateConventionSettings] Is organizer:', isOrganizer);
+    console.log('[updateConventionSettings] Is admin:', isAdmin);
+
     if (!isOrganizer && !isAdmin) {
       return { success: false, error: "Authorization failed. You are not authorized to update this convention." };
     }
 
-    // Update settings using upsert to handle create/update logic
-    await db.$transaction(async (prisma) => {
-      // Upsert currency setting
-      await prisma.conventionSetting.upsert({
+    // Validate timezone ID if provided
+    let timezoneId = validatedData.data.timezone;
+    if (timezoneId) {
+      const timezone = await db.timezone.findUnique({
+        where: { id: timezoneId },
+        select: { id: true, ianaId: true }
+      });
+
+      if (!timezone) {
+        console.error('[updateConventionSettings] Invalid timezone ID:', timezoneId);
+        return {
+          success: false,
+          error: "Invalid timezone selected.",
+          fieldErrors: { timezone: ["Invalid timezone selected"] }
+        };
+      }
+
+      console.log('[updateConventionSettings] Validated timezone:', timezone);
+    }
+
+    // Update Convention with timezone foreign key
+    console.log('[updateConventionSettings] Updating Convention with timezone foreign key');
+    console.log('[updateConventionSettings] Data to save:', validatedData.data);
+
+    await db.convention.update({
+      where: { id: conventionId },
+      data: {
+        timezoneId: timezoneId || null,
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('[updateConventionSettings] Convention timezone updated successfully');
+
+    // Also handle ConventionSetting for currency (if needed in the future)
+    if (validatedData.data.currency) {
+      await db.conventionSetting.upsert({
         where: {
           conventionId_key: {
-            conventionId,
-            key: 'currency',
-          },
+            conventionId: conventionId,
+            key: 'currency'
+          }
+        },
+        update: {
+          value: validatedData.data.currency,
+          updatedAt: new Date(),
         },
         create: {
-          conventionId,
+          conventionId: conventionId,
           key: 'currency',
           value: validatedData.data.currency,
         },
-        update: {
-          value: validatedData.data.currency,
-        },
       });
-
-      // Upsert timezone setting
-      await prisma.conventionSetting.upsert({
-        where: {
-          conventionId_key: {
-            conventionId,
-            key: 'timezone',
-          },
-        },
-        create: {
-          conventionId,
-          key: 'timezone',
-          value: validatedData.data.timezone,
-        },
-        update: {
-          value: validatedData.data.timezone,
-        },
-      });
-    });
+    }
 
     revalidatePath(`/organizer/conventions/${conventionId}/edit`);
 
@@ -1767,22 +1800,43 @@ export async function getConventionSettings(
   "use server";
 
   try {
-    const settings = await db.conventionSetting.findMany({
-      where: { conventionId },
+    // Load convention with timezone relationship
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      select: {
+        timezoneId: true,
+        timezone: {
+          select: {
+            id: true,
+            ianaId: true,
+            value: true
+          }
+        }
+      },
+    });
+
+    if (!convention) {
+      return null;
+    }
+
+    // Load currency from ConventionSetting
+    const currencySetting = await db.conventionSetting.findUnique({
+      where: {
+        conventionId_key: {
+          conventionId: conventionId,
+          key: 'currency'
+        }
+      },
+      select: { value: true }
     });
 
     const settingsData: ConventionSettingData = {
-      currency: 'USD',
-      timezone: 'America/New_York',
+      currency: currencySetting?.value || 'USD',
+      timezone: convention.timezoneId || '',
     };
 
-    settings.forEach((setting: { key: string; value: string }) => {
-      if (setting.key === 'currency') {
-        settingsData.currency = setting.value;
-      } else if (setting.key === 'timezone') {
-        settingsData.timezone = setting.value;
-      }
-    });
+    console.log('[getConventionSettings] Loaded settings:', settingsData);
+    console.log('[getConventionSettings] Timezone info:', convention.timezone);
 
     return settingsData;
   } catch (error) {

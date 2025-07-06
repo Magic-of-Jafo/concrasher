@@ -40,9 +40,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
 
   useEffect(() => {
     if (formData.venueName !== localVenueName) {
-        setLocalVenueName(formData.venueName);
+      setLocalVenueName(formData.venueName);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.venueName]);
 
   // Update ref only when formData.id or tempId changes, indicating a different item
@@ -52,7 +52,7 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = event.target;
-    
+
     let finalValue = value;
 
     // Special handling for websiteUrl to prepend http:// if no scheme is present
@@ -64,7 +64,7 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
       onFormDataChange({ [name]: finalValue });
       return; // Exit early as we've handled this field.
     }
-    
+
     // Handle other fields
     if (name === "venueName") {
       setLocalVenueName(value); // Update local state for venueName
@@ -81,10 +81,12 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
     }
   };
 
+
+
   const handleVenueNameBlur = () => {
     // Update parent state only when the venueName field loses focus
     if (formData.venueName !== localVenueName) { // Only update if different
-        onFormDataChange({ venueName: localVenueName });
+      onFormDataChange({ venueName: localVenueName });
     }
   };
 
@@ -103,15 +105,15 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
     } else {
       // If for some reason photos[0] doesn't exist but we are trying to set a caption (should not happen with current UI)
       // We might initialize it with a null URL or handle error, for now, let's assume photos[0] exists if caption is being changed.
-       console.warn("Attempted to change caption but no photo exists in formData");
+      console.warn("Attempted to change caption but no photo exists in formData");
     }
   };
 
   return (
-    <Box component="form" noValidate autoComplete="off" sx={{ mt: 2 }}>
+    <Box sx={{ mt: 2 }}>
       <GlobalStyles />
       <Typography variant="h6" gutterBottom>{title}</Typography>
-      
+
       {/* Row 1: Venue Name and Website URL */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
@@ -179,9 +181,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         disabled={disabled}
         error={!!errors?.googleMapsUrl}
         helperText={errors?.googleMapsUrl || ''}
-        sx={{ mb: 2, mt:2 }}
+        sx={{ mb: 2, mt: 2 }}
       />
-      
+
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Address</Typography>
       {/* Row 4: Street Address and City */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
@@ -273,17 +275,53 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         />
       </Box>
 
+      {/* Row 8: Amenities */}
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Amenities</Typography>
       <TextField
         fullWidth
-        label="Venue Amenities (one per line)"
-        name="amenitiesPasted"
-        value={(formData.amenities || []).join('\n')}
-        onChange={handleChange}
         multiline
         rows={4}
+        name="amenitiesPasted"
+        label="Amenities (one per line)"
+        value={formData.amenities ? formData.amenities.join('\n') : ''}
+        onChange={handleChange}
+        placeholder="Free Wi-Fi&#10;Parking&#10;Air Conditioning&#10;Accessibility Features"
+        helperText="Enter each amenity on a new line"
         disabled={disabled}
-        helperText="Enter each amenity on a new line. This will be saved as a list."
+        onKeyDown={(e) => {
+          // Workaround for keyboard event blocking
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.stopPropagation();
+            e.preventDefault();
+
+            const target = e.target as HTMLTextAreaElement;
+            const start = target.selectionStart;
+            const end = target.selectionEnd;
+            const value = target.value;
+
+            let newValue: string;
+            let newCursorPosition: number;
+
+            if (e.key === 'Enter') {
+              // Insert newline
+              newValue = value.substring(0, start) + '\n' + value.substring(end);
+              newCursorPosition = start + 1;
+            } else if (e.key === ' ') {
+              // Insert space
+              newValue = value.substring(0, start) + ' ' + value.substring(end);
+              newCursorPosition = start + 1;
+            } else {
+              return; // Should not happen given our if condition
+            }
+
+            target.value = newValue;
+            target.selectionStart = target.selectionEnd = newCursorPosition;
+
+            // Trigger change event to update React state
+            const changeEvent = new Event('change', { bubbles: true });
+            target.dispatchEvent(changeEvent);
+          }
+        }}
         sx={{ mb: 2 }}
       />
 
@@ -336,7 +374,7 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         <TextField
           fullWidth
           label="Photo Caption"
-          name="photoCaption" 
+          name="photoCaption"
           value={formData.photos[0].caption || ''}
           onChange={handleCaptionChange}
           disabled={disabled}

@@ -19,6 +19,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { PriceTier, PriceDiscount, PricingTabData, PriceTierSchema, PriceDiscountSchema, PricingTabSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { useSnackbar } from 'notistack';
+import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 
 interface PricingTabProps {
   conventionId?: string;
@@ -26,11 +27,12 @@ interface PricingTabProps {
   onChange: (data: PricingTabData) => void;
   disabled?: boolean;
   currency?: string; // e.g. '$', '€', etc.
+  timezone?: string; // IANA timezone identifier for the convention
 }
 
 const defaultCurrency = '$';
 
-export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency = defaultCurrency }) => {
+export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency = defaultCurrency, timezone }) => {
   // --- CONSOLE LOGS FOR DEBUGGING ---
   // console.log('[PricingTab] Render. conventionId:', conventionId); // Removed for brevity
   // console.log('[PricingTab] Render. value.priceTiers:', JSON.stringify(value.priceTiers)); // Removed for brevity
@@ -81,12 +83,14 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
     const newUIDiscountGroups = Object.entries(groupedByDate).map(([dateStrKey_YYYY_MM_DD_UTC, discountsOnDate], index) => {
       const [year, month_1_indexed, day] = dateStrKey_YYYY_MM_DD_UTC.split('-').map(Number);
-      // Create a Date object in local timezone for the DatePicker
-      // DatePicker expects local timezone dates for proper display
-      const dateForPicker = new Date(year, month_1_indexed - 1, day); // month is 0-indexed
+
+      // Create a Date object that represents the correct date regardless of timezone
+      // The key is to create a Date object that when displayed will show the correct date
+      // We create it at noon UTC to avoid timezone boundary issues
+      const dateForPicker = new Date(Date.UTC(year, month_1_indexed - 1, day, 12, 0, 0, 0));
 
       return {
-        date: dateForPicker, // DatePicker receives a date object representing the correct day in local timezone
+        date: dateForPicker, // DatePicker receives a date object representing the correct day
         tempId: `loaded-dategroup-${dateStrKey_YYYY_MM_DD_UTC}-${index}`,
         tierDiscounts: value.priceTiers.filter(t => t.id).map(tier => {
           const existingDiscount = discountsOnDate.find(d => d.priceTierId === tier.id);

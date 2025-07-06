@@ -624,98 +624,106 @@ export async function PUT(
 
 
     // --- Process Price Tiers ---
-    if (Array.isArray(priceTiers)) {
-      // Delete tiers not present in the incoming array
-      const incomingTierIds = priceTiers.map(tier => tier.id).filter(id => id);
-      if (incomingTierIds.length > 0) {
-        await prisma.priceTier.deleteMany({
-          where: {
-            conventionId: updatedConvention.id,
-            NOT: {
-              id: { in: incomingTierIds }
+    // CRITICAL FIX: Only process pricing data if explicitly provided, not when undefined
+    if (body.hasOwnProperty('priceTiers')) {
+      if (Array.isArray(priceTiers)) {
+        // Delete tiers not present in the incoming array
+        const incomingTierIds = priceTiers.map(tier => tier.id).filter(id => id);
+        if (incomingTierIds.length > 0) {
+          await prisma.priceTier.deleteMany({
+            where: {
+              conventionId: updatedConvention.id,
+              NOT: {
+                id: { in: incomingTierIds }
+              }
             }
+          });
+        } else { // If no tiers are incoming, delete all existing for this convention
+          await prisma.priceTier.deleteMany({
+            where: { conventionId: updatedConvention.id }
+          });
+        }
+
+        // Upsert incoming tiers
+        for (const tierData of priceTiers) {
+          const tierPayload = {
+            label: tierData.label,
+            amount: parseFloat(tierData.amount), // Ensure amount is float
+            order: tierData.order,
+          };
+          if (tierData.id) {
+            await prisma.priceTier.update({
+              where: { id: tierData.id },
+              data: tierPayload,
+            });
+          } else {
+            await prisma.priceTier.create({
+              data: { ...tierPayload, convention: { connect: { id: updatedConvention.id } } },
+            });
           }
-        });
-      } else { // If no tiers are incoming, delete all existing for this convention
+        }
+      } else { // If priceTiers is explicitly null, delete all existing
         await prisma.priceTier.deleteMany({
           where: { conventionId: updatedConvention.id }
         });
       }
-
-      // Upsert incoming tiers
-      for (const tierData of priceTiers) {
-        const tierPayload = {
-          label: tierData.label,
-          amount: parseFloat(tierData.amount), // Ensure amount is float
-          order: tierData.order,
-        };
-        if (tierData.id) {
-          await prisma.priceTier.update({
-            where: { id: tierData.id },
-            data: tierPayload,
-          });
-        } else {
-          await prisma.priceTier.create({
-            data: { ...tierPayload, convention: { connect: { id: updatedConvention.id } } },
-          });
-        }
-      }
-    } else { // If priceTiers array is not provided, or null, assume all existing should be deleted
-      await prisma.priceTier.deleteMany({
-        where: { conventionId: updatedConvention.id }
-      });
     }
+    // If priceTiers is not provided in the request, leave existing pricing data unchanged
     // --- End Process Price Tiers ---
 
     // --- Process Price Discounts ---
-    if (Array.isArray(priceDiscounts)) {
-      const incomingDiscountIds = priceDiscounts.map(discount => discount.id).filter(id => id);
-      if (incomingDiscountIds.length > 0) {
-        await prisma.priceDiscount.deleteMany({
-          where: {
-            conventionId: updatedConvention.id,
-            NOT: {
-              id: { in: incomingDiscountIds }
+    // CRITICAL FIX: Only process discount data if explicitly provided, not when undefined
+    if (body.hasOwnProperty('priceDiscounts')) {
+      if (Array.isArray(priceDiscounts)) {
+        const incomingDiscountIds = priceDiscounts.map(discount => discount.id).filter(id => id);
+        if (incomingDiscountIds.length > 0) {
+          await prisma.priceDiscount.deleteMany({
+            where: {
+              conventionId: updatedConvention.id,
+              NOT: {
+                id: { in: incomingDiscountIds }
+              }
             }
+          });
+        } else { // If no discounts are incoming, delete all existing for this convention
+          await prisma.priceDiscount.deleteMany({
+            where: { conventionId: updatedConvention.id }
+          });
+        }
+
+        for (const discountData of priceDiscounts) {
+          const discountPayload: any = { // Use 'any' temporarily for flexibility
+            code: discountData.code, // Assuming code is always present
+            percentage: discountData.percentage ? parseFloat(discountData.percentage) : null,
+            fixedAmount: discountData.fixedAmount ? parseFloat(discountData.fixedAmount) : null,
+            cutoffDate: discountData.cutoffDate ? new Date(discountData.cutoffDate) : null,
+            priceTierId: discountData.priceTierId || null, // Link to priceTier
+          };
+          // Ensure only one of percentage or fixedAmount is set
+          if (discountPayload.percentage && discountPayload.fixedAmount) {
+            // Handle error or prioritize one, e.g., clear fixedAmount if percentage is set
+            console.warn(`[API PUT /organizer/conventions/${conventionId}] Discount has both percentage and fixedAmount. Prioritizing percentage.`);
+            discountPayload.fixedAmount = null;
           }
-        });
-      } else { // If no discounts are incoming, delete all existing for this convention
+
+          if (discountData.id) {
+            await prisma.priceDiscount.update({
+              where: { id: discountData.id },
+              data: discountPayload,
+            });
+          } else {
+            await prisma.priceDiscount.create({
+              data: { ...discountPayload, convention: { connect: { id: updatedConvention.id } } },
+            });
+          }
+        }
+      } else { // If priceDiscounts is explicitly null, delete all existing
         await prisma.priceDiscount.deleteMany({
           where: { conventionId: updatedConvention.id }
         });
       }
-
-      for (const discountData of priceDiscounts) {
-        const discountPayload: any = { // Use 'any' temporarily for flexibility
-          code: discountData.code, // Assuming code is always present
-          percentage: discountData.percentage ? parseFloat(discountData.percentage) : null,
-          fixedAmount: discountData.fixedAmount ? parseFloat(discountData.fixedAmount) : null,
-          cutoffDate: discountData.cutoffDate ? new Date(discountData.cutoffDate) : null,
-          priceTierId: discountData.priceTierId || null, // Link to priceTier
-        };
-        // Ensure only one of percentage or fixedAmount is set
-        if (discountPayload.percentage && discountPayload.fixedAmount) {
-          // Handle error or prioritize one, e.g., clear fixedAmount if percentage is set
-          console.warn(`[API PUT /organizer/conventions/${conventionId}] Discount has both percentage and fixedAmount. Prioritizing percentage.`);
-          discountPayload.fixedAmount = null;
-        }
-
-        if (discountData.id) {
-          await prisma.priceDiscount.update({
-            where: { id: discountData.id },
-            data: discountPayload,
-          });
-        } else {
-          await prisma.priceDiscount.create({
-            data: { ...discountPayload, convention: { connect: { id: updatedConvention.id } } },
-          });
-        }
-      }
-    } else { // If priceDiscounts array is not provided, or null, delete all existing
-      await prisma.priceDiscount.deleteMany({
-        where: { conventionId: updatedConvention.id }
-      });
     }
+    // If priceDiscounts is not provided in the request, leave existing discount data unchanged
     // --- End Process Price Discounts ---
 
 

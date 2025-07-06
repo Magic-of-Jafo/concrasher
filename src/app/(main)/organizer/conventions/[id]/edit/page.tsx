@@ -33,6 +33,7 @@ interface PageConventionData extends BasicInfoFormData {
   media?: ConventionMediaData[]; // Add media field
   coverImageUrl?: string; // Add cover image URL
   profileImageUrl?: string; // Add profile image URL
+  settings?: { currency: string; timezone: string; }; // Add settings field
   // Add other top-level fields if the API for fetching a single convention returns more
 }
 
@@ -89,7 +90,7 @@ interface ApiHotelData {
 export default function ConventionEditPage() { // Remove params from props
   const router = useRouter();
   const params = useParams(); // Use the hook here
-  const conventionId = Array.isArray(params.id) ? params.id[0] : params.id; // Get ID from hook
+  const conventionId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : undefined; // Get ID from hook
 
   const { data: session, status: sessionStatus } = useSession();
   const isEditing = !!conventionId; // Determine if editing based on conventionId
@@ -123,6 +124,19 @@ export default function ConventionEditPage() { // Remove params from props
             throw new Error(errorData.error || 'Failed to load convention');
           }
           const loadedApiConvention = await response.json(); // This is the raw data from your API
+
+          // Also load settings data
+          let conventionSettings = null;
+          try {
+            const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`);
+            if (settingsResponse.ok) {
+              const settingsData = await settingsResponse.json();
+              conventionSettings = settingsData;
+              console.log('[EditPage] Loaded settings:', conventionSettings);
+            }
+          } catch (settingsError) {
+            console.warn('[EditPage] Failed to load settings:', settingsError);
+          }
 
           let finalPrimaryVenue: VenueData | undefined = undefined;
           const finalSecondaryVenues: VenueData[] = [];
@@ -214,9 +228,9 @@ export default function ConventionEditPage() { // Remove params from props
           const transformedVenueHotelData: VenueHotelTabData = {
             primaryVenue: finalPrimaryVenue,
             secondaryVenues: finalSecondaryVenues,
+            primaryHotelDetails: finalPrimaryHotelDetails,
             hotels: finalHotels,
             guestsStayAtPrimaryVenue: actualGuestsStayAtPrimaryVenue, // Use the direct value from API
-            primaryHotelDetails: finalPrimaryHotelDetails,
           };
 
           console.log('[EditPage] loadedApiConvention.coverImageUrl:', loadedApiConvention.coverImageUrl);
@@ -245,6 +259,7 @@ export default function ConventionEditPage() { // Remove params from props
             media: loadedApiConvention.media || [], // Add media data
             coverImageUrl: loadedApiConvention.coverImageUrl || '', // Add cover image URL
             profileImageUrl: loadedApiConvention.profileImageUrl || '', // Add profile image URL
+            settings: conventionSettings || { currency: 'USD', timezone: '' }, // Add settings data
           });
 
           if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {
@@ -489,8 +504,29 @@ export default function ConventionEditPage() { // Remove params from props
       }
 
       const conventionResult = await response.json();
-      // Optionally, update conventionPageData with conventionResult if API returns full updated object
-      // setConventionPageData(prev => ({...prev, ...conventionResult, id: conventionId }));
+
+      // Handle settings separately if provided
+      if (dataFromTabs.settings) {
+        console.log('[EditPage] Saving settings:', dataFromTabs.settings);
+        try {
+          const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataFromTabs.settings),
+          });
+
+          if (!settingsResponse.ok) {
+            const settingsError = await settingsResponse.json();
+            console.warn('[EditPage] Failed to save settings:', settingsError);
+            // Don't fail the whole operation if settings save fails
+          } else {
+            console.log('[EditPage] Settings saved successfully');
+          }
+        } catch (settingsError) {
+          console.warn('[EditPage] Settings save error:', settingsError);
+          // Don't fail the whole operation if settings save fails
+        }
+      }
 
       // START OF MODIFICATION: Update local state before navigating
       // First, transform the API response (conventionResult) to match PageConventionData structure

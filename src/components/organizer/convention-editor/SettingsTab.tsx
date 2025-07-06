@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import { Grid } from '@mui/material';
 import { ConventionSettingData } from '@/lib/validators';
+import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
 
 // Currency options commonly used in magic conventions
 const CURRENCIES = [
@@ -14,66 +15,88 @@ const CURRENCIES = [
     { code: 'JPY', label: 'JPY - Japanese Yen' },
 ];
 
-// Timezone options grouped by region
-const TIMEZONES = [
-    // North America
-    { value: 'America/New_York', label: 'Eastern Time (New York)' },
-    { value: 'America/Chicago', label: 'Central Time (Chicago)' },
-    { value: 'America/Denver', label: 'Mountain Time (Denver)' },
-    { value: 'America/Los_Angeles', label: 'Pacific Time (Los Angeles)' },
-    { value: 'America/Phoenix', label: 'Mountain Standard Time (Phoenix)' },
-    { value: 'America/Anchorage', label: 'Alaska Time (Anchorage)' },
-    { value: 'Pacific/Honolulu', label: 'Hawaii Time (Honolulu)' },
-    { value: 'America/Toronto', label: 'Eastern Time (Toronto)' },
-    { value: 'America/Vancouver', label: 'Pacific Time (Vancouver)' },
 
-    // Europe
-    { value: 'Europe/London', label: 'GMT (London)' },
-    { value: 'Europe/Paris', label: 'Central European Time (Paris)' },
-    { value: 'Europe/Berlin', label: 'Central European Time (Berlin)' },
-    { value: 'Europe/Rome', label: 'Central European Time (Rome)' },
-    { value: 'Europe/Madrid', label: 'Central European Time (Madrid)' },
-    { value: 'Europe/Amsterdam', label: 'Central European Time (Amsterdam)' },
-    { value: 'Europe/Zurich', label: 'Central European Time (Zurich)' },
-    { value: 'Europe/Vienna', label: 'Central European Time (Vienna)' },
-
-    // Asia Pacific
-    { value: 'Australia/Sydney', label: 'Australian Eastern Time (Sydney)' },
-    { value: 'Australia/Melbourne', label: 'Australian Eastern Time (Melbourne)' },
-    { value: 'Australia/Perth', label: 'Australian Western Time (Perth)' },
-    { value: 'Asia/Tokyo', label: 'Japan Standard Time (Tokyo)' },
-    { value: 'Asia/Singapore', label: 'Singapore Time' },
-    { value: 'Asia/Hong_Kong', label: 'Hong Kong Time' },
-
-    // South America
-    { value: 'America/Sao_Paulo', label: 'Brasília Time (São Paulo)' },
-    { value: 'America/Buenos_Aires', label: 'Argentina Time (Buenos Aires)' },
-    { value: 'America/Bogota', label: 'Colombia Time (Bogotá)' },
-];
 
 interface SettingsTabProps {
     value: ConventionSettingData;
     onFormChange: (field: keyof ConventionSettingData, value: any) => void;
     errors?: Record<string, string>;
     isEditing: boolean;
+    conventionId?: string; // Add convention ID for auto-save
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
     value,
     onFormChange,
     errors = {},
-    isEditing
+    isEditing,
+    conventionId
 }) => {
     const [localValue, setLocalValue] = useState<ConventionSettingData>(value);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         setLocalValue(value);
     }, [value]);
 
-    const handleChange = (field: keyof ConventionSettingData) => (event: any) => {
+    const handleChange = (field: keyof ConventionSettingData) => async (event: any) => {
         const newValue = event.target.value;
+        console.log(`[SettingsTab] handleChange called for ${field} with value:`, newValue);
+        console.log(`[SettingsTab] conventionId:`, conventionId);
+        console.log(`[SettingsTab] isEditing:`, isEditing);
+
         setLocalValue(prev => ({ ...prev, [field]: newValue }));
         onFormChange(field, newValue);
+
+        // Auto-save immediately when timezone changes
+        if (field === 'timezone' && conventionId && isEditing) {
+            console.log('[SettingsTab] Starting auto-save for timezone...');
+            setIsSaving(true);
+            try {
+                console.log('[SettingsTab] Auto-saving timezone:', newValue);
+                console.log('[SettingsTab] Current currency:', localValue.currency);
+
+                // Update ConventionSetting table only
+                const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currency: localValue.currency || 'USD',
+                        timezone: newValue
+                    }),
+                });
+
+                console.log('[SettingsTab] Settings response status:', settingsResponse.status);
+
+                if (settingsResponse.ok) {
+                    console.log('[SettingsTab] Timezone auto-saved successfully to ConventionSetting table');
+                    const responseData = await settingsResponse.json();
+                    console.log('[SettingsTab] Success response:', responseData);
+                } else {
+                    console.error('[SettingsTab] Failed to auto-save timezone');
+                    const settingsError = await settingsResponse.text();
+                    console.error('Settings response error:', settingsError);
+
+                    // Try to parse the error for more details
+                    try {
+                        const errorData = JSON.parse(settingsError);
+                        console.error('Parsed error details:', errorData);
+                    } catch (e) {
+                        console.error('Could not parse error response');
+                    }
+                }
+            } catch (error) {
+                console.error('[SettingsTab] Error auto-saving timezone:', error);
+            } finally {
+                setIsSaving(false);
+            }
+        } else {
+            console.log('[SettingsTab] Auto-save conditions not met:', {
+                isTimezone: field === 'timezone',
+                hasConventionId: !!conventionId,
+                isEditing
+            });
+        }
     };
 
     return (
@@ -86,8 +109,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </Typography>
 
             <Paper elevation={1} sx={{ p: 3, mt: 2 }}>
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+                    <Box sx={{ flex: 1 }}>
                         <FormControl fullWidth error={!!errors.currency}>
                             <InputLabel id="currency-label">Default Currency</InputLabel>
                             <Select
@@ -107,38 +130,63 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                 <FormHelperText>{errors.currency}</FormHelperText>
                             )}
                         </FormControl>
-                    </Grid>
+                    </Box>
 
-                    <Grid item xs={12} md={6}>
-                        <FormControl fullWidth error={!!errors.timezone}>
-                            <InputLabel id="timezone-label">Primary Timezone</InputLabel>
-                            <Select
-                                labelId="timezone-label"
-                                value={localValue.timezone || 'America/New_York'}
-                                onChange={handleChange('timezone')}
-                                label="Primary Timezone"
-                                disabled={!isEditing}
-                            >
-                                {TIMEZONES.map((timezone) => (
-                                    <MenuItem key={timezone.value} value={timezone.value}>
-                                        {timezone.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                            {errors.timezone && (
-                                <FormHelperText>{errors.timezone}</FormHelperText>
-                            )}
-                        </FormControl>
-                    </Grid>
+                    <Box sx={{ flex: 1 }}>
+                        <TimezoneSelector
+                            value={localValue.timezone || undefined}
+                            onChange={async (timezoneId, timezone) => {
+                                console.log('[SettingsTab] TimezoneSelector onChange:', { timezoneId, timezone });
 
-                    <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                            <strong>Currency:</strong> This will be the default currency used for all pricing throughout your convention listing.
-                            <br />
-                            <strong>Timezone:</strong> This will be used for displaying schedule times and handling time-sensitive operations.
-                        </Typography>
-                    </Grid>
-                </Grid>
+                                // Update local state
+                                setLocalValue(prev => ({ ...prev, timezone: timezoneId || '' }));
+                                onFormChange('timezone', timezoneId || '');
+
+                                // Auto-save immediately when timezone changes
+                                if (timezoneId && conventionId && isEditing) {
+                                    console.log('[SettingsTab] Starting auto-save for new timezone...');
+                                    setIsSaving(true);
+                                    try {
+                                        const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                currency: localValue.currency || 'USD',
+                                                timezone: timezoneId
+                                            }),
+                                        });
+
+                                        if (settingsResponse.ok) {
+                                            console.log('[SettingsTab] Timezone auto-saved successfully');
+                                        } else {
+                                            console.error('[SettingsTab] Failed to auto-save timezone');
+                                        }
+                                    } catch (error) {
+                                        console.error('[SettingsTab] Error auto-saving timezone:', error);
+                                    } finally {
+                                        setIsSaving(false);
+                                    }
+                                }
+                            }}
+                            label={`Primary Timezone ${isSaving ? '(Saving...)' : ''}`}
+                            placeholder="Search and select your convention's timezone..."
+                            error={!!errors.timezone}
+                            helperText={
+                                errors.timezone ||
+                                (isSaving && "Saving timezone...") ||
+                                undefined
+                            }
+                            disabled={!isEditing || isSaving}
+                            showDetectButton={true} // Show the manual detect button
+                        />
+                    </Box>
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+                    <strong>Currency:</strong> This will be the default currency used for all pricing throughout your convention listing.
+                    <br />
+                    <strong>Timezone:</strong> This will be used for displaying schedule times and handling time-sensitive operations.
+                </Typography>
             </Paper>
         </Box>
     );

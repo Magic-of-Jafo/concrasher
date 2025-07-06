@@ -311,18 +311,20 @@ export const HotelSchema = z.object({
 export type HotelData = z.infer<typeof HotelSchema>;
 
 export const VenueHotelTabSchema = z.object({
-  venues: z.array(VenueSchema),
-  hotels: z.array(HotelSchema),
+  primaryVenue: VenueSchema.optional(),
+  secondaryVenues: z.array(VenueSchema).default([]),
+  primaryHotelDetails: HotelSchema.optional(),
+  hotels: z.array(HotelSchema).default([]),
   guestsStayAtPrimaryVenue: z.boolean().default(false),
 }).superRefine((data, ctx) => {
   // Only validate if guests are *not* staying at the primary venue
   if (!data.guestsStayAtPrimaryVenue) {
-    // Require at least one hotel with isPrimaryHotel === true
-    if (!data.hotels.some(h => h.isPrimaryHotel)) {
+    // Require primary hotel details if not staying at venue
+    if (!data.primaryHotelDetails?.hotelName) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'A primary hotel is required if the venue is not serving as the hotel.',
-        path: ['hotels'],
+        path: ['primaryHotelDetails'],
       });
     }
   }
@@ -358,7 +360,9 @@ export const createDefaultHotel = (isPrimaryHotelFlag: boolean = false): HotelDa
 // Helper function to create a default structure for the tab data
 export function createDefaultVenueHotelTabData(): VenueHotelTabData {
   return {
-    venues: [createDefaultVenue(true)], // Start with one primary venue
+    primaryVenue: createDefaultVenue(true), // Start with one primary venue
+    secondaryVenues: [],
+    primaryHotelDetails: undefined,
     hotels: [],
     guestsStayAtPrimaryVenue: false,
   };
@@ -425,8 +429,12 @@ export const ConventionMediaSchema = z.object({
   conventionId: z.string().cuid().optional(),
   type: z.enum(['IMAGE', 'VIDEO_LINK']),
   url: z.string().min(1, 'URL is required').refine((val) => {
-    // Accept full URLs (for video links) or relative paths starting with /uploads/ (for images)
-    return val.startsWith('/uploads/') || val.startsWith('http://') || val.startsWith('https://');
+    // Accept relative upload paths or supported video host URLs (YouTube, Vimeo)
+    if (val.startsWith('/uploads/')) return true;
+
+    // Allow only specific video hosts for external URLs
+    const supportedHostsRegex = /^(https?:\/\/(?:www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com|player\.vimeo\.com))/i;
+    return supportedHostsRegex.test(val);
   }, 'Invalid URL format'),
   caption: z.string().optional().nullable().transform((val) => val || undefined),
   order: z.number().int().min(0),
@@ -443,7 +451,7 @@ export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>;
 
 export const ConventionSettingSchema = z.object({
   currency: z.string().min(3, 'Currency must be at least 3 characters').max(3, 'Currency must be exactly 3 characters'),
-  timezone: z.string().min(1, 'Timezone is required'),
+  timezone: z.string().min(1, 'Timezone is required').or(z.literal('')).optional().transform((val) => val || ''),
 });
 
 export type ConventionSettingData = z.infer<typeof ConventionSettingSchema>; 

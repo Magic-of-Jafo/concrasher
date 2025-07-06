@@ -36,7 +36,7 @@ function parseCSV(filePath: string): any[] {
   const fileContent = readFileSync(resolvedPath, 'utf8');
   const rows = fileContent.trim().split('\n');
   const headers = rows.shift()?.split(',').map(header => header.trim()) || [];
-  
+
   return rows.map(row => {
     const values = row.split(',').map(value => value.trim());
     return headers.reduce((obj, header, index) => {
@@ -75,10 +75,50 @@ async function main() {
     // The ConventionSeries and Conventions are already created in seed.sql
     // console.log('Seed completed successfully'); // This log was for seed.sql
 
+    // --- Seeding Timezones from JSON ---
+    console.log('Starting timezone seeding from JSON...');
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const timezoneDataPath = join(__dirname, '../docs/timezones.json');
+    const timezoneData = JSON.parse(readFileSync(timezoneDataPath, 'utf8'));
+
+    for (const timezone of timezoneData) {
+      if (!timezone.utc || timezone.utc.length === 0) {
+        console.warn(`Skipping timezone due to missing IANA IDs: ${timezone.value || 'Unnamed'}`);
+        continue;
+      }
+
+      // Use the first IANA ID as the primary ianaId
+      const primaryIanaId = timezone.utc[0];
+
+      const timezoneRecord = await prisma.timezone.upsert({
+        where: { ianaId: primaryIanaId },
+        update: {
+          value: timezone.value,
+          abbr: timezone.abbr,
+          offset: timezone.offset,
+          isdst: timezone.isdst,
+          text: timezone.text,
+          utcAliases: timezone.utc,
+        },
+        create: {
+          ianaId: primaryIanaId,
+          value: timezone.value,
+          abbr: timezone.abbr,
+          offset: timezone.offset,
+          isdst: timezone.isdst,
+          text: timezone.text,
+          utcAliases: timezone.utc,
+        },
+      });
+      console.log(`Upserted timezone: ${timezoneRecord.value} (${timezoneRecord.ianaId})`);
+    }
+    console.log(`Timezone seeding completed. Total timezones: ${timezoneData.length}`);
+
     // --- Seeding Users from CSV ---
     console.log('Starting user seeding from CSV...');
     const usersFromCSV = parseCSV('docs/dummy-data/users_seed.csv');
-    
+
     let organizerUserIdForSeries: string | undefined = undefined;
 
     for (const userData of usersFromCSV) {
@@ -192,12 +232,12 @@ async function main() {
         if (!dateStr) return null;
         const parts = dateStr.split('/');
         if (parts.length === 3) {
-          const month = parseInt(parts[0], 10) -1; // Month is 0-indexed
+          const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed
           const day = parseInt(parts[1], 10);
           const year = parseInt(parts[2], 10);
           if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
             // Basic validation for year, month, day ranges
-            if (year > 1900 && year < 3000 && month >= 0 && month <= 11 && day >=1 && day <=31) {
+            if (year > 1900 && year < 3000 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
               return new Date(year, month, day);
             }
           }
@@ -224,9 +264,9 @@ async function main() {
         : ConventionStatus.DRAFT; // Default to DRAFT if invalid or missing
 
       if (statusString && !ConventionStatus[statusString as keyof typeof ConventionStatus]) {
-          console.warn(`Invalid status "${convData.status}" for convention "${convData.name}". Defaulting to DRAFT.`);
+        console.warn(`Invalid status "${convData.status}" for convention "${convData.name}". Defaulting to DRAFT.`);
       }
-      
+
       // Gallery Image URLs (assuming comma-separated if provided, else empty array)
       let galleryImageUrls: string[] = [];
       if (convData.galleryImageUrls && typeof convData.galleryImageUrls === 'string' && convData.galleryImageUrls.trim() !== '') {
@@ -252,7 +292,7 @@ async function main() {
         status: conventionStatus,
         coverImageUrl: convData.coverImageUrl,
         profileImageUrl: convData.profileImageUrl,
-        galleryImageUrls: galleryImageUrls, 
+        galleryImageUrls: galleryImageUrls,
         seriesId: convData.seriesId,
       };
 

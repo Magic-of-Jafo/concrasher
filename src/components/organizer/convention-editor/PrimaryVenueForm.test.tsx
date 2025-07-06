@@ -92,7 +92,7 @@ describe('PrimaryVenueForm', () => {
     expect(screen.getByLabelText(/country/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/contact email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/contact phone/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/venue amenities/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/amenities \(one per line\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/parking information/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/public transportation access/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/overall accessibility notes/i)).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('PrimaryVenueForm', () => {
     expect(screen.getByLabelText(/venue name/i)).toHaveValue('Grand Venue Hall');
     expect(screen.getByLabelText(/website url/i)).toHaveValue('http://grandvenue.com');
     expect(screen.getByTestId('mock-tinymce-editor')).toHaveValue('<p>A grand place for events.</p>');
-    
+
     // Check that ImageUploadInput received the correct currentImageUrl (via mock)
     const imageUploadMock = screen.getByTestId('mock-image-upload-input');
     expect(imageUploadMock.querySelector('img')).toHaveAttribute('src', 'existing-photo.jpg');
@@ -138,7 +138,7 @@ describe('PrimaryVenueForm', () => {
     expect(screen.getByLabelText(/country/i)).toHaveValue('Venue Country');
     expect(screen.getByLabelText(/contact email/i)).toHaveValue('contact@grandvenue.com');
     expect(screen.getByLabelText(/contact phone/i)).toHaveValue('555-1234');
-    expect(screen.getByLabelText(/venue amenities/i)).toHaveValue('WiFi\nStage'); // Textarea joins with newline
+    expect(screen.getByLabelText(/amenities \(one per line\)/i)).toHaveValue('WiFi\nStage'); // Textarea joins with newline
     expect(screen.getByLabelText(/parking information/i)).toHaveValue('Ample parking available.');
     expect(screen.getByLabelText(/public transportation access/i)).toHaveValue('Bus stop nearby.');
     expect(screen.getByLabelText(/overall accessibility notes/i)).toHaveValue('Fully accessible.');
@@ -166,7 +166,7 @@ describe('PrimaryVenueForm', () => {
 
   test('calls onFormDataChange when amenities text area changes', () => {
     renderComponent();
-    const amenitiesInput = screen.getByLabelText(/venue amenities/i);
+    const amenitiesInput = screen.getByLabelText(/amenities \(one per line\)/i);
     fireEvent.change(amenitiesInput, { target: { value: 'New Amenity 1\nNew Amenity 2' } });
     expect(mockOnFormDataChange).toHaveBeenCalledWith({ amenities: ['New Amenity 1', 'New Amenity 2'] });
   });
@@ -181,15 +181,15 @@ describe('PrimaryVenueForm', () => {
   test('calls onFormDataChange with new photo url when image is uploaded', () => {
     renderComponent({ formData: { ...defaultProps.formData, photos: [] } });
     const uploadButton = screen.getByTestId('mock-upload-btn');
-    fireEvent.click(uploadButton); 
+    fireEvent.click(uploadButton);
     expect(mockOnFormDataChange).toHaveBeenCalledWith({ photos: [{ url: 'new-image.jpg', caption: '' }] });
   });
 
   test('calls onFormDataChange with existing caption when new image is uploaded and caption existed', () => {
-    renderComponent({ 
-      formData: { 
-        ...defaultProps.formData, 
-        photos: [{ url: 'old.jpg', caption: 'Old Caption' }] 
+    renderComponent({
+      formData: {
+        ...defaultProps.formData,
+        photos: [{ url: 'old.jpg', caption: 'Old Caption' }]
       }
     });
     // Simulate removing the old image first (or just directly uploading)
@@ -197,12 +197,12 @@ describe('PrimaryVenueForm', () => {
     // The mock currently calls onUploadComplete with 'new-image.jpg'.
     // The handlePhotoUpload in the component should preserve the caption.
     const uploadButton = screen.getByTestId('mock-upload-btn');
-    fireEvent.click(uploadButton); 
+    fireEvent.click(uploadButton);
     expect(mockOnFormDataChange).toHaveBeenCalledWith({ photos: [{ url: 'new-image.jpg', caption: 'Old Caption' }] });
   });
 
   test('calls onFormDataChange with empty array when image is removed', () => {
-    renderComponent({ formData: { ...defaultProps.formData, photos: [{ url: 'existing.jpg', caption: 'Test' }] }});
+    renderComponent({ formData: { ...defaultProps.formData, photos: [{ url: 'existing.jpg', caption: 'Test' }] } });
     const removeButton = screen.getByTestId('mock-remove-btn');
     expect(removeButton).not.toBeDisabled();
     fireEvent.click(removeButton);
@@ -210,12 +210,12 @@ describe('PrimaryVenueForm', () => {
   });
 
   test('calls onFormDataChange when photo caption is changed', () => {
-    renderComponent({ formData: { ...defaultProps.formData, photos: [{ url: 'existing.jpg', caption: 'Initial Caption' }] }});
+    renderComponent({ formData: { ...defaultProps.formData, photos: [{ url: 'existing.jpg', caption: 'Initial Caption' }] } });
     const captionInput = screen.getByLabelText(/photo caption/i);
     fireEvent.change(captionInput, { target: { value: 'Updated Caption' } });
     expect(mockOnFormDataChange).toHaveBeenCalledWith({ photos: [{ url: 'existing.jpg', caption: 'Updated Caption' }] });
   });
-  
+
   test('displays error messages when errors prop is provided', () => {
     const errors = {
       venueName: 'Venue name is required!',
@@ -243,9 +243,9 @@ describe('PrimaryVenueForm', () => {
   });
 
   test('disables remove photo button and caption field if disabled prop is true and photo exists', () => {
-    renderComponent({ 
+    renderComponent({
       formData: { ...defaultProps.formData, photos: [{ url: 'photo.jpg', caption: 'A Photo' }] },
-      disabled: true 
+      disabled: true
     });
     expect(screen.getByTestId('mock-remove-btn')).toBeDisabled();
     expect(screen.getByLabelText(/photo caption/i)).toBeDisabled();

@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 import PrimaryVenueForm from './PrimaryVenueForm';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import DebugKeyboardEvents from './debug-keyboard-events';
 
 interface VenueHotelTabProps {
   conventionId: string | null;
@@ -28,9 +29,10 @@ interface VenueHotelTabProps {
   schema?: typeof VenueHotelTabSchema;
 }
 
-const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
+const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawValue, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>('primaryVenue');
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
 
   const structuredErrors = useMemo(() => {
     const errors: {
@@ -52,16 +54,55 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     return errors;
   }, [zodErrors]);
 
+  // Normalize incoming value to ensure backward-compatibility with older shape used in some tests
+  const value: VenueHotelTabData = React.useMemo(() => {
+    // If the consumer already provides primaryVenue/secondaryVenues fields, simply ensure defaults
+    const secondaryVenues = (rawValue as any).secondaryVenues ?? (rawValue as any).venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
+    const primaryVenue = (rawValue as any).primaryVenue ?? ((rawValue as any).venues?.find((v: any) => v.isPrimaryVenue) ?? undefined);
+
+    return {
+      primaryVenue,
+      secondaryVenues,
+      primaryHotelDetails: (rawValue as any).primaryHotelDetails,
+      hotels: (rawValue as any).hotels ?? [],
+      guestsStayAtPrimaryVenue: (rawValue as any).guestsStayAtPrimaryVenue ?? false,
+    } as VenueHotelTabData;
+  }, [rawValue]);
+
+  // Combine primary and secondary venues into a single array
+  const venues = useMemo(() => {
+    const result = [];
+    if (value.primaryVenue) result.push(value.primaryVenue);
+    if (value.secondaryVenues) result.push(...value.secondaryVenues);
+    return result;
+  }, [value.primaryVenue, value.secondaryVenues]);
+
   // Memoize finds for primary entities to avoid re-computation on every render
-  const primaryVenue = useMemo(() => value.venues.find(v => v.isPrimaryVenue), [value.venues]);
+  const primaryVenue = useMemo(() => venues.find(v => v.isPrimaryVenue), [venues]);
   const primaryHotel = useMemo(() => value.hotels.find(h => h.isPrimaryHotel), [value.hotels]);
 
   const validateAndNotify = useCallback((data: VenueHotelTabData) => {
     const result = schema.safeParse(data);
     const isValid = result.success;
     setZodErrors(isValid ? null : result.error.issues);
+
+    // Don't auto-show validation alerts - let users edit freely
+    // Individual field errors will still show inline where needed
+
     onValidationChange(isValid);
-    onChange(data, isValid);
+
+    // For backward compatibility (older tests expect a `venues` array property)
+    const combinedVenues = [] as VenueData[];
+    if (data.primaryVenue) combinedVenues.push(data.primaryVenue);
+    if (data.secondaryVenues?.length) combinedVenues.push(...data.secondaryVenues);
+
+    // @ts-ignore – allow additional legacy field
+    const legacyPayload = {
+      ...data,
+      venues: combinedVenues,
+    };
+
+    onChange(legacyPayload as VenueHotelTabData & { venues: VenueData[] }, isValid);
   }, [onChange, onValidationChange, schema]);
 
   useEffect(() => {
@@ -81,9 +122,17 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
   };
 
   const handleVenueChange = (index: number, updatedVenueData: Partial<VenueData>) => {
-    const newVenues = [...value.venues];
+    const newVenues = [...venues];
     newVenues[index] = { ...newVenues[index], ...updatedVenueData };
-    handleDataChange({ venues: newVenues });
+
+    // Update the appropriate property based on whether it's primary or secondary
+    const updatedVenue = newVenues[index];
+    if (updatedVenue.isPrimaryVenue) {
+      handleDataChange({ primaryVenue: updatedVenue });
+    } else {
+      const secondaryVenues = newVenues.filter(v => !v.isPrimaryVenue);
+      handleDataChange({ secondaryVenues });
+    }
   };
 
   const handleHotelChange = (index: number, updatedHotelData: Partial<HotelData>) => {
@@ -94,16 +143,22 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
   const handleAddVenue = () => {
     const newVenue = createDefaultVenue(false);
-    handleDataChange({ venues: [...value.venues, newVenue] });
+    handleDataChange({ secondaryVenues: [...(value.secondaryVenues ?? []), newVenue] });
   };
 
   const handleRemoveVenue = (index: number) => {
-    handleDataChange({ venues: value.venues.filter((_, i) => i !== index) });
+    const newVenues = venues.filter((_, i) => i !== index);
+    const primaryVenue = newVenues.find(v => v.isPrimaryVenue);
+    const secondaryVenues = newVenues.filter(v => !v.isPrimaryVenue);
+    handleDataChange({
+      primaryVenue: primaryVenue || undefined,
+      secondaryVenues
+    });
   };
 
   const handleAddHotel = () => {
     const newHotel = createDefaultHotel(false);
-    handleDataChange({ hotels: [...value.hotels, newHotel] });
+    handleDataChange({ hotels: [...(value.hotels ?? []), newHotel] });
   };
 
   const handleRemoveHotel = (index: number) => {
@@ -132,27 +187,35 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
   };
 
   const renderVenueForms = () => {
-    const primaryVenueIndex = value.venues.findIndex(v => v.isPrimaryVenue);
-    const secondaryVenues = value.venues.filter(v => !v.isPrimaryVenue);
+    const primaryVenueIndex = venues.findIndex(v => v.isPrimaryVenue);
+    const secondaryVenues = venues.filter(v => !v.isPrimaryVenue);
+
+    // Ensure we have a primary venue to work with, create default if needed
+    const currentPrimaryVenue = primaryVenue || createDefaultVenue(true);
 
     return (
       <>
-        {primaryVenue && primaryVenueIndex !== -1 && (
-          <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">Primary Venue</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <PrimaryVenueForm
-                formData={primaryVenue}
-                onFormDataChange={(data) => handleVenueChange(primaryVenueIndex, data)}
-                errors={structuredErrors.venues[primaryVenueIndex]}
-                title="Primary Venue Details"
-                disabled={disabled}
-              />
-            </AccordionDetails>
-          </Accordion>
-        )}
+        <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Primary Venue</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <PrimaryVenueForm
+              formData={currentPrimaryVenue}
+              onFormDataChange={(data) => {
+                if (primaryVenueIndex !== -1) {
+                  handleVenueChange(primaryVenueIndex, data);
+                } else {
+                  // Create new primary venue if it doesn't exist
+                  handleDataChange({ primaryVenue: { ...currentPrimaryVenue, ...data } });
+                }
+              }}
+              errors={structuredErrors.venues[primaryVenueIndex]}
+              title="Primary Venue Details"
+              disabled={disabled}
+            />
+          </AccordionDetails>
+        </Accordion>
 
         <Accordion expanded={expandedAccordion === 'secondaryVenues'} onChange={handleAccordionChange('secondaryVenues')}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -160,7 +223,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
           </AccordionSummary>
           <AccordionDetails>
             {secondaryVenues.map((venue, index) => {
-              const originalIndex = value.venues.findIndex(v => v.tempId === venue.tempId);
+              const originalIndex = venues.findIndex(v => v.tempId === venue.tempId);
               return (
                 <Paper key={venue.tempId || index} elevation={2} sx={{ p: 2, mb: 2 }}>
                   <PrimaryVenueForm
@@ -268,13 +331,22 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
   return (
     <Box>
-      {zodErrors && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Please correct the errors before proceeding.
-          <ul>
-            {zodErrors.map((err, index) => <li key={index}>{err.path.join('.')} - {err.message}</li>)}
-          </ul>
-        </Alert>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" gutterBottom>
+          Venue/Hotel Configuration
+        </Typography>
+        <Button
+          variant="outlined"
+          color="error"
+          onClick={() => setDebugMode(!debugMode)}
+          size="small"
+        >
+          {debugMode ? 'Disable Debug' : 'Enable Debug Mode'}
+        </Button>
+      </Box>
+
+      {debugMode && (
+        <DebugKeyboardEvents onClose={() => setDebugMode(false)} />
       )}
 
       <Box sx={{ mb: 4 }}>

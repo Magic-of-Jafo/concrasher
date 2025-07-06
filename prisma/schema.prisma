@@ -9,6 +9,22 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+model Timezone {
+  id               String    @id @default(cuid())
+  ianaId           String    @unique
+  value            String?   
+  abbr             String?   
+  offset           Int?      
+  isdst            Boolean?  
+  text             String?   
+  utcAliases       String[]  
+  
+  // Relationships
+  users            User[]
+  conventions      Convention[]
+  conventionSettings ConventionSetting[]
+}
+
 model User {
   id               String             @id @default(cuid())
   name             String?
@@ -22,7 +38,8 @@ model User {
   bio              String?
   resetToken       String?            @unique
   resetTokenExpiry DateTime?
-  timezone         String?
+  timezoneId       String?
+  timezone         Timezone?          @relation(fields: [timezoneId], references: [id])
   accounts         Account[]
   ownedBrands      Brand[]            @relation("BrandOwner")
   brandMemberships BrandUser[]
@@ -140,7 +157,8 @@ model Convention {
   isOneDayEvent            Boolean                  @default(false)
   isTBD                    Boolean                  @default(false)
   profileImageUrl          String?
-  timezone                 String?
+  timezoneId               String?
+  timezone                 Timezone?                @relation(fields: [timezoneId], references: [id])
   guestsStayAtPrimaryVenue Boolean?                 @default(false)
   series                   ConventionSeries?        @relation(fields: [seriesId], references: [id])
   dealerLinks              ConventionDealerLink[]
@@ -162,6 +180,8 @@ model ConventionSetting {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  timezoneId   String?
+  timezone     Timezone?  @relation(fields: [timezoneId], references: [id])
   
   @@unique([conventionId, key])
 }

@@ -31,6 +31,12 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { getProfileImageUrl } from '@/lib/defaults';
+import BasicInfoSection from '@/components/conventions/detail/BasicInfoSection';
+import PricingSection from '@/components/conventions/detail/PricingSection';
+import VenueHotelSection from '@/components/conventions/detail/VenueHotelSection';
+import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
+import DealersSection from '@/components/conventions/detail/DealersSection';
+import MediaGallerySection from '@/components/conventions/detail/MediaGallerySection';
 
 const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary' | 'error' | 'info'> = {
     [ConventionStatus.DRAFT]: 'default',
@@ -60,18 +66,29 @@ function formatPrice(amount: number): string {
     return `$${amount.toFixed(2)}`;
 }
 
-// Helper function to format cutoff date
-function formatCutoffDate(date: Date): string {
-    // Extract the UTC date components and format them directly
+// Helper function to format discount cutoff date in "mmm dd" format
+function formatDiscountDate(date: Date, timezone?: string): string {
+    if (timezone) {
+        // Convert UTC date to convention's timezone for display
+        try {
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: '2-digit',
+                timeZone: timezone
+            });
+            return formatter.format(date);
+        } catch (error) {
+            console.warn(`Invalid timezone: ${timezone}, falling back to UTC noon approach`);
+        }
+    }
+
+    // Fallback: Extract UTC components and create date at noon UTC to avoid timezone boundary issues
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth(); // 0-based (6 = July)
     const day = date.getUTCDate(); // 1-based (9 = 9th)
+    const displayDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
 
-    // Create a date object in local timezone using the UTC date values
-    // This ensures we display July 9, not July 8
-    const displayDate = new Date(year, month, day);
-
-    return `thru ${format(displayDate, 'MMMM d')}`;
+    return format(displayDate, 'MMM dd');
 }
 
 function PricingView({ convention }: { convention: any }) {
@@ -79,6 +96,7 @@ function PricingView({ convention }: { convention: any }) {
     // In a real implementation, you'd fetch this data in the server component
     const priceTiers = convention.priceTiers || [];
     const priceDiscounts = convention.priceDiscounts || [];
+    const conventionTimezone = convention.timezone?.ianaId || convention.settings?.timezone;
 
     if (priceTiers.length === 0) {
         return (
@@ -126,21 +144,61 @@ function PricingView({ convention }: { convention: any }) {
             <TableContainer component={Paper} sx={{ mt: 3 }}>
                 <Table>
                     <TableHead>
+                        {/* First header row - spanning header only */}
+                        {uniqueCutoffDates.length > 0 && (
+                            <TableRow>
+                                <TableCell sx={{ border: 'none' }}></TableCell>
+                                <TableCell
+                                    align="center"
+                                    colSpan={uniqueCutoffDates.length}
+                                    sx={{
+                                        borderBottom: 'none',
+                                        backgroundColor: '#f5f5f5',
+                                        color: 'text.primary'
+                                    }}
+                                >
+                                    <Typography variant="h6">
+                                        Price good through
+                                    </Typography>
+                                </TableCell>
+                                <TableCell sx={{ border: 'none' }}></TableCell>
+                            </TableRow>
+                        )}
+                        {/* Second header row - all column headers */}
                         <TableRow>
-                            <TableCell>
-                                <Typography variant="h6">
-                                    Registration Type
+                            <TableCell sx={{
+                                backgroundColor: 'grey.800',
+                                color: 'white',
+                                py: 1
+                            }}>
+                                <Typography variant="h6" sx={{ color: 'white' }}>
+                                    Attendee Category
                                 </Typography>
                             </TableCell>
                             {uniqueCutoffDates.map((date: Date, index: number) => (
-                                <TableCell key={index} align="center">
+                                <TableCell
+                                    key={index}
+                                    align="center"
+                                    sx={{
+                                        backgroundColor: 'grey.300',
+                                        color: 'text.primary',
+                                        py: 1
+                                    }}
+                                >
                                     <Typography variant="h6">
-                                        {formatCutoffDate(date)}
+                                        {formatDiscountDate(date, conventionTimezone)}
                                     </Typography>
                                 </TableCell>
                             ))}
-                            <TableCell align="center">
-                                <Typography variant="h6">
+                            <TableCell
+                                align="center"
+                                sx={{
+                                    backgroundColor: 'grey.800',
+                                    color: 'white',
+                                    py: 1
+                                }}
+                            >
+                                <Typography variant="h6" sx={{ color: 'white' }}>
                                     Regular Price
                                 </Typography>
                             </TableCell>
@@ -166,7 +224,11 @@ function PricingView({ convention }: { convention: any }) {
                                         const discountPrice = discount ? Number(discount.discountedAmount) : Number(tier.amount);
 
                                         return (
-                                            <TableCell key={index} align="center">
+                                            <TableCell
+                                                key={index}
+                                                align="center"
+                                                sx={{ backgroundColor: 'grey.100' }}
+                                            >
                                                 <Typography variant="body1">
                                                     {formatPrice(discountPrice)}
                                                 </Typography>
@@ -400,29 +462,29 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
     const renderCurrentView = () => {
         switch (currentView) {
             case 'basic':
-                return <BasicInfoView convention={convention} />;
-            case 'schedule':
-                return <PlaceholderView title="Schedule" />;
+                return <BasicInfoSection convention={convention} />;
             case 'pricing':
-                return <PricingView convention={convention} />;
+                return <PricingSection convention={convention} />;
             case 'venue':
-                return <PlaceholderView title="Venue/Hotel" />;
+                return <VenueHotelSection convention={convention} />;
+            case 'schedule':
+                return <ScheduleSection convention={convention} />;
             case 'dealers':
-                return <PlaceholderView title="Dealers" />;
+                return <DealersSection convention={convention} />;
             case 'media':
-                return <PlaceholderView title="Media" />;
+                return <MediaGallerySection convention={convention} />;
             default:
-                return <BasicInfoView convention={convention} />;
+                return <BasicInfoSection convention={convention} />;
         }
     };
 
     return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Container id="main-content" maxWidth="lg" sx={{ py: 4 }}>
             <Box sx={{ display: 'flex', gap: 3 }}>
                 {/* Left Sidebar Navigation */}
                 <Paper
                     sx={{
-                        width: 250,
+                        width: 200,
                         height: 'fit-content',
                         position: 'sticky',
                         top: 20,
@@ -438,6 +500,7 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
                                         selected={currentView === item.id}
                                         onClick={() => setCurrentView(item.id)}
                                         sx={{
+                                            pl: 2,
                                             '&.Mui-selected': {
                                                 backgroundColor: 'primary.main',
                                                 color: 'primary.contrastText',
@@ -450,9 +513,6 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
                                             },
                                         }}
                                     >
-                                        <ListItemIcon>
-                                            <IconComponent />
-                                        </ListItemIcon>
                                         <ListItemText primary={item.label} />
                                     </ListItemButton>
                                 </ListItem>

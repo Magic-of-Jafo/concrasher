@@ -144,7 +144,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
   const [settingsData, setSettingsData] = useState<ConventionSettingData>(() => ({
     currency: initialConventionData?.settings?.currency || 'USD',
-    timezone: initialConventionData?.settings?.timezone || 'America/New_York',
+    timezone: initialConventionData?.settings?.timezone || '',
   }));
 
   const conventionId = initialConventionData?.id;
@@ -170,7 +170,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       // Restore Settings Tab update
       setSettingsData({
         currency: initialConventionData.settings?.currency || 'USD',
-        timezone: initialConventionData.settings?.timezone || 'America/New_York',
+        timezone: initialConventionData.settings?.timezone || '',
       });
 
       // Corrected Venue/Hotel Tab update
@@ -190,7 +190,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       setBasicInfoData(initialBasicFormData); // Reset basic info
       setPricingTabData({ priceTiers: [], priceDiscounts: [] }); // Reset pricing
       setVenueHotelData(defaultVenueHotelData); // Reset venue/hotel
-      setSettingsData({ currency: 'USD', timezone: 'America/New_York' }); // Reset settings
+      setSettingsData({ currency: 'USD', timezone: '' }); // Reset settings
     }
   }, [initialConventionData, defaultVenueHotelData]);
 
@@ -291,6 +291,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           conventionId={conventionId}
           value={pricingTabData}
           onChange={handlePricingDataChange}
+          timezone={settingsData.timezone}
         />
       </TabPanel>
 
@@ -347,6 +348,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           value={settingsData}
           onFormChange={handleSettingsChange}
           isEditing={isEditing}
+          conventionId={conventionId}
         />
       </TabPanel>
 
