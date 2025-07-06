@@ -372,20 +372,11 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                             />
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<EditIcon />}
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isProcessing}
-                            >
-                                Replace Image
-                            </Button>
                             <Link
                                 component="button"
                                 variant="body2"
                                 color="error"
                                 onClick={() => setShowRemoveDialog(true)}
-                                sx={{ ml: 2 }}
                             >
                                 Remove Profile Image (Permanent)
                             </Link>

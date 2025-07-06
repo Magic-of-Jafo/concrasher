@@ -10,6 +10,8 @@ import ScheduleTab from './ScheduleTab';
 import DealersTab from './DealersTab';
 import { MediaTab } from './MediaTab';
 import { type ConventionMediaData } from '@/lib/validators';
+import { SettingsTab } from './SettingsTab';
+import { type ConventionSettingData } from '@/lib/validators';
 import { useRouter } from 'next/navigation';
 
 interface TabPanelProps {
@@ -65,6 +67,7 @@ interface ConventionDataForEditor extends BasicInfoFormData {
   media?: ConventionMediaData[];
   coverImageUrl?: string;
   profileImageUrl?: string;
+  settings?: ConventionSettingData;
 }
 
 interface ConventionEditorTabsProps {
@@ -92,7 +95,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     const storedTab = localStorage.getItem(localStorageKey);
     if (storedTab) {
       const tabIndex = parseInt(storedTab, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 5) {
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 6) {
         setActiveTab(tabIndex);
         // console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
       }
@@ -139,6 +142,11 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     initialConventionData?.media || []
   );
 
+  const [settingsData, setSettingsData] = useState<ConventionSettingData>(() => ({
+    currency: initialConventionData?.settings?.currency || 'USD',
+    timezone: initialConventionData?.settings?.timezone || 'America/New_York',
+  }));
+
   const conventionId = initialConventionData?.id;
   // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
 
@@ -159,6 +167,12 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       // Restore Media Tab update
       setMediaData(initialConventionData.media || []);
 
+      // Restore Settings Tab update
+      setSettingsData({
+        currency: initialConventionData.settings?.currency || 'USD',
+        timezone: initialConventionData.settings?.timezone || 'America/New_York',
+      });
+
       // Corrected Venue/Hotel Tab update
       const loadedVH = venueHotel; // 'venueHotel' was destructured above from initialConventionData
       console.log('[ConventionEditorTabs - useEffect] initialConventionData.venueHotel (loadedVH):', loadedVH);
@@ -176,6 +190,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       setBasicInfoData(initialBasicFormData); // Reset basic info
       setPricingTabData({ priceTiers: [], priceDiscounts: [] }); // Reset pricing
       setVenueHotelData(defaultVenueHotelData); // Reset venue/hotel
+      setSettingsData({ currency: 'USD', timezone: 'America/New_York' }); // Reset settings
     }
   }, [initialConventionData, defaultVenueHotelData]);
 
@@ -218,6 +233,16 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     console.log('Media save result:', success, message);
   }, []);
 
+  const handleSettingsChange = useCallback((
+    fieldName: keyof ConventionSettingData,
+    value: any
+  ) => {
+    setSettingsData((prevData) => ({
+      ...prevData,
+      [fieldName]: value,
+    }));
+  }, []);
+
 
 
   const [localIsSaving, setLocalIsSaving] = useState(false);
@@ -232,6 +257,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       priceDiscounts: pricingTabData.priceDiscounts,
       venueHotel: venueHotelData,
       media: mediaData,
+      settings: settingsData,
     };
     await onSave(fullDataToSave);
     setLocalIsSaving(false);
@@ -248,6 +274,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           <Tab label="Schedule" {...allyProps(3)} />
           <Tab label="Media" {...allyProps(4)} />
           <Tab label="Dealers" {...allyProps(5)} />
+          <Tab label="Settings" {...allyProps(6)} />
         </Tabs>
       </Box>
 
@@ -313,6 +340,14 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
       <TabPanel value={activeTab} index={5}>
         <DealersTab conventionId={conventionId!} />
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={6}>
+        <SettingsTab
+          value={settingsData}
+          onFormChange={handleSettingsChange}
+          isEditing={isEditing}
+        />
       </TabPanel>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2, mt: 2, gap: 2, borderTop: 1, borderColor: 'divider' }}>

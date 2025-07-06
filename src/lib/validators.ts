@@ -437,4 +437,13 @@ export const ConventionMediaTabSchema = z.object({
 });
 
 export type ConventionMediaData = z.infer<typeof ConventionMediaSchema>;
-export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>; 
+export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>;
+
+// --- Convention Settings Schema ---
+
+export const ConventionSettingSchema = z.object({
+  currency: z.string().min(3, 'Currency must be at least 3 characters').max(3, 'Currency must be exactly 3 characters'),
+  timezone: z.string().min(1, 'Timezone is required'),
+});
+
+export type ConventionSettingData = z.infer<typeof ConventionSettingSchema>; 

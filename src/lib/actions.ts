@@ -21,6 +21,8 @@ import {
   type BrandUpdateInput,
   ConventionMediaSchema,
   type ConventionMediaData,
+  ConventionSettingSchema,
+  type ConventionSettingData,
   // ConventionScheduleItemBulkUploadSchema, // Corrected: Removed the problematic one, this is the main schema for the array - THIS LINE IS THE CULPRIT
 } from './validators';
 
@@ -1652,5 +1654,139 @@ export async function updateConventionImages(
       success: false,
       error: "An unexpected error occurred while updating images.",
     };
+  }
+}
+
+export async function updateConventionSettings(
+  conventionId: string,
+  settings: ConventionSettingData
+): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: any;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const validatedData = ConventionSettingSchema.safeParse(settings);
+  if (!validatedData.success) {
+    return {
+      success: false,
+      error: "Invalid data provided.",
+      fieldErrors: validatedData.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    // Check if user has permission to update this convention
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      select: {
+        id: true,
+        series: {
+          select: { organizerUserId: true }
+        }
+      },
+    });
+
+    if (!convention) {
+      return { success: false, error: "Convention not found." };
+    }
+
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
+    const isOrganizer = convention.series?.organizerUserId === session.user.id;
+    const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
+
+    if (!isOrganizer && !isAdmin) {
+      return { success: false, error: "Authorization failed. You are not authorized to update this convention." };
+    }
+
+    // Update settings using upsert to handle create/update logic
+    await db.$transaction(async (prisma) => {
+      // Upsert currency setting
+      await prisma.conventionSetting.upsert({
+        where: {
+          conventionId_key: {
+            conventionId,
+            key: 'currency',
+          },
+        },
+        create: {
+          conventionId,
+          key: 'currency',
+          value: validatedData.data.currency,
+        },
+        update: {
+          value: validatedData.data.currency,
+        },
+      });
+
+      // Upsert timezone setting
+      await prisma.conventionSetting.upsert({
+        where: {
+          conventionId_key: {
+            conventionId,
+            key: 'timezone',
+          },
+        },
+        create: {
+          conventionId,
+          key: 'timezone',
+          value: validatedData.data.timezone,
+        },
+        update: {
+          value: validatedData.data.timezone,
+        },
+      });
+    });
+
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+
+    return {
+      success: true,
+      message: "Convention settings updated successfully!",
+    };
+
+  } catch (error) {
+    console.error("Error updating convention settings:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while updating convention settings.",
+    };
+  }
+}
+
+export async function getConventionSettings(
+  conventionId: string
+): Promise<ConventionSettingData | null> {
+  "use server";
+
+  try {
+    const settings = await db.conventionSetting.findMany({
+      where: { conventionId },
+    });
+
+    const settingsData: ConventionSettingData = {
+      currency: 'USD',
+      timezone: 'America/New_York',
+    };
+
+    settings.forEach((setting: { key: string; value: string }) => {
+      if (setting.key === 'currency') {
+        settingsData.currency = setting.value;
+      } else if (setting.key === 'timezone') {
+        settingsData.timezone = setting.value;
+      }
+    });
+
+    return settingsData;
+  } catch (error) {
+    console.error("Error loading convention settings:", error);
+    return null;
   }
 }

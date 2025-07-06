@@ -151,6 +151,19 @@ model Convention {
   priceTiers               PriceTier[]
   scheduleDays             ScheduleDay[]
   venues                   Venue[]
+  settings                 ConventionSetting[]
+}
+
+model ConventionSetting {
+  id           String     @id @default(cuid())
+  conventionId String
+  key          String     // e.g., 'currency', 'timezone'
+  value        String     // e.g., 'USD', 'America/New_York'
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  
+  @@unique([conventionId, key])
 }
 
 model Venue {
