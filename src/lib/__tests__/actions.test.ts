@@ -1,5 +1,5 @@
 import { Role, ApplicationStatus, RequestedRole } from '@prisma/client';
-import { requestRoles, activateTalentRole, deactivateTalentRole, createBrand } from '../actions';
+import { requestRoles, activateTalentRole, deactivateTalentRole, createBrand, deleteConvention } from '../actions';
 import { db } from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { revalidatePath } from 'next/cache';
@@ -25,6 +25,10 @@ jest.mock('@/lib/db', () => ({
     },
     brandUser: {
       create: jest.fn(),
+    },
+    convention: {
+      findUnique: jest.fn(),
+      delete: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -59,6 +63,9 @@ const mockRoleApplicationCreateMany = db.roleApplication.createMany as jest.Mock
 const mockBrandCreate = db.brand.create as jest.Mock;
 const mockBrandUserCreate = db.brandUser.create as jest.Mock;
 const mockTransaction = db.$transaction as jest.Mock;
+const mockDbConventionFindUnique = db.convention.findUnique as jest.Mock;
+const mockDbConventionDelete = db.convention.delete as jest.Mock;
+
 
 describe('Server Actions - User Roles and Applications', () => {
   beforeEach(() => {
@@ -74,6 +81,8 @@ describe('Server Actions - User Roles and Applications', () => {
     mockBrandCreate.mockReset();
     mockBrandUserCreate.mockReset();
     mockTransaction.mockReset();
+    mockDbConventionFindUnique.mockReset();
+    mockDbConventionDelete.mockReset();
   });
 
   describe('requestRoles', () => {
@@ -311,6 +320,37 @@ describe('Server Actions - User Roles and Applications', () => {
       expect(result.brand).toBeDefined();
       expect(result.brand).toEqual(mockBrand);
       expect(mockTransaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteConvention', () => {
+    const mockConventionId = 'conv-123';
+    const mockOwnerId = 'owner-456';
+    const mockAdminId = 'admin-789';
+    const mockRandomUserId = 'random-user-000';
+
+    it('should allow an admin to delete any convention', async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: mockAdminId, roles: ['ADMIN'] } });
+      mockDbConventionFindUnique.mockResolvedValue({ id: mockConventionId, userId: mockOwnerId });
+      mockDbConventionDelete.mockResolvedValue({ id: mockConventionId });
+
+      const result = await deleteConvention(mockConventionId);
+
+      expect(result.success).toBe(true);
+      expect(mockDbConventionDelete).toHaveBeenCalledWith({ where: { id: mockConventionId } });
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/conventions');
+      expect(mockRevalidatePath).toHaveBeenCalledWith(`/organizer/conventions`);
+    });
+
+    it('should prevent a non-admin from deleting a convention they do not own', async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: mockRandomUserId, roles: ['USER'] } });
+      mockDbConventionFindUnique.mockResolvedValue({ id: mockConventionId, userId: mockOwnerId });
+
+      const result = await deleteConvention(mockConventionId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Unauthorized: You do not have permission to delete this convention.');
+      expect(mockDbConventionDelete).not.toHaveBeenCalled();
     });
   });
 }); 

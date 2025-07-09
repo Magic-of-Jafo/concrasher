@@ -1286,31 +1286,33 @@ export async function bulkCreateScheduleItems(
     return mutableItem;
   });
 
-  const parsedInput = ConventionScheduleItemBulkInputSchema.safeParse({
+  const payload = {
     conventionId,
-    items: normalizedItemsForZod
-  });
+    scheduleItems: normalizedItemsForZod,
+  };
 
-  if (!parsedInput.success) {
-    const itemSpecificErrors = parsedInput.error.issues.map(issue => {
-      let itemIndex = -1;
-      if (issue.path.length > 1 && issue.path[0] === 'items' && typeof issue.path[1] === 'number') {
-        itemIndex = issue.path[1];
-      }
-      return {
-        itemIndex: itemIndex,
-        message: `Validation error for item at index ${itemIndex !== -1 ? itemIndex : '(unknown)'}: [${issue.path.join('.')}] ${issue.message}`,
-        originalItem: itemIndex !== -1 && itemIndex < rawItems.length ? rawItems[itemIndex] : undefined
-      };
-    });
+  // Validate the entire payload against the main schema
+  const validationResult = ConventionScheduleItemBulkInputSchema.safeParse(payload);
+
+  if (!validationResult.success) {
     return {
       success: false,
-      error: "Invalid bulk input format. See detailed errors.",
-      errors: itemSpecificErrors.length > 0 ? itemSpecificErrors : [{ itemIndex: -1, message: "General validation error with bulk input." }],
+      error: "Payload validation failed.",
+      errors: validationResult.error.issues.map(issue => {
+        let itemIndex = -1;
+        if (issue.path.length > 1 && issue.path[0] === 'scheduleItems' && typeof issue.path[1] === 'number') {
+          itemIndex = issue.path[1];
+        }
+        return {
+          itemIndex: itemIndex,
+          message: `Validation error for item at index ${itemIndex !== -1 ? itemIndex : '(unknown)'}: [${issue.path.join('.')}] ${issue.message}`,
+          originalItem: itemIndex !== -1 && itemIndex < rawItems.length ? rawItems[itemIndex] : undefined
+        };
+      }),
     };
   }
 
-  const validatedItems = parsedInput.data.scheduleItems;
+  const validatedItems = validationResult.data.scheduleItems;
   const itemProcessingErrors: { itemIndex: number; message: string; originalItem?: any }[] = [];
   let createdCount = 0;
 

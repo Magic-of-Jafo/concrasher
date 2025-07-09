@@ -85,8 +85,11 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   isSaving,
   onCancel,
 }) => {
+  const router = useRouter();
   // console.log('[ConventionEditorTabs] Received initialConventionData:', initialConventionData);
   const [activeTab, setActiveTab] = useState(0);
+  const [hasVenueHotelTabBeenInteractedWith, setHasVenueHotelTabBeenInteractedWith] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const localStorageKey = 'conventionEditorActiveTab';
 
@@ -204,13 +207,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
   const handleVenueHotelDataChange = useCallback((data: VenueHotelTabData, isValid: boolean) => {
     setVenueHotelData(data);
+    setHasVenueHotelTabBeenInteractedWith(true);
     // console.log("VenueHotelTab data updated. Is valid:", isValid); // For future use with validation state
   }, []);
 
   // Dummy handler for onValidationChange, can be expanded later
   const handleVenueHotelValidationChange = useCallback((isValid: boolean) => {
     // Here you could, for example, disable the save button if a tab reports invalid data
-  }, []);
+    // For now, only consider it if the tab has been interacted with.
+    if (!hasVenueHotelTabBeenInteractedWith) return;
+    // ... logic to handle validation state
+  }, [hasVenueHotelTabBeenInteractedWith]);
 
   const handleMediaSave = useCallback((success: boolean, message?: string) => {
     // Handle media save feedback - could show toast or update state
@@ -227,29 +234,37 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     }));
   }, []);
 
-
-
   const [localIsSaving, setLocalIsSaving] = useState(false);
-  const router = useRouter();
 
   const handleSaveConvention = async () => {
     setLocalIsSaving(true);
-    const fullDataToSave: Partial<ConventionDataForEditor> = {
-      ...basicInfoData,
-      id: conventionId,
-      priceTiers: pricingTabData.priceTiers,
-      priceDiscounts: pricingTabData.priceDiscounts,
-      venueHotel: venueHotelData,
-      media: mediaData,
-      settings: settingsData,
-    };
-    await onSave(fullDataToSave);
-    setLocalIsSaving(false);
-    router.push('/organizer/conventions?toastMessage=Convention+updated+successfully');
+    setSaveError(null);
+    try {
+      const fullDataToSave: Partial<ConventionDataForEditor> = {
+        ...basicInfoData,
+        id: conventionId,
+        priceTiers: pricingTabData.priceTiers,
+        priceDiscounts: pricingTabData.priceDiscounts,
+        venueHotel: venueHotelData,
+        media: mediaData,
+        settings: settingsData,
+      };
+      await onSave(fullDataToSave);
+      // The onSave function is now responsible for navigation.
+      // router.push('/organizer/conventions?toastMessage=Convention+updated+successfully');
+    } catch (error) {
+      console.error("Failed to save convention:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      setSaveError(`Failed to save convention: ${errorMessage}`);
+    } finally {
+      setLocalIsSaving(false);
+    }
   };
 
+  const isSaveDisabled = localIsSaving || isSaving;
+
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: '100%', position: 'relative' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="Convention editor tabs">
           <Tab label="Basic Info" {...allyProps(0)} />
@@ -285,7 +300,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           value={venueHotelData}
           onChange={handleVenueHotelDataChange}
           onValidationChange={handleVenueHotelValidationChange}
-          disabled={isSaving || localIsSaving}
+          disabled={isSaveDisabled}
         />
       </TabPanel>
 
@@ -341,18 +356,24 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       </TabPanel>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2, mt: 2, gap: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Button variant="outlined" onClick={onCancel} disabled={isSaving || localIsSaving}>
+        <Button variant="outlined" onClick={onCancel} disabled={isSaveDisabled}>
           Cancel
         </Button>
         <Button
           variant="contained"
+          color="primary"
           onClick={handleSaveConvention}
-          disabled={isSaving || localIsSaving}
-          startIcon={isSaving || localIsSaving ? <CircularProgress size={20} color="inherit" /> : null}
+          disabled={isSaveDisabled}
+          sx={{ minWidth: 150 }}
         >
-          {isSaving || localIsSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Convention')}
+          {isSaveDisabled ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
         </Button>
       </Box>
+      {saveError && (
+        <Typography color="error" sx={{ mt: 2, textAlign: 'right' }}>
+          Failed to save changes: {saveError}
+        </Typography>
+      )}
     </Box>
   );
 };

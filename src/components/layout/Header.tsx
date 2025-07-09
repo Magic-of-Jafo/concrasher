@@ -27,6 +27,11 @@ export default function Header() {
           </Button>
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {isAuthenticated && session?.user?.roles?.includes('ADMIN') && (
+            <Button color="inherit" component={Link} href="/admin/conventions" sx={{ mr: 1 }}>
+              Manage Conventions
+            </Button>
+          )}
           {isAuthenticated && session?.user?.roles?.includes('ORGANIZER') && (
             <Button color="inherit" component={Link} href="/organizer/conventions" sx={{ mr: 1 }}>
               Dashboard

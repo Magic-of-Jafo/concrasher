@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -10,10 +10,17 @@ import {
   CircularProgress,
   Box,
   Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Chip,
 } from '@mui/material';
+import { ConventionStatus } from '@prisma/client';
 import ConventionSeriesSelector from '@/components/ConventionSeriesSelector';
 import ConventionEditorTabs from '@/components/organizer/convention-editor/ConventionEditorTabs';
 import { type BasicInfoFormData, type PriceTier, type PriceDiscount, type VenueHotelTabData, type VenueData, type HotelData, type ConventionMediaData, createDefaultVenueHotelTabData } from '@/lib/validators';
+import AdminGuard from '@/components/auth/AdminGuard';
 
 // Define ConventionSeries interface locally
 interface ConventionSeries {
@@ -27,6 +34,7 @@ interface ConventionSeries {
 // This interface will hold the complete data for the convention being edited on this page
 interface PageConventionData extends BasicInfoFormData {
   id?: string; // Convention ID itself
+  status?: ConventionStatus; // Add status property
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
   venueHotel: VenueHotelTabData; // USE IMPORTED TYPE
@@ -66,6 +74,21 @@ const initialPageConventionData: PageConventionData = {
   venueHotel: createDefaultVenueHotelTabData(), // Use factory from validators
 };
 
+// Status colors and labels
+const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary' | 'error' | 'info'> = {
+  [ConventionStatus.DRAFT]: 'default',
+  [ConventionStatus.PUBLISHED]: 'primary',
+  [ConventionStatus.PAST]: 'secondary',
+  [ConventionStatus.CANCELLED]: 'error',
+};
+
+const statusLabels: Record<ConventionStatus, string> = {
+  [ConventionStatus.DRAFT]: 'Draft',
+  [ConventionStatus.PUBLISHED]: 'Published',
+  [ConventionStatus.PAST]: 'Past Event',
+  [ConventionStatus.CANCELLED]: 'Cancelled',
+};
+
 interface NewSeriesData extends Omit<ConventionSeries, 'id'> { }
 
 // Define local interfaces for how API data might be initially shaped. 
@@ -87,7 +110,7 @@ interface ApiHotelData {
   bookingLink?: string; bookingCutoffDate?: Date | string | null; groupRateOrBookingCode?: string; groupPrice?: string;
 }
 
-export default function ConventionEditPage() { // Remove params from props
+function ConventionEditPage() { // Remove params from props
   const router = useRouter();
   const params = useParams(); // Use the hook here
   const conventionId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : undefined; // Get ID from hook
@@ -107,21 +130,80 @@ export default function ConventionEditPage() { // Remove params from props
     }
   }));
 
-  const [isLoading, setIsLoading] = useState(true); // Start true if editing
+  const [isLoading, setIsLoading] = useState(isEditing); // Start true if editing, false if new
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seriesError, setSeriesError] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const conventionPageDataRef = useRef(conventionPageData);
+
+  // Handle status updates
+  const handleStatusChange = async (newStatus: ConventionStatus) => {
+    if (!conventionId || newStatus === conventionPageData.status) return;
+
+    console.log('Attempting to change status from', conventionPageData.status, 'to', newStatus);
+
+    setIsUpdatingStatus(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/conventions/${conventionId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      console.log('Status update response:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Status update failed:', errorData);
+        throw new Error(errorData.error || 'Failed to update status');
+      }
+
+      const updatedConvention = await response.json();
+      console.log('Status updated successfully:', updatedConvention);
+
+      // Update local state
+      setConventionPageData(prev => ({
+        ...prev,
+        status: updatedConvention.status,
+      }));
+
+      console.log('Local state updated with new status:', updatedConvention.status);
+
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      setError(err.message || 'Failed to update status');
+
+      // Don't revert the UI state here - let it show the attempted change
+      // The user will see the error message and can try again
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    conventionPageDataRef.current = conventionPageData;
+  }, [conventionPageData]);
 
   // Load existing convention data if editing
   useEffect(() => {
     if (conventionId && isEditing) {
       const loadConvention = async () => {
-        setIsLoading(true);
         try {
           const response = await fetch(`/api/organizer/conventions/${conventionId}`);
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to load convention');
+            if (response.status === 404) {
+              setError('The requested convention could not be found. It may have been deleted or you may not have permission to view it.');
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to load convention');
+            }
+            return;
           }
           const loadedApiConvention = await response.json(); // This is the raw data from your API
 
@@ -132,7 +214,6 @@ export default function ConventionEditPage() { // Remove params from props
             if (settingsResponse.ok) {
               const settingsData = await settingsResponse.json();
               conventionSettings = settingsData;
-              console.log('[EditPage] Loaded settings:', conventionSettings);
             }
           } catch (settingsError) {
             console.warn('[EditPage] Failed to load settings:', settingsError);
@@ -233,13 +314,11 @@ export default function ConventionEditPage() { // Remove params from props
             guestsStayAtPrimaryVenue: actualGuestsStayAtPrimaryVenue, // Use the direct value from API
           };
 
-          console.log('[EditPage] loadedApiConvention.coverImageUrl:', loadedApiConvention.coverImageUrl);
-          console.log('[EditPage] loadedApiConvention.profileImageUrl:', loadedApiConvention.profileImageUrl);
-
           setConventionPageData({
             id: conventionId,
             name: loadedApiConvention.name || '',
             slug: loadedApiConvention.slug || '',
+            status: loadedApiConvention.status || ConventionStatus.DRAFT,
             startDate: loadedApiConvention.startDate ? new Date(loadedApiConvention.startDate) : null,
             endDate: loadedApiConvention.endDate ? new Date(loadedApiConvention.endDate) : null,
             isOneDayEvent: loadedApiConvention.isOneDayEvent || false,
@@ -252,14 +331,15 @@ export default function ConventionEditPage() { // Remove params from props
             descriptionMain: loadedApiConvention.descriptionMain || '',
             websiteUrl: loadedApiConvention.websiteUrl || '',
             registrationUrl: loadedApiConvention.registrationUrl || '',
-            seriesId: loadedApiConvention.conventionSeriesId || loadedApiConvention.seriesId,
+            seriesId: loadedApiConvention.seriesId || undefined,
+            newSeriesName: '',
             priceTiers: loadedApiConvention.priceTiers || [],
             priceDiscounts: loadedApiConvention.priceDiscounts || [],
-            venueHotel: transformedVenueHotelData, // Assign the ALIGNED data structure
-            media: loadedApiConvention.media || [], // Add media data
-            coverImageUrl: loadedApiConvention.coverImageUrl || '', // Add cover image URL
-            profileImageUrl: loadedApiConvention.profileImageUrl || '', // Add profile image URL
-            settings: conventionSettings || { currency: 'USD', timezone: '' }, // Add settings data
+            venueHotel: transformedVenueHotelData, // Use the fully transformed object
+            media: loadedApiConvention.media || [],
+            coverImageUrl: loadedApiConvention.coverImageUrl,
+            profileImageUrl: loadedApiConvention.profileImageUrl,
+            settings: conventionSettings || { currency: 'USD', timezone: '' },
           });
 
           if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {
@@ -269,21 +349,24 @@ export default function ConventionEditPage() { // Remove params from props
           }
 
         } catch (err: any) {
-          setError(err.message || 'Failed to load convention data.');
-          setCurrentStep('editDetails');
+          setError(err.message || 'An unexpected error occurred.');
         } finally {
           setIsLoading(false);
         }
       };
-      loadConvention();
+
+      if (sessionStatus === 'authenticated') {
+        loadConvention();
+      }
     }
-  }, [conventionId, isEditing]); // Use conventionId from the hook as a dependency
+  }, [conventionId, isEditing, sessionStatus]);
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
       router.push('/login');
     }
-    if (sessionStatus === 'authenticated' && !session?.user?.roles?.includes('ORGANIZER')) {
+    // An admin OR an organizer can edit a convention
+    if (sessionStatus === 'authenticated' && !session?.user?.roles?.some(role => ['ADMIN', 'ORGANIZER'].includes(role))) {
       router.push('/unauthorized');
     }
   }, [sessionStatus, session, router]);
@@ -329,330 +412,90 @@ export default function ConventionEditPage() { // Remove params from props
     setIsSaving(true);
     setError(null);
 
-    // Initialize variables to hold the final venue and hotel data for the API
-    let finalPrimaryVenueForApi: VenueData | undefined | null = dataFromTabs.venueHotel?.primaryVenue;
-    let allOtherVenuesForApi: VenueData[] = [];
-    let finalPrimaryHotelDetailsForApi: HotelData | undefined | null = dataFromTabs.venueHotel?.primaryHotelDetails;
-
-    // Initialize allOtherHotelsForApi, ensuring isPrimaryHotel is false and stripping any UI-only flags like markedForPrimaryPromotion
-    let allOtherHotelsForApi: HotelData[] = (dataFromTabs.venueHotel?.hotels || []).map(hotel => {
-      const { markedForPrimaryPromotion, ...restOfHotel } = hotel as any; // Cast to access and then remove UI flag
-      return { ...restOfHotel, isPrimaryHotel: false };
-    });
-
-    if (dataFromTabs.venueHotel) {
-      // --- Venue Promotion Logic ---
-      const currentPrimaryVenue = dataFromTabs.venueHotel.primaryVenue;
-      const secondaryVenues = dataFromTabs.venueHotel.secondaryVenues || [];
-      let promotedVenueFromSecondaries: VenueData | undefined = undefined;
-      let promotedVenueIndex = -1;
-
-      secondaryVenues.forEach((venue, index) => {
-        if (venue.markedForPrimaryPromotion && !promotedVenueFromSecondaries) {
-          promotedVenueFromSecondaries = { ...venue, isPrimaryVenue: true, markedForPrimaryPromotion: false };
-          promotedVenueIndex = index;
-        }
-      });
-
-      if (promotedVenueFromSecondaries) {
-        // A secondary venue is promoted
-        if (currentPrimaryVenue) {
-          allOtherVenuesForApi.push({ ...currentPrimaryVenue, isPrimaryVenue: false, markedForPrimaryPromotion: false });
-        }
-        finalPrimaryVenueForApi = promotedVenueFromSecondaries;
-        secondaryVenues.forEach((venue, index) => {
-          if (index !== promotedVenueIndex) {
-            allOtherVenuesForApi.push({ ...venue, isPrimaryVenue: false, markedForPrimaryPromotion: false });
-          }
-        });
-      } else {
-        // No secondary venue promoted, current primary (if any) remains primary.
-        // allOtherVenuesForApi are just the non-promoted secondary venues.
-        finalPrimaryVenueForApi = currentPrimaryVenue; // Already set at initialization, ensure isPrimary:true if it exists
-        if (finalPrimaryVenueForApi) finalPrimaryVenueForApi.isPrimaryVenue = true;
-
-        allOtherVenuesForApi = secondaryVenues.map(venue => ({ ...venue, isPrimaryVenue: false, markedForPrimaryPromotion: false }));
-      }
-      allOtherVenuesForApi.forEach(v => delete (v as any).markedForPrimaryPromotion); // Clean UI field
-      // --- End Venue Promotion Logic ---
-
-      // --- Hotel Promotion Logic ---
-      // This logic mirrors the Venue Promotion Logic.
-      // It decides which hotel becomes the single primary hotel sent to the API
-      // based on dataFromTabs.venueHotel.primaryHotelDetails and any hotel in
-      // dataFromTabs.venueHotel.hotels marked for primary promotion.
-
-      let finalPrimaryHotelDetailsForApi_temp: HotelData | undefined | null = dataFromTabs.venueHotel?.primaryHotelDetails;
-      let allOtherHotelsForApi_temp: HotelData[] = [];
-
-      if (dataFromTabs.venueHotel) {
-        const currentPrimaryHotelInForm = dataFromTabs.venueHotel.primaryHotelDetails;
-        const additionalHotelsFromForm = dataFromTabs.venueHotel.hotels || [];
-
-        console.log('[EditPage] handleSubmitConvention: Raw additionalHotelsFromForm from tabs:', JSON.stringify(additionalHotelsFromForm, null, 2));
-        additionalHotelsFromForm.forEach(h => console.log(`[EditPage] Hotel: ${h.hotelName}, Marked for promotion: ${(h as any).markedForPrimaryPromotion}`));
-
-        let promotedHotelFromAdditionals: HotelData | undefined = undefined;
-        let promotedHotelIndexInAdditionals = -1;
-
-        additionalHotelsFromForm.forEach((hotel, index) => {
-          // Use 'markedForPrimaryPromotion' which is a UI flag from DisplayHotelData
-          if ((hotel as any).markedForPrimaryPromotion && !promotedHotelFromAdditionals) {
-            // Take a clean copy, ensure isPrimaryHotel is true, and remove UI flags
-            const { markedForPrimaryPromotion, tempId, ...restOfHotel } = hotel as any;
-            promotedHotelFromAdditionals = { ...restOfHotel, isPrimaryHotel: true };
-            promotedHotelIndexInAdditionals = index;
-          }
-        });
-
-        if (promotedHotelFromAdditionals) {
-          // An additional hotel is promoted to be the primary.
-          finalPrimaryHotelDetailsForApi_temp = promotedHotelFromAdditionals;
-
-          // The hotel that was in the primaryHotelDetails form (if any) now becomes an 'other' hotel.
-          if (currentPrimaryHotelInForm) {
-            const { markedForPrimaryPromotion, tempId, ...restOfOldPrimary } = currentPrimaryHotelInForm as any;
-            allOtherHotelsForApi_temp.push({ ...restOfOldPrimary, isPrimaryHotel: false });
-          }
-          // Add all other non-promoted additional hotels to the 'other' hotels list.
-          additionalHotelsFromForm.forEach((hotel, index) => {
-            if (index !== promotedHotelIndexInAdditionals) {
-              const { markedForPrimaryPromotion, tempId, ...restOfHotel } = hotel as any;
-              allOtherHotelsForApi_temp.push({ ...restOfHotel, isPrimaryHotel: false });
-            }
-          });
-        } else {
-          // No additional hotel was marked for promotion.
-          // The hotel in primaryHotelDetails form (if any) remains the primary.
-          if (currentPrimaryHotelInForm) {
-            const { markedForPrimaryPromotion, tempId, ...restOfPrimary } = currentPrimaryHotelInForm as any;
-            finalPrimaryHotelDetailsForApi_temp = { ...restOfPrimary, isPrimaryHotel: true };
-          } else {
-            finalPrimaryHotelDetailsForApi_temp = undefined; // No primary hotel specified at all
-          }
-          // All hotels from the additional hotels list are non-primary.
-          allOtherHotelsForApi_temp = additionalHotelsFromForm.map(hotel => {
-            const { markedForPrimaryPromotion, tempId, ...restOfHotel } = hotel as any;
-            return { ...restOfHotel, isPrimaryHotel: false };
-          });
-        }
-      } else {
-        // No venueHotel data in dataFromTabs, so no hotel details to process.
-        finalPrimaryHotelDetailsForApi_temp = undefined;
-        allOtherHotelsForApi_temp = [];
-      }
-      // Assign to the variables used in payloadForApi
-      finalPrimaryHotelDetailsForApi = finalPrimaryHotelDetailsForApi_temp;
-      allOtherHotelsForApi = allOtherHotelsForApi_temp;
-      // --- End Hotel Promotion Logic ---
-    } else {
-      // No venueHotel data in dataFromTabs, clear all venue/hotel related fields for API
-      finalPrimaryVenueForApi = undefined;
-      allOtherVenuesForApi = [];
-      finalPrimaryHotelDetailsForApi = undefined;
-      allOtherHotelsForApi = [];
-    }
-
-    // Construct the final payload for the API
-    const payloadForApi = {
-      // Basic info fields from dataFromTabs
-      name: dataFromTabs.name,
-      slug: dataFromTabs.slug,
-      startDate: dataFromTabs.startDate,
-      endDate: dataFromTabs.endDate,
-      isOneDayEvent: dataFromTabs.isOneDayEvent,
-      isTBD: dataFromTabs.isTBD,
-      city: dataFromTabs.city,
-      stateName: dataFromTabs.stateName,
-      stateAbbreviation: dataFromTabs.stateAbbreviation,
-      country: dataFromTabs.country,
-      descriptionShort: dataFromTabs.descriptionShort,
-      descriptionMain: dataFromTabs.descriptionMain,
-      websiteUrl: dataFromTabs.websiteUrl,
-      registrationUrl: dataFromTabs.registrationUrl,
-      seriesId: dataFromTabs.seriesId,
-      // Price tiers and discounts from dataFromTabs
-      priceTiers: dataFromTabs.priceTiers,
-      priceDiscounts: dataFromTabs.priceDiscounts,
-      // Venue and Hotel information
-      venueHotel: {
-        primaryVenue: finalPrimaryVenueForApi, // Contains the single primary venue or undefined
-        guestsStayAtPrimaryVenue: dataFromTabs.venueHotel?.guestsStayAtPrimaryVenue ?? false,
-        primaryHotelDetails: finalPrimaryHotelDetailsForApi, // Now correctly determined by new Hotel Promotion Logic
-        hotels: allOtherHotelsForApi, // Array of non-primary hotels, correctly determined
-        secondaryVenues: allOtherVenuesForApi, // Array of non-primary venues
-      },
-    };
-
-    console.log('[EditPage] PayloadForApi being sent (entire object):', JSON.stringify(payloadForApi, null, 2));
-    if (payloadForApi.venueHotel?.primaryVenue) {
-      console.log('[EditPage] Chosen Primary Venue for API:', JSON.stringify(payloadForApi.venueHotel.primaryVenue, null, 2));
-    }
-    // console.log('[EditPage] All other venues collected (API might not use this array directly for updates):', JSON.stringify(allOtherVenuesForApi, null, 2));
+    // Merge the latest data from the active tab with the ref data from all other tabs
+    const finalData = { ...conventionPageDataRef.current, ...dataFromTabs };
 
     try {
-      const url = `/api/organizer/conventions/${conventionId}`;
-      const response = await fetch(url, {
+      // Helper to remove temporary UI-only fields
+      const cleanObject = (obj: any) => {
+        if (!obj) return undefined;
+        const { tempId, markedForPrimaryPromotion, ...rest } = obj;
+        return rest;
+      };
+
+      // Construct payload, ensuring to use the merged finalData
+      const payload = {
+        ...finalData,
+        venueHotel: {
+          primaryVenue: finalData.venueHotel?.primaryVenue ? cleanObject(finalData.venueHotel.primaryVenue) : null,
+          secondaryVenues: finalData.venueHotel?.secondaryVenues?.map(cleanObject) || [],
+          primaryHotelDetails: finalData.venueHotel?.primaryHotelDetails ? cleanObject(finalData.venueHotel.primaryHotelDetails) : null,
+          hotels: finalData.venueHotel?.hotels?.map(cleanObject) || [],
+          guestsStayAtPrimaryVenue: finalData.venueHotel?.guestsStayAtPrimaryVenue,
+        }
+      };
+
+      // Remove fields that shouldn't be in the PUT body for convention root
+      delete (payload as any).priceTiers;
+      delete (payload as any).priceDiscounts;
+      delete (payload as any).newSeriesName; // Should not be sent
+
+      const response = await fetch(`/api/organizer/conventions/${conventionId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadForApi), // Send the more complete payload
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update convention`);
+        throw new Error(errorData.error || `Failed to save convention. Status: ${response.status}`);
       }
 
-      const conventionResult = await response.json();
+      const savedConvention = await response.json();
 
-      // Handle settings separately if provided
-      if (dataFromTabs.settings) {
-        console.log('[EditPage] Saving settings:', dataFromTabs.settings);
-        try {
-          const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dataFromTabs.settings),
-          });
-
-          if (!settingsResponse.ok) {
-            const settingsError = await settingsResponse.json();
-            console.warn('[EditPage] Failed to save settings:', settingsError);
-            // Don't fail the whole operation if settings save fails
-          } else {
-            console.log('[EditPage] Settings saved successfully');
-          }
-        } catch (settingsError) {
-          console.warn('[EditPage] Settings save error:', settingsError);
-          // Don't fail the whole operation if settings save fails
+      // Update local state with any new data from the server (like new IDs)
+      setConventionPageData(prev => ({
+        ...prev,
+        ...savedConvention,
+        venueHotel: {
+          ...prev.venueHotel,
+          ...savedConvention.venueHotel,
         }
-      }
-
-      // START OF MODIFICATION: Update local state before navigating
-      // First, transform the API response (conventionResult) to match PageConventionData structure
-      let transformedPrimaryVenue: VenueData | undefined = undefined;
-      const transformedSecondaryVenues: VenueData[] = [];
-      const transformedHotels: HotelData[] = [];
-      let transformedPrimaryHotelDetails: HotelData | undefined = undefined;
-
-      if (conventionResult.venues && Array.isArray(conventionResult.venues)) {
-        conventionResult.venues.forEach((apiVenue: ApiVenueData) => {
-          const venue: VenueData = {
-            id: apiVenue.id,
-            isPrimaryVenue: apiVenue.isPrimaryVenue || false,
-            markedForPrimaryPromotion: false, // Reset UI flag
-            venueName: apiVenue.venueName || '',
-            description: apiVenue.description || '',
-            websiteUrl: apiVenue.websiteUrl || '',
-            googleMapsUrl: apiVenue.googleMapsUrl || '',
-            streetAddress: apiVenue.streetAddress || '',
-            city: apiVenue.city || '',
-            stateRegion: apiVenue.stateRegion || '',
-            postalCode: apiVenue.postalCode || '',
-            country: apiVenue.country || '',
-            contactEmail: apiVenue.contactEmail || '',
-            contactPhone: apiVenue.contactPhone || '',
-            amenities: Array.isArray(apiVenue.amenities) ? apiVenue.amenities.map(String) : [],
-            parkingInfo: apiVenue.parkingInfo || '',
-            publicTransportInfo: apiVenue.publicTransportInfo || '',
-            overallAccessibilityNotes: apiVenue.overallAccessibilityNotes || '',
-            photos: Array.isArray(apiVenue.photos) ? apiVenue.photos.map((p: ApiPhotoData) => ({ url: p.url, caption: p.caption, id: p.id })) : [],
-          };
-          if (venue.isPrimaryVenue) {
-            transformedPrimaryVenue = venue;
-          } else {
-            transformedSecondaryVenues.push(venue);
-          }
-        });
-      }
-
-      const actualGuestsStayAtPrimaryVenue = conventionResult.guestsStayAtPrimaryVenue ?? false;
-
-      if (conventionResult.hotels && Array.isArray(conventionResult.hotels)) {
-        conventionResult.hotels.forEach((apiHotel: ApiHotelData) => {
-          const commonHotelData: HotelData = {
-            id: apiHotel.id,
-            isPrimaryHotel: apiHotel.isPrimaryHotel || false,
-            isAtPrimaryVenueLocation: apiHotel.isAtPrimaryVenueLocation || false,
-            markedForPrimaryPromotion: false, // Initialize with default
-            hotelName: apiHotel.hotelName || '',
-            description: apiHotel.description || '',
-            websiteUrl: apiHotel.websiteUrl || '',
-            googleMapsUrl: apiHotel.googleMapsUrl || '',
-            streetAddress: apiHotel.streetAddress || '',
-            city: apiHotel.city || '',
-            stateRegion: apiHotel.stateRegion || '',
-            postalCode: apiHotel.postalCode || '',
-            country: apiHotel.country || '',
-            contactEmail: apiHotel.contactEmail || '',
-            contactPhone: apiHotel.contactPhone || '',
-            amenities: Array.isArray(apiHotel.amenities) ? apiHotel.amenities.map(String) : [],
-            photos: Array.isArray(apiHotel.photos) ? apiHotel.photos.map(p => ({ url: p.url, caption: p.caption, id: p.id })) : [],
-            parkingInfo: apiHotel.parkingInfo || '',
-            publicTransportInfo: apiHotel.publicTransportInfo || '',
-            overallAccessibilityNotes: apiHotel.overallAccessibilityNotes || '',
-            bookingLink: apiHotel.bookingLink || '',
-            bookingCutoffDate: apiHotel.bookingCutoffDate ? new Date(apiHotel.bookingCutoffDate) : null,
-            groupRateOrBookingCode: apiHotel.groupRateOrBookingCode || '',
-            groupPrice: apiHotel.groupPrice || '',
-          };
-          if (actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel) {
-            transformedPrimaryHotelDetails = commonHotelData;
-          } else {
-            if (!(actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel)) {
-              transformedHotels.push(commonHotelData);
-            }
-          }
-        });
-      }
-
-      const transformedVenueHotelData: VenueHotelTabData = {
-        primaryVenue: transformedPrimaryVenue,
-        secondaryVenues: transformedSecondaryVenues,
-        hotels: transformedHotels,
-        guestsStayAtPrimaryVenue: actualGuestsStayAtPrimaryVenue,
-        primaryHotelDetails: transformedPrimaryHotelDetails,
-      };
-
-      setConventionPageData(prevData => ({
-        ...prevData, // Keep existing data not directly from conventionResult (like non-API fields or UI state)
-        id: conventionResult.id || conventionId, // Ensure ID is from result or params
-        name: conventionResult.name || '',
-        slug: conventionResult.slug || '',
-        startDate: conventionResult.startDate ? new Date(conventionResult.startDate) : null,
-        endDate: conventionResult.endDate ? new Date(conventionResult.endDate) : null,
-        isOneDayEvent: conventionResult.isOneDayEvent || false,
-        isTBD: conventionResult.isTBD || false,
-        city: conventionResult.city || '',
-        stateName: conventionResult.stateName || conventionResult.stateAbbreviation || '',
-        stateAbbreviation: conventionResult.stateAbbreviation || '',
-        country: conventionResult.country || '',
-        descriptionShort: conventionResult.descriptionShort || '',
-        descriptionMain: conventionResult.descriptionMain || '',
-        seriesId: conventionResult.seriesId, // API should return seriesId
-        priceTiers: conventionResult.priceTiers || [],
-        priceDiscounts: conventionResult.priceDiscounts || [],
-        venueHotel: transformedVenueHotelData,
       }));
-      // END OF MODIFICATION
 
-      router.push('/organizer/conventions?toastMessage=Convention+updated+successfully'); // Or back to conventions list
+      // Optionally, show a success message
+      // e.g., using a toast notification library
+      console.log('Convention saved successfully!');
+
+      // Redirect based on user role
+      if (session?.user?.roles?.includes('ADMIN')) {
+        router.push('/admin/conventions');
+      } else {
+        router.push('/organizer/conventions'); // Default for Organizers
+      }
+
     } catch (err: any) {
-      console.error('Client-side error during handleSubmitConvention:', err);
-      setError(err.message || 'Failed to update convention. Please check console for details.');
+      console.error('Save failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      setError(errorMessage);
+      // Re-throw the error so the calling component knows about the failure.
+      throw new Error(errorMessage);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    router.push('/organizer/conventions');
+    router.back();
   };
 
-  if (isLoading && !conventionPageData) { // Show loading only if data isn't there yet
+  if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh" flexDirection="column">
         <CircularProgress />
+        <Typography sx={{ mt: 2 }}>Loading Convention Data...</Typography>
       </Box>
     );
   }
@@ -661,7 +504,7 @@ export default function ConventionEditPage() { // Remove params from props
     return <p>Loading session...</p>;
   }
 
-  if (sessionStatus === 'unauthenticated' || (sessionStatus === 'authenticated' && !session?.user?.roles?.includes('ORGANIZER'))) {
+  if (sessionStatus === 'unauthenticated' || (sessionStatus === 'authenticated' && !session?.user?.roles?.some(role => ['ADMIN', 'ORGANIZER'].includes(role)))) {
     return <p>Redirecting...</p>;
   }
 
@@ -670,29 +513,76 @@ export default function ConventionEditPage() { // Remove params from props
   }
 
   return (
-    <Container maxWidth="lg">
-      <Paper elevation={3} sx={{ p: 3, mt: 3, mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          {conventionPageData?.name ? `Edit ${conventionPageData.name}` : 'Edit Convention'}
+    <Container maxWidth="lg" sx={{ my: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ flex: 1 }}>
+          {isEditing ? `Edit ${conventionPageData.name || 'Convention'}` : 'Create New Convention'}
         </Typography>
-        {currentStep === 'selectSeries' && conventionPageData && (
+
+        {isEditing && conventionPageData.status && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Chip
+              label={statusLabels[conventionPageData.status]}
+              color={statusColors[conventionPageData.status]}
+              size="small"
+            />
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={conventionPageData.status}
+                label="Status"
+                onChange={(e) => handleStatusChange(e.target.value as ConventionStatus)}
+                disabled={isUpdatingStatus}
+              >
+                <MenuItem value={ConventionStatus.PUBLISHED}>
+                  {statusLabels[ConventionStatus.PUBLISHED]}
+                </MenuItem>
+                <MenuItem value={ConventionStatus.DRAFT}>
+                  {statusLabels[ConventionStatus.DRAFT]}
+                </MenuItem>
+                <MenuItem value={ConventionStatus.PAST}>
+                  {statusLabels[ConventionStatus.PAST]}
+                </MenuItem>
+                <MenuItem value={ConventionStatus.CANCELLED}>
+                  {statusLabels[ConventionStatus.CANCELLED]}
+                </MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        )}
+      </Box>
+
+      {/* Display any errors */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {currentStep === 'selectSeries' && !isEditing ? (
+        <Paper elevation={3} sx={{ p: 4 }}>
           <ConventionSeriesSelector
             onSeriesSelect={handleExistingSeriesSelected}
             onNewSeriesCreate={handleNewSeriesCreated}
-            initialSeriesId={conventionPageData?.seriesId}
           />
-        )}
-        {currentStep === 'editDetails' && conventionPageData && (
-          <ConventionEditorTabs
-            initialConventionData={conventionPageData}
-            isEditing={isEditing}
-            onSave={handleSubmitConvention}
-            isSaving={isSaving}
-            onCancel={handleCancel}
-          />
-        )}
-        {error && currentStep === 'editDetails' && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-      </Paper>
+        </Paper>
+      ) : (
+        <ConventionEditorTabs
+          initialConventionData={conventionPageData}
+          onSave={handleSubmitConvention}
+          onCancel={handleCancel}
+          isSaving={isSaving}
+          isEditing={isEditing}
+        />
+      )}
     </Container>
+  );
+}
+
+export default function GuardedConventionEditPage() {
+  return (
+    <AdminGuard redirectUrl="/admin/conventions">
+      <ConventionEditPage />
+    </AdminGuard>
   );
 } 

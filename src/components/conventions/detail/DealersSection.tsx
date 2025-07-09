@@ -10,6 +10,7 @@ import {
     CardContent,
     Avatar,
     Button,
+    CardActionArea,
 } from '@mui/material';
 import NextLink from 'next/link';
 
@@ -56,33 +57,28 @@ export default function DealersSection({ convention }: DealersSectionProps) {
             </Typography>
             <Grid container spacing={3}>
                 {dealers.map((dealer) => (
-                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={dealer.id}>
-                        <Card sx={{ height: '100%' }}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                                <Avatar
-                                    variant="square"
-                                    src={dealer.profileImageUrl || undefined}
-                                    alt={dealer.displayNameOverride || dealer.name}
-                                    sx={{ width: 120, height: 120, margin: '0 auto 16px', bgcolor: 'transparent', '& img': { objectFit: 'contain' } }}
-                                />
-                                <Typography variant="h6" component="div">
-                                    {dealer.displayNameOverride || dealer.name}
-                                </Typography>
-                                {dealer.descriptionOverride && (
-                                    <Typography variant="body2" color="text.secondary" paragraph>
-                                        {dealer.descriptionOverride}
-                                    </Typography>
-                                )}
-                                {dealer.profileLink && (
-                                    <Button
-                                        component={NextLink}
-                                        href={dealer.profileLink}
-                                        variant="text"
-                                    >
-                                        View Profile
-                                    </Button>
-                                )}
-                            </CardContent>
+                    <Grid item xs={12} sm={6} md={4} key={dealer.id}>
+                        <Card sx={{ height: '100%', borderRadius: '8px' }}>
+                            <NextLink href={dealer.profileLink || '#'} passHref legacyBehavior>
+                                <CardActionArea sx={{ height: '100%' }}>
+                                    <CardContent sx={{ textAlign: 'center', p: '12px' }}>
+                                        <Avatar
+                                            variant="square"
+                                            src={dealer.profileImageUrl || undefined}
+                                            alt={dealer.displayNameOverride || dealer.name}
+                                            sx={{ width: 120, height: 120, margin: '0 auto 8px', bgcolor: 'transparent', '& img': { objectFit: 'contain' } }}
+                                        />
+                                        <Typography variant="h6" component="div">
+                                            {dealer.displayNameOverride || dealer.name}
+                                        </Typography>
+                                        {dealer.descriptionOverride && (
+                                            <Typography variant="body2" color="text.secondary" paragraph sx={{ mb: 0 }}>
+                                                {dealer.descriptionOverride}
+                                            </Typography>
+                                        )}
+                                    </CardContent>
+                                </CardActionArea>
+                            </NextLink>
                         </Card>
                     </Grid>
                 ))}

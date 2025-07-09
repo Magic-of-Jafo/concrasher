@@ -36,8 +36,21 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     // Setup projects for authentication
-    { name: 'setup-organizer', testMatch: /auth\.setup\.ts/ },
-    // { name: 'setup-admin', testMatch: /admin\.auth\.setup\.ts/ },
+    {
+      name: 'setup-organizer',
+      testMatch: /auth\.setup\.ts/,
+      use: { baseURL },
+    },
+    {
+      name: 'setup-admin',
+      testMatch: /admin\.auth\.setup\.ts/,
+      use: { baseURL },
+    },
+    {
+      name: 'setup-user',
+      testMatch: /user\.auth\.setup\.ts/,
+      use: { baseURL },
+    },
 
     // Project for tests that need an ORGANIZER role
     {
@@ -46,20 +59,22 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         storageState: '.auth/organizer.json',
+        baseURL,
       },
       dependencies: ['setup-organizer'],
     },
 
     // Project for tests that need an ADMIN role
-    // {
-    //   name: 'admin',
-    //   testDir: 'tests/admin',
-    //   use: {
-    //     ...devices['Desktop Chrome'],
-    //     storageState: '.auth/admin.json',
-    //   },
-    //   dependencies: ['setup-admin'],
-    // },
+    {
+      name: 'admin',
+      testDir: 'tests/admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: '.auth/admin.json',
+        baseURL,
+      },
+      dependencies: ['setup-admin', 'setup-user'],
+    },
   ],
 
   /* Optional: Run your local dev server before starting the tests */
@@ -68,5 +83,13 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // Increase timeout for server start
+    env: {
+      E2E_ADMIN_EMAIL: process.env.E2E_ADMIN_EMAIL!,
+      E2E_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD!,
+      E2E_ORGANIZER_EMAIL: process.env.E2E_ORGANIZER_EMAIL!,
+      E2E_ORGANIZER_PASSWORD: process.env.E2E_ORGANIZER_PASSWORD!,
+      E2E_USER_EMAIL: process.env.E2E_USER_EMAIL!,
+      E2E_USER_PASSWORD: process.env.E2E_USER_PASSWORD!,
+    }
   },
 }); 

@@ -1,275 +1,346 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState, useEffect, KeyboardEvent } from 'react';
 import {
-  DataGrid,
-  GridColDef,
-  GridRenderCellParams,
-  GridValueGetter,
-} from "@mui/x-data-grid";
-import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
   Box,
-  Chip,
-  IconButton,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Snackbar,
+  CircularProgress,
   Alert,
-} from "@mui/material";
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  MoreVert as MoreIcon,
-  Person as PersonIcon,
-} from "@mui/icons-material";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Convention, ConventionStatus } from "@prisma/client";
-import { useRouter } from "next/navigation";
+  IconButton,
+  TextField,
+  Typography,
+  Button,
+  ButtonGroup,
+  ToggleButton,
+  InputAdornment,
+} from '@mui/material';
+import { Grid } from '@mui/material';
+import { format } from 'date-fns';
+import { Convention, ConventionStatus } from '@prisma/client';
+import NextLink from 'next/link';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ClearIcon from '@mui/icons-material/Clear';
+import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
+import { deleteConvention } from '@/lib/actions';
+import { useDebounce } from '@/hooks/useDebounce';
 
-const columns: GridColDef[] = [
-  {
-    field: "name",
-    headerName: "Name",
-    flex: 1,
-    minWidth: 200,
-  },
-  {
-    field: "status",
-    headerName: "Status",
-    width: 130,
-    renderCell: (params: GridRenderCellParams) => (
-      <Chip
-        label={params.value}
-        color={
-          params.value === "PUBLISHED"
-            ? "success"
-            : params.value === "DRAFT"
-            ? "default"
-            : "warning"
-        }
-        size="small"
-      />
-    ),
-  },
-  {
-    field: "startDate",
-    headerName: "Start Date",
-    width: 130,
-    valueGetter: (params: GridValueGetter) =>
-      params.row?.startDate ? new Date(params.row.startDate).toLocaleDateString() : "N/A",
-  },
-  {
-    field: "endDate",
-    headerName: "End Date",
-    width: 130,
-    valueGetter: (params: GridValueGetter) =>
-      params.row?.endDate ? new Date(params.row.endDate).toLocaleDateString() : "N/A",
-  },
-  {
-    field: "organizer",
-    headerName: "Organizer",
-    width: 150,
-    valueGetter: (params: GridValueGetter) => params.row?.organizer?.name || "N/A",
-  },
-  {
-    field: "actions",
-    headerName: "Actions",
-    width: 100,
-    sortable: false,
-    renderCell: (params: GridRenderCellParams) => (
-      <AdminConventionActions convention={params.row} />
-    ),
-  },
-];
 
-interface AdminConventionActionsProps {
-  convention: Convention;
+
+type FilterValue = ConventionStatus | 'PAST';
+
+interface AdminConventionListProps {
+  error: string | null;
+  setError: (error: string | null) => void;
 }
 
-function AdminConventionActions({ convention }: AdminConventionActionsProps) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+export default function AdminConventionList({ error, setError }: AdminConventionListProps) {
+  const [conventions, setConventions] = useState<Convention[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [conventionToDelete, setConventionToDelete] = useState<Convention | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [isExpiring, setIsExpiring] = useState(false);
+  const [matchCounts, setMatchCounts] = useState<Record<ConventionStatus, number> | null>(null);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<ConventionStatus>(ConventionStatus.PUBLISHED);
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
-  const handleEdit = () => {
-    handleMenuClose();
-    router.push(`/conventions/${convention.id}/edit`);
-  };
+  const fetchConventions = async () => {
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams();
+    if (debouncedSearchQuery) {
+      params.set('query', debouncedSearchQuery);
+    }
 
-  const handleViewOrganizer = () => {
-    handleMenuClose();
-    router.push(`/admin/users/${convention.organizerUserId}`);
-  };
+    params.set('status', activeFilter);
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/admin/conventions/${convention.id}`, {
-        method: "DELETE",
-      });
+    // Only apply the 'current' view for published conventions
+    if (activeFilter === ConventionStatus.PUBLISHED) {
+      params.set('view', 'current');
+    }
+
+    try {
+      const response = await fetch(`/api/conventions?${params.toString()}`);
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to delete convention");
+        const errorMessage = data.error || data.message || 'An unknown error occurred.';
+        throw new Error(errorMessage);
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-conventions"] });
-      setDeleteDialogOpen(false);
-      setSnackbar({
-        open: true,
-        message: "Convention deleted successfully",
-        severity: "success",
-      });
-    },
-    onError: () => {
-      setSnackbar({
-        open: true,
-        message: "Failed to delete convention",
-        severity: "error",
-      });
-    },
-  });
 
-  const handleDelete = () => {
-    handleMenuClose();
-    setDeleteDialogOpen(true);
+      setConventions(data.items);
+      setMatchCounts(data.matchCounts);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const confirmDelete = () => {
-    deleteMutation.mutate();
+  useEffect(() => {
+    fetchConventions();
+  }, [debouncedSearchQuery, activeFilter]);
+
+  useEffect(() => {
+    if (!confirmingDeleteId) return;
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setConfirmingDeleteId(null);
+      }
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-delete-button-id]')) {
+        setConfirmingDeleteId(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [confirmingDeleteId]);
+
+  const handleDeleteIconClick = (conventionId: string) => {
+    setConfirmingDeleteId(conventionId);
   };
+
+  const triggerDeleteConfirmation = (convention: Convention) => {
+    setConventionToDelete(convention);
+    setConfirmingDeleteId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!conventionToDelete) return;
+    setIsDeleting(true);
+    setError(null);
+
+    const result = await deleteConvention(conventionToDelete.id);
+
+    setIsDeleting(false);
+    if (result.success) {
+      setConventionToDelete(null);
+      fetchConventions(); // Refresh the list
+    } else {
+      setError(result.error || 'Failed to delete convention.');
+    }
+  };
+
+  const handleStatusChange = (status: ConventionStatus) => {
+    setActiveFilter(status);
+  };
+
+  const handleFindExpired = async () => {
+    setIsExpiring(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/conventions/expire', { method: 'POST' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Use the error message from the API, or a fallback.
+        const errorMessage = data.error || data.message || 'An unknown error occurred.';
+        throw new Error(errorMessage);
+      }
+
+      console.log(data.message); // Log success message
+      // TODO: Maybe show a success snackbar/toast here in the future
+      if (activeFilter === 'PAST') {
+        fetchConventions(); // Refresh if we are viewing past conventions
+      } else {
+        setActiveFilter('PAST'); // Switch to past view to see the change
+      }
+    } catch (err: any) {
+      // Also catch network errors from fetch itself
+      setError(err.message || 'A network error occurred. Please try again.');
+    } finally {
+      setIsExpiring(false);
+    }
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setSearchQuery('');
+    }
+  };
+
+  const filterOptions: { label: string; value: ConventionStatus }[] = [
+    { label: 'Published', value: ConventionStatus.PUBLISHED },
+    { label: 'Draft', value: ConventionStatus.DRAFT },
+    { label: 'Cancelled', value: ConventionStatus.CANCELLED },
+    { label: 'Past', value: ConventionStatus.PAST },
+  ];
+
+  const currentFilterLabel = filterOptions.find(f => f.value === activeFilter)?.label || 'Conventions';
 
   return (
-    <>
-      <IconButton
-        size="small"
-        onClick={handleMenuOpen}
-        aria-label="convention actions"
-      >
-        <MoreIcon />
-      </IconButton>
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={3} component={Paper} sx={{ p: 2, position: 'sticky', top: '80px' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box>
+            <Typography variant="subtitle1" gutterBottom component="div" sx={{ fontWeight: 'bold' }}>
+              Status
+            </Typography>
+            <ButtonGroup
+              orientation="vertical"
+              fullWidth
+              sx={{
+                '& .MuiButtonGroup-grouped': {
+                  border: '1px solid rgba(0, 0, 0, 0.23)',
+                  '&:not(:last-of-type)': {
+                    borderBottom: 0,
+                  },
+                }
+              }}
+            >
+              {filterOptions.map(({ label, value }) => (
+                <Button
+                  key={value}
+                  variant={activeFilter === value ? 'contained' : 'outlined'}
+                  onClick={() => setActiveFilter(value)}
+                  sx={{ display: 'flex', justifyContent: 'space-between' }}
+                >
+                  <span>{label}</span>
+                  {matchCounts && matchCounts[value] > 0 && activeFilter !== value && (
+                    <Box sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: 'success.main',
+                      ml: 1
+                    }} />
+                  )}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </Box>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleEdit}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Edit</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleViewOrganizer}>
-          <ListItemIcon>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>View Organizer</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleDelete}>
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
-        </MenuItem>
-      </Menu>
-
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>Delete Convention</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete "{convention.name}"? This action cannot
-          be undone.
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button
-            onClick={confirmDelete}
-            color="error"
-            disabled={deleteMutation.isPending}
+            variant="outlined"
+            size="small"
+            onClick={handleFindExpired}
+            disabled={isExpiring}
           >
-            Delete
+            {isExpiring ? 'Working...' : 'Set Expired'}
           </Button>
-        </DialogActions>
-      </Dialog>
+          <TextField
+            label="Search"
+            variant="outlined"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            fullWidth
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  {searchQuery && (
+                    <IconButton
+                      aria-label="clear search"
+                      onClick={() => setSearchQuery('')}
+                      edge="end"
+                    >
+                      <ClearIcon />
+                    </IconButton>
+                  )}
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+      </Grid>
+      <Grid item xs={12} md={9}>
+        {loading ? (
+          <CircularProgress />
+        ) : (
+          <TableContainer component={Paper}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: '40%' }}>Convention ({currentFilterLabel})</TableCell>
+                  <TableCell sx={{ width: '25%' }}>Dates</TableCell>
+                  <TableCell sx={{ width: '25%' }}>Location</TableCell>
+                  <TableCell sx={{ width: '10%' }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {conventions.map((convention) => (
+                  <TableRow key={convention.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                    <TableCell
+                      component="th"
+                      scope="row"
+                      sx={{
+                        maxWidth: '300px', // Set a maximum width for the name column
+                        wordWrap: 'break-word',
+                        whiteSpace: 'normal',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {convention.name}
+                    </TableCell>
+                    <TableCell>
+                      {convention.startDate ? format(new Date(convention.startDate), 'PPP') : 'TBD'}
+                    </TableCell>
+                    <TableCell>{convention.city && convention.stateAbbreviation ? `${convention.city}, ${convention.stateAbbreviation}` : 'TBD'}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconButton component={NextLink} href={`/organizer/conventions/${convention.id}/edit`} aria-label="edit">
+                          <EditIcon />
+                        </IconButton>
+                        {confirmingDeleteId === convention.id ? (
+                          <Button
+                            variant="contained"
+                            color="error"
+                            onClick={() => triggerDeleteConfirmation(convention)}
+                            data-delete-button-id={convention.id}
+                            size="small"
+                          >
+                            DELETE
+                          </Button>
+                        ) : (
+                          <IconButton
+                            onClick={() => handleDeleteIconClick(convention.id)}
+                            aria-label="delete"
+                            data-delete-button-id={convention.id}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Grid>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </>
-  );
-}
-
-export default function AdminConventionList() {
-  const [paginationModel, setPaginationModel] = useState({
-    pageSize: 10,
-    page: 0,
-  });
-
-  const { data: conventions, isLoading } = useQuery<{
-    data: Convention[];
-    total: number;
-  }>({
-    queryKey: ["admin-conventions", paginationModel],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/admin/conventions?page=${paginationModel.page}&pageSize=${paginationModel.pageSize}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch conventions");
-      }
-      return response.json();
-    },
-  });
-
-  return (
-    <Box sx={{ height: 600, width: "100%" }}>
-      <DataGrid
-        rows={conventions?.data || []}
-        columns={columns}
-        loading={isLoading}
-        paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[10, 25, 50]}
-        rowCount={conventions?.total || 0}
-        paginationMode="server"
-        getRowId={(row) => row.id}
+      <ConfirmationModal
+        isOpen={!!conventionToDelete}
+        onClose={() => setConventionToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Confirm Deletion"
+        description={`Are you sure you want to delete the convention "${conventionToDelete?.name}"? This action is permanent.`}
+        isConfirming={isDeleting}
       />
-    </Box>
+    </Grid>
   );
 } 

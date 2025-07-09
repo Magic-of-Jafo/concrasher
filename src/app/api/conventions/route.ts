@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { ConventionCreateSchema as StaticConventionCreateSchema } from '@/lib/validators';
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role, ConventionStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { ConventionSearchParamsSchema, buildSearchQuery, calculatePagination } from '@/lib/search';
 import { NextRequest } from 'next/server';
@@ -11,8 +11,6 @@ import { db } from "@/lib/db";
 import { getStateVariations } from '@/lib/stateUtils';
 import { ConventionSearchParams } from '@/lib/search';
 import { Prisma } from '@prisma/client';
-
-type ConventionStatus = 'PUBLISHED' | 'PAST' | 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'CANCELLED';
 
 // Simple slugify function (replace with a more robust one if needed, e.g., slugify library)
 function slugify(text: string): string {
@@ -112,81 +110,149 @@ export async function POST(req: Request) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { id: string; roles: Role[] } | undefined;
+    const isAdmin = user?.roles?.includes(Role.ADMIN);
+
     const searchParams = request.nextUrl.searchParams;
-    const params: ConventionSearchParams = {
-      page: Number(searchParams.get('page')) || 1,
-      limit: Number(searchParams.get('limit')) || 10,
+    const params = {
       query: searchParams.get('query') || '',
       city: searchParams.get('city') || '',
       state: searchParams.get('state') || '',
       country: searchParams.get('country') || '',
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
-      status: searchParams.get('status') ? [searchParams.get('status') as ConventionStatus] : undefined,
+      status: searchParams.get('status') || '', // Can be comma-separated
+      view: searchParams.get('view') || '', // 'current' or empty
     };
 
-    const skip = (params.page - 1) * params.limit;
-    const searchQuery: Prisma.ConventionWhereInput = params.query ? {
-      OR: [
-        { name: { contains: params.query, mode: 'insensitive' as const } },
-        { city: { contains: params.query, mode: 'insensitive' as const } },
-        { stateName: { contains: params.query, mode: 'insensitive' as const } },
-        { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
-        { country: { contains: params.query, mode: 'insensitive' as const } },
-        { venueName: { contains: params.query, mode: 'insensitive' as const } },
-        { description: { contains: params.query, mode: 'insensitive' as const } },
-      ],
-    } : {};
+    const where: Prisma.ConventionWhereInput = {};
+    const andClauses: Prisma.ConventionWhereInput[] = [];
+
+    if (params.query) {
+      andClauses.push({
+        OR: [
+          { name: { contains: params.query, mode: 'insensitive' as const } },
+          { city: { contains: params.query, mode: 'insensitive' as const } },
+          { stateName: { contains: params.query, mode: 'insensitive' as const } },
+          { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
+          { country: { contains: params.query, mode: 'insensitive' as const } },
+          { venueName: { contains: params.query, mode: 'insensitive' as const } },
+          { descriptionShort: { contains: params.query, mode: 'insensitive' as const } },
+          { descriptionMain: { contains: params.query, mode: 'insensitive' as const } },
+        ],
+      });
+    }
 
     // Add additional filters
     if (params.city) {
-      searchQuery.city = { contains: params.city, mode: 'insensitive' as const };
+      andClauses.push({ city: { contains: params.city, mode: 'insensitive' as const } });
     }
     if (params.state) {
-      searchQuery.OR = [
-        { stateName: { contains: params.state, mode: 'insensitive' as const } },
-        { stateAbbreviation: { contains: params.state, mode: 'insensitive' as const } },
-      ];
+      andClauses.push({
+        OR: [
+          { stateName: { contains: params.state, mode: 'insensitive' as const } },
+          { stateAbbreviation: { contains: params.state, mode: 'insensitive' as const } },
+        ],
+      });
     }
     if (params.country) {
-      searchQuery.country = { contains: params.country, mode: 'insensitive' as const };
+      andClauses.push({ country: { contains: params.country, mode: 'insensitive' as const } });
     }
     if (params.startDate) {
-      searchQuery.startDate = { gte: new Date(params.startDate) };
+      andClauses.push({ startDate: { gte: new Date(params.startDate) } });
     }
     if (params.endDate) {
-      searchQuery.endDate = { lte: new Date(params.endDate) };
+      andClauses.push({ endDate: { lte: new Date(params.endDate) } });
     }
 
-    // Handle status filter - default to showing PUBLISHED conventions
-    const statusParam = searchParams.get('status');
-    if (statusParam === 'PAST') {
-      searchQuery.status = ConventionStatus.PAST;
+    const baseSearchQuery: Prisma.ConventionWhereInput = andClauses.length > 0 ? { AND: andClauses } : {};
+
+    // --- Main Query to get the list of items ---
+    const mainQueryWhere = { ...baseSearchQuery };
+    const mainQueryAnd: Prisma.ConventionWhereInput[] = (mainQueryWhere.AND as Prisma.ConventionWhereInput[]) || [];
+
+    // Handle status and visibility based on admin role
+    if (isAdmin) {
+      // Status filter is now mandatory for this admin view, but we check for safety.
+      if (params.status) {
+        const statuses = params.status
+          .split(',')
+          .filter(s => !!s && Object.values(ConventionStatus).includes(s as any)) as ConventionStatus[];
+
+        if (statuses.length > 0) {
+          mainQueryAnd.push({ status: { in: statuses } });
+        }
+      }
+
+      // The 'view' parameter is now only used to scope 'PUBLISHED' conventions
+      if (params.view === 'current') {
+        mainQueryAnd.push({
+          OR: [{ endDate: { gte: new Date() } }, { endDate: null }],
+        });
+      }
     } else {
-      // For active view, show PUBLISHED conventions
-      searchQuery.status = ConventionStatus.PUBLISHED;
+      // For public/non-admin view, only show PUBLISHED conventions
+      mainQueryAnd.push({ status: 'PUBLISHED' });
+      // Always filter out soft-deleted conventions for public view
+      mainQueryAnd.push({ deletedAt: null });
     }
 
-    // Always filter out soft-deleted conventions for public view
-    searchQuery.deletedAt = null;
+    if (mainQueryAnd.length > 0) {
+      mainQueryWhere.AND = mainQueryAnd;
+    }
 
-    const [items, total] = await Promise.all([
-      prisma.convention.findMany({
-        where: searchQuery,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: params.limit,
-      }),
-      prisma.convention.count({
-        where: searchQuery,
-      }),
-    ]);
+    const items = await prisma.convention.findMany({
+      where: mainQueryWhere,
+      orderBy: { startDate: 'asc' },
+    });
+
+    // --- Parallel queries to get match counts for each status ---
+    let matchCounts: Record<ConventionStatus, number> = {
+      PUBLISHED: 0,
+      DRAFT: 0,
+      CANCELLED: 0,
+      PAST: 0
+    };
+
+    if (isAdmin && params.query) {
+      const statuses = Object.values(ConventionStatus);
+      const countPromises = statuses.map(status => {
+        // Re-create the text search clause from scratch to ensure no side-effects.
+        const textSearchClause: Prisma.ConventionWhereInput = {
+          OR: [
+            { name: { contains: params.query, mode: 'insensitive' as const } },
+            { city: { contains: params.query, mode: 'insensitive' as const } },
+            { stateName: { contains: params.query, mode: 'insensitive' as const } },
+            { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
+            { country: { contains: params.query, mode: 'insensitive' as const } },
+            { venueName: { contains: params.query, mode: 'insensitive' as const } },
+            { descriptionShort: { contains: params.query, mode: 'insensitive' as const } },
+            { descriptionMain: { contains: params.query, mode: 'insensitive' as const } },
+          ],
+        };
+
+        return prisma.convention.count({
+          where: {
+            status: status,
+            AND: [textSearchClause]
+          }
+        });
+      });
+      const counts = await Promise.all(countPromises);
+
+      const newMatchCounts = {} as Record<ConventionStatus, number>;
+      statuses.forEach((status, index) => {
+        newMatchCounts[status] = counts[index];
+      });
+      matchCounts = newMatchCounts;
+    }
+
 
     return NextResponse.json({
       items,
-      total,
-      page: params.page,
-      totalPages: Math.ceil(total / params.limit),
+      total: items.length,
+      matchCounts,
     });
   } catch (error) {
     console.error('Error fetching conventions:', error);

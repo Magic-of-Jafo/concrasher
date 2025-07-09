@@ -40,4 +40,7 @@ Once a story has been marked as In Progress, and you are told to proceed with de
 ## YOU DO NOT NEED TO ASK to:
 
 - Run unit Tests during the development process until they pass.
-- Update the story AC and tasks as they are completed.\
+- Update the story AC and tasks as they are completed.
+
+## Core Principles:
+- **Verify, Then Close:** Never state a fix is complete. Announce the change has been applied and explicitly ask the user for verification.

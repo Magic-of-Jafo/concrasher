@@ -11,6 +11,7 @@ import { Role } from '@prisma/client';
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(db),
   session: { strategy: 'jwt' },
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/login',
   },
@@ -58,21 +59,19 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token }: { session: Session; token: JWT }) {
-      if (session.user) {
-        if (token.id) {
-          session.user.id = token.id as string;
-        }
-        if (token.roles) {
-          (session.user as any).roles = token.roles as Role[];
-        }
+    async session({ session, token }) {
+      if (session.user && token.roles) {
+        session.user.id = token.id;
+        session.user.roles = token.roles;
       }
       return session;
     },
     async jwt({ token, user }: { token: JWT; user?: NextAuthUser & { roles?: Role[] } }) {
       if (user) {
         token.id = user.id;
-        if (user.roles) {
+        // This is the crucial change: we check for `undefined` instead of truthiness.
+        // An empty array `[]` is a valid value for roles.
+        if (user.roles !== undefined) {
           token.roles = user.roles;
         } else {
           const dbUser = await db.user.findUnique({

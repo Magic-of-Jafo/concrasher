@@ -1,31 +1,27 @@
-import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
-import { Role } from "@prisma/client";
-import AdminConventionList from "./AdminConventionList";
-import { Box, Container, Typography } from "@mui/material";
+'use client';
 
-export default async function AdminConventionsPage() {
-  const session = await getServerSession(authOptions);
+import AdminConventionList from './AdminConventionList';
+import { Suspense, useState } from 'react';
+import { Box, Typography, Paper, CircularProgress, Alert } from '@mui/material';
 
-  if (!session) {
-    redirect("/login");
-  }
-
-  // Check if user is an admin
-  const user = session.user as { roles: Role[] };
-  if (!user.roles?.includes(Role.ADMIN)) {
-    redirect("/"); // Redirect non-admin users
-  }
+export default function AdminConventionsPage() {
+  const [error, setError] = useState<string | null>(null);
 
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ py: 4 }}>
+    <Box sx={{ p: 3 }}>
+      <Paper sx={{ p: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Admin Convention Management
+          Manage All Conventions
         </Typography>
-        <AdminConventionList />
-      </Box>
-    </Container>
+        {error && (
+          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Suspense fallback={<CircularProgress />}>
+          <AdminConventionList error={error} setError={setError} />
+        </Suspense>
+      </Paper>
+    </Box>
   );
 } 

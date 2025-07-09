@@ -1,49 +1,35 @@
+import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import { NextRequestWithAuth } from 'next-auth/middleware';
+import { Role } from '@prisma/client';
 
-export default async function middleware(request: NextRequestWithAuth) {
-  const token = await getToken({ req: request });
-  const isAuth = !!token;
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login');
+export default withAuth(
+  function middleware(req) {
+    const { token } = req.nextauth;
+    const { pathname } = req.nextUrl;
 
-  if (isAuthPage) {
-    if (isAuth) {
-      return NextResponse.redirect(new URL('/organizer/conventions', request.url));
+    // If the user is trying to access an admin route
+    if (pathname.startsWith('/admin')) {
+      // And they are not an admin
+      const hasAdminRole = (token?.roles as string[])?.includes('ADMIN');
+
+      if (!hasAdminRole) {
+        // Redirect them to the unauthorized page
+        const url = req.nextUrl.clone();
+        url.pathname = '/unauthorized';
+        return NextResponse.redirect(url);
+      }
     }
-    return null;
+
+    // Allow the request to proceed
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token,
+    },
   }
-
-  if (!isAuth) {
-    let from = request.nextUrl.pathname;
-    if (request.nextUrl.search) {
-      from += request.nextUrl.search;
-    }
-
-    return NextResponse.redirect(
-      new URL(`/login?from=${encodeURIComponent(from)}`, request.url)
-    );
-  }
-
-  // Role-based access control
-  const userRoles = token.roles as string[] || [];
-  const isOrganizer = userRoles.includes('ORGANIZER');
-  const isAdmin = userRoles.includes('ADMIN');
-
-  // Protect convention management routes - now only /organizer/conventions and its subpaths
-  if (request.nextUrl.pathname.startsWith('/organizer/conventions')) {
-    if (!isOrganizer && !isAdmin) {
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
-    }
-  }
-
-  return NextResponse.next();
-}
+);
 
 export const config = {
-  matcher: [
-    // '/conventions/manage/:path*', // Removed old path
-    '/organizer/conventions/:path*',
-    '/login',
-  ],
+  matcher: ['/admin/:path*', '/organizer/:path*'], // Protect admin and organizer routes
 }; 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TextField, Box, Typography, CircularProgress, SxProps, Theme } from '@mui/material';
 import Fuse from 'fuse.js';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -96,15 +96,23 @@ export const FuzzyStateInput: React.FC<FuzzyStateInputProps> = ({
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const debouncedInput = useDebounce(inputValue, 300);
 
+  // Memoize the onChange handler to prevent infinite loops
+  const handleChange = useCallback((stateName: string, stateAbbreviation: string) => {
+    onChange(stateName, stateAbbreviation);
+  }, [onChange]);
+
   useEffect(() => {
     if (debouncedInput.length >= 2) {
       setIsSearching(true);
       const results = fuse.search(debouncedInput);
-      
-      if (results.length > 0 && results[0].score < 0.3) {
+
+      if (results.length > 0 && results[0].score && results[0].score < 0.3) {
         const match = results[0].item;
         setSuggestion(match.name);
-        onChange(match.name, match.abbreviation);
+        // Only call onChange if the value actually changed
+        if (match.name !== value) {
+          handleChange(match.name, match.abbreviation);
+        }
       } else {
         setSuggestion(null);
       }
@@ -112,12 +120,12 @@ export const FuzzyStateInput: React.FC<FuzzyStateInputProps> = ({
     } else {
       setSuggestion(null);
     }
-  }, [debouncedInput, onChange]);
+  }, [debouncedInput, handleChange, value]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value;
     setInputValue(newValue);
-    
+
     if (newValue.length < 2) {
       setSuggestion(null);
     }
@@ -126,12 +134,12 @@ export const FuzzyStateInput: React.FC<FuzzyStateInputProps> = ({
   const handleBlur = () => {
     // First check for state abbreviation
     if (inputValue.length === 2 && /^[A-Za-z]{2}$/.test(inputValue)) {
-      const stateMatch = US_STATES.find(state => 
+      const stateMatch = US_STATES.find(state =>
         state.abbreviation.toLowerCase() === inputValue.toLowerCase()
       );
       if (stateMatch) {
         setInputValue(stateMatch.name);
-        onChange(stateMatch.name, stateMatch.abbreviation);
+        handleChange(stateMatch.name, stateMatch.abbreviation);
         return;
       }
     }
@@ -142,12 +150,12 @@ export const FuzzyStateInput: React.FC<FuzzyStateInputProps> = ({
       // Find the state data for the suggestion
       const stateData = US_STATES.find(state => state.name === suggestion);
       if (stateData) {
-        onChange(stateData.name, stateData.abbreviation);
+        handleChange(stateData.name, stateData.abbreviation);
       }
     } else if (!suggestion && inputValue.length > 0) {
       // Clear the input if there's no valid suggestion
       setInputValue('');
-      onChange('', '');
+      handleChange('', '');
     }
   };
 

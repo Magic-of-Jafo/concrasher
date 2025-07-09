@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Typography,
@@ -8,128 +8,96 @@ import {
     Grid,
     Card,
     CardContent,
-    Link,
+    Link as MuiLink,
     Divider,
     Button,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
+    Tabs,
+    Tab,
+    CardActionArea
 } from '@mui/material';
+import NextLink from 'next/link';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import HotelIcon from '@mui/icons-material/Hotel';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useTheme } from '@mui/material/styles';
+
 
 interface VenueHotelSectionProps {
     convention: any;
 }
 
-const VenueHotelCard = ({ entity, type, isPrimary = false }: { entity: any, type: 'venue' | 'hotel', isPrimary?: boolean }) => {
+const VenueHotelCard = ({ entity, type }: { entity: any, type: 'venue' | 'hotel' }) => {
+    const theme = useTheme();
     const {
+        id,
         venueName,
         hotelName,
+        description,
         streetAddress,
         city,
         stateRegion,
         postalCode,
         country,
-        websiteUrl,
         googleMapsUrl,
-        // Hotel specific fields
-        description,
-        amenities,
-        contactEmail,
-        contactPhone,
-        groupRateOrBookingCode,
-        groupPrice,
-        bookingLink,
-        bookingCutoffDate,
-        parkingInfo,
-        publicTransportInfo,
-        overallAccessibilityNotes
     } = entity;
 
     const name = venueName || hotelName;
     const address = [streetAddress, city, stateRegion, postalCode, country].filter(Boolean).join(', ');
 
+    // Fallback to google maps search query if no explicit link
+    const mapLink = googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+
+    const entityPath = type === 'venue' ? 'venues' : 'hotels';
+    // The convention object passed down may not have its own ID if it was looked up by slug
+    // We would need to pass the convention ID down to build this link properly.
+    // For now, this will be a non-functional link.
+    const editPath = `/organizer/${entityPath}/${id}/edit`; // Placeholder
+
     return (
-        <Card sx={{ height: '100%' }}>
-            <CardContent>
-                <Typography variant="h6" component="div" gutterBottom>
-                    {type === 'venue' ? <LocationOnIcon sx={{ mr: 1, verticalAlign: 'middle' }} /> : <HotelIcon sx={{ mr: 1, verticalAlign: 'middle' }} />}
-                    {name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {address}
-                </Typography>
-                {websiteUrl && (
-                    <Link href={websiteUrl} target="_blank" rel="noopener noreferrer" sx={{ display: 'inline-block', mr: 2 }}>
-                        Website
-                    </Link>
-                )}
-                {googleMapsUrl && (
-                    <Link href={googleMapsUrl} target="_blank" rel="noopener noreferrer" sx={{ display: 'inline-block' }}>
-                        View on Google Maps
-                    </Link>
-                )}
-
-                {isPrimary && (
-                    <Box mt={2}>
-                        <Divider sx={{ my: 2 }} />
-
-                        <Accordion>
-                            <AccordionSummary
-                                expandIcon={<ExpandMoreIcon />}
-                                aria-controls="panel1a-content"
-                                id="panel1a-header"
+        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <NextLink href={editPath} passHref legacyBehavior>
+                <CardActionArea sx={{ flexGrow: 1 }}>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <MuiLink
+                                href={mapLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                sx={{ textDecoration: 'none', textAlign: 'center', mr: 2, color: 'text.primary' }}
                             >
-                                <Typography>Details</Typography>
-                            </AccordionSummary>
-                            <AccordionDetails>
-                                <Box>
-                                    {description && <Box mb={2} dangerouslySetInnerHTML={{ __html: description }} />}
+                                <LocationOnIcon />
+                                <Typography variant="caption" display="block">Map</Typography>
+                            </MuiLink>
+                            <Typography variant="h6" component="div">
+                                {name}
+                            </Typography>
+                        </Box>
 
-                                    {type === 'hotel' && (groupPrice || bookingLink || groupRateOrBookingCode) && (
-                                        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                                            <Typography variant="h6" gutterBottom>Booking Information</Typography>
-                                            {groupPrice && <Typography variant="body1"><b>Group Rate:</b> {groupPrice}</Typography>}
-                                            {groupRateOrBookingCode && <Typography variant="body1"><b>Code:</b> {groupRateOrBookingCode}</Typography>}
-                                            {bookingCutoffDate && <Typography variant="body1"><b>Book by:</b> {new Date(bookingCutoffDate).toLocaleDateString()}</Typography>}
-                                            {bookingLink && <Button variant="contained" href={bookingLink} target="_blank" sx={{ mt: 1 }}>Book Now</Button>}
-                                        </Paper>
-                                    )}
-
-                                    {amenities && amenities.length > 0 && (
-                                        <Box mb={2}>
-                                            <Typography variant="subtitle1"><b>Amenities:</b></Typography>
-                                            <Typography variant="body2">{amenities.join(', ')}</Typography>
-                                        </Box>
-                                    )}
-                                    {(parkingInfo || publicTransportInfo || overallAccessibilityNotes) && (
-                                        <Box mb={2}>
-                                            <Typography variant="h6" gutterBottom>Venue Information</Typography>
-                                            {parkingInfo && <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}><b>Parking:</b> {parkingInfo}</Typography>}
-                                            {publicTransportInfo && <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}><b>Public Transport:</b> {publicTransportInfo}</Typography>}
-                                            {overallAccessibilityNotes && <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}><b>Accessibility:</b> {overallAccessibilityNotes}</Typography>}
-                                        </Box>
-                                    )}
-                                    {(contactEmail || contactPhone) && (
-                                        <Box>
-                                            <Typography variant="subtitle1"><b>Contact:</b></Typography>
-                                            {contactEmail && <Typography variant="body2">{contactEmail}</Typography>}
-                                            {contactPhone && <Typography variant="body2">{contactPhone}</Typography>}
-                                        </Box>
-                                    )}
-                                </Box>
-                            </AccordionDetails>
-                        </Accordion>
-                    </Box>
-                )}
-            </CardContent>
+                        <Typography variant="body2" color="text.secondary" gutterBottom sx={{ minHeight: '40px' }}>
+                            {address}
+                        </Typography>
+                        <Box
+                            sx={{
+                                ...theme.typography.body2,
+                                mt: 1,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                '& p': { margin: 0 },
+                            }}
+                            dangerouslySetInnerHTML={{ __html: description || '' }}
+                        />
+                    </CardContent>
+                </CardActionArea>
+            </NextLink>
         </Card>
     );
 };
 
 export default function VenueHotelSection({ convention }: VenueHotelSectionProps) {
+    const [currentTab, setCurrentTab] = useState(0);
+
     const { venues = [], hotels = [] } = convention;
 
     const primaryVenue = venues.find((v: any) => v.isPrimaryVenue);
@@ -137,7 +105,21 @@ export default function VenueHotelSection({ convention }: VenueHotelSectionProps
     const primaryHotel = hotels.find((h: any) => h.isPrimaryHotel);
     const additionalHotels = hotels.filter((h: any) => !h.isPrimaryHotel);
 
-    if (!primaryVenue && !primaryHotel && secondaryVenues.length === 0 && additionalHotels.length === 0) {
+    const allVenues = [
+        ...(primaryVenue ? [{ ...primaryVenue, isPrimary: true }] : []),
+        ...secondaryVenues.map((v: any) => ({ ...v, isPrimary: false }))
+    ];
+
+    const allHotels = [
+        ...(primaryHotel ? [{ ...primaryHotel, isPrimary: true }] : []),
+        ...additionalHotels.map((h: any) => ({ ...h, isPrimary: false }))
+    ];
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setCurrentTab(newValue);
+    };
+
+    if (venues.length === 0 && hotels.length === 0) {
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
                 <Typography variant="h4" component="h1" gutterBottom>
@@ -156,46 +138,31 @@ export default function VenueHotelSection({ convention }: VenueHotelSectionProps
                 Venue & Hotel Information
             </Typography>
 
-            {primaryVenue && (
-                <Box mb={4}>
-                    <Typography variant="h5" gutterBottom>Primary Venue</Typography>
-                    <VenueHotelCard entity={primaryVenue} type="venue" isPrimary={true} />
-                </Box>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs value={currentTab} onChange={handleTabChange} aria-label="Venue and Hotel Tabs">
+                    <Tab label={`Venues (${venues.length})`} disabled={venues.length === 0} />
+                    <Tab label={`Hotels (${hotels.length})`} disabled={hotels.length === 0} />
+                </Tabs>
+            </Box>
+
+            {currentTab === 0 && (
+                <Grid container spacing={2}>
+                    {allVenues.map((venue: any) => (
+                        <Grid item key={venue.id} xs={12} sm={6} md={4}>
+                            <VenueHotelCard entity={venue} type="venue" />
+                        </Grid>
+                    ))}
+                </Grid>
             )}
 
-            {secondaryVenues.length > 0 && (
-                <Box mb={4}>
-                    <Typography variant="h5" gutterBottom>Additional Venues</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {secondaryVenues.map((venue: any) => (
-                            <Box key={venue.id} sx={{ flex: '1 1 300px', minWidth: '300px' }}>
-                                <VenueHotelCard entity={venue} type="venue" />
-                            </Box>
-                        ))}
-                    </Box>
-                </Box>
-            )}
-
-            <Divider sx={{ my: 4 }} />
-
-            {primaryHotel && (
-                <Box mb={4}>
-                    <Typography variant="h5" gutterBottom>Primary Hotel</Typography>
-                    <VenueHotelCard entity={primaryHotel} type="hotel" isPrimary={true} />
-                </Box>
-            )}
-
-            {additionalHotels.length > 0 && (
-                <Box mb={4}>
-                    <Typography variant="h5" gutterBottom>Additional Hotels</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {additionalHotels.map((hotel: any) => (
-                            <Box key={hotel.id} sx={{ flex: '1 1 300px', minWidth: '300px' }}>
-                                <VenueHotelCard entity={hotel} type="hotel" />
-                            </Box>
-                        ))}
-                    </Box>
-                </Box>
+            {currentTab === 1 && (
+                <Grid container spacing={2}>
+                    {allHotels.map((hotel: any) => (
+                        <Grid item key={hotel.id} xs={12} sm={6} md={4}>
+                            <VenueHotelCard entity={hotel} type="hotel" />
+                        </Grid>
+                    ))}
+                </Grid>
             )}
         </Paper>
     );

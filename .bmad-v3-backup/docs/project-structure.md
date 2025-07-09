@@ -61,9 +61,13 @@ agile_test/
 ├── src/                        # Main application source code
 │   ├── app/                    # Next.js App Router: Pages, Layouts, API Routes
 │   │   ├── api/                # API routes (e.g., src/app/api/conventions/route.ts)
-│   │   │   └── auth/
-│   │   │       └── [...nextauth]/
-│   │   │           └── route.ts # Auth.js route handler
+│   │   │   ├── auth/
+│   │   │   │   └── [...nextauth]/
+│   │   │   │       └── route.ts # Auth.js route handler
+│   │   │   └── organizer/
+│   │   │       └── venues/
+│   │   │           └── [venueId]/
+│   │   │               └── route.ts # Venue management routes
 │   │   ├── (auth)/             # Auth-related pages (e.g., login, register)
 │   │   │   └── login/
 │   │   │       └── page.tsx

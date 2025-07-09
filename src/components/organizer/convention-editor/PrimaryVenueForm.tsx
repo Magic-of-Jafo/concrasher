@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Button, Paper, Card, CardMedia, CardActions } from '@mui/material';
+import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Button, Paper } from '@mui/material';
 import { VenueData, VenuePhotoData } from '@/lib/validators';
 import { Editor } from '@tinymce/tinymce-react';
 import ImageUploadInput from '@/components/shared/ImageUploadInput';
 
-// ADD THIS STYLE BLOCK
 const GlobalStyles = () => (
   <style jsx global>{`
     .tox-statusbar__branding {
@@ -14,11 +13,11 @@ const GlobalStyles = () => (
 );
 
 interface PrimaryVenueFormProps {
-  title?: string;
-  formData: VenueData;  // Require full VenueData
-  onFormDataChange: (data: Partial<VenueData>) => void;
+  value: VenueData;
+  onChange: (data: Partial<VenueData>) => void;
+  onMarkForPromotion?: () => void;
   disabled?: boolean;
-  errors?: { // Added errors prop
+  errors?: {
     venueName?: string;
     websiteUrl?: string;
     googleMapsUrl?: string;
@@ -29,100 +28,109 @@ interface PrimaryVenueFormProps {
     country?: string;
     contactEmail?: string;
     contactPhone?: string;
-    // Add any other fields from VenueData that might have validation
   };
-  // TODO: onPhotosChange: (photos: VenuePhotoData[]) => void;
+  title?: string; // Kept for secondary venues, but optional
 }
 
-const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Details', formData, onFormDataChange, disabled = false, errors }) => {
-  const [localVenueName, setLocalVenueName] = useState(formData.venueName);
-  const initialDescriptionRef = useRef(formData.description); // Store initial description
+const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ value, onChange, onMarkForPromotion, disabled = false, errors, title }) => {
+  const [localFormData, setLocalFormData] = useState(value);
+
+  const initialDescriptionRef = useRef(value.description);
+  const identityRef = useRef(value.id || (value as any).tempId);
+  const currentIdentity = value.id || (value as any).tempId;
+
+  if (currentIdentity !== identityRef.current) {
+    initialDescriptionRef.current = value.description;
+    identityRef.current = currentIdentity;
+  }
 
   useEffect(() => {
-    if (formData.venueName !== localVenueName) {
-      setLocalVenueName(formData.venueName);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.venueName]);
-
-  // Update ref only when formData.id or tempId changes, indicating a different item
-  useEffect(() => {
-    initialDescriptionRef.current = formData.description;
-  }, [formData.id, (formData as any).tempId]); // Dependency on item identity
+    setLocalFormData(currentLocalData => {
+      if (value.id !== currentLocalData.id || value.tempId !== currentLocalData.id) {
+        return value;
+      }
+      return currentLocalData;
+    });
+  }, [value]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = event.target;
 
-    let finalValue = value;
+    if (type === 'checkbox') {
+      const { checked } = event.target as HTMLInputElement;
+      const updatedData = { ...localFormData, [name]: checked };
+      setLocalFormData(updatedData);
+      onChange({ [name]: checked });
+    } else if (name === 'amenitiesPasted') {
+      const amenitiesArray = value.split('\n').map(line => line.trim()).filter(line => line !== '');
+      const updatedData = { ...localFormData, amenities: amenitiesArray };
+      setLocalFormData(updatedData);
+      onChange({ amenities: amenitiesArray });
+    } else {
+      setLocalFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
 
-    // Special handling for websiteUrl to prepend http:// if no scheme is present
+  const handleBlur = (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    let finalValue: string | Partial<VenueData> = value;
+
     if (name === "websiteUrl") {
       if (value && !value.match(/^(\w+):\/\//) && value.includes('.')) {
         finalValue = `http://${value}`;
       }
-      // For websiteUrl, call onFormDataChange directly with the potentially modified value.
-      onFormDataChange({ [name]: finalValue });
-      return; // Exit early as we've handled this field.
-    }
-
-    // Handle other fields
-    if (name === "venueName") {
-      setLocalVenueName(value); // Update local state for venueName
-      // onFormDataChange for venueName is handled by onBlur
-    } else if (type === 'checkbox') {
-      const { checked } = event.target as HTMLInputElement;
-      onFormDataChange({ [name]: checked });
-    } else if (name === 'amenitiesPasted') {
-      const amenitiesArray = value.split('\n').map(line => line.trim()).filter(line => line !== '');
-      onFormDataChange({ amenities: amenitiesArray });
+      onChange({ [name]: finalValue });
     } else {
-      // For any other fields not specifically handled above, update parent immediately.
-      onFormDataChange({ [name]: value });
+      if ((localFormData as any)[name] !== (value as any)[name]) {
+        onChange({ [name]: value } as Partial<VenueData>);
+      }
     }
   };
 
-
-
-  const handleVenueNameBlur = () => {
-    // Update parent state only when the venueName field loses focus
-    if (formData.venueName !== localVenueName) { // Only update if different
-      onFormDataChange({ venueName: localVenueName });
+  const handleEditorChange = (content: string) => {
+    if (!disabled) {
+      onChange({ description: content });
     }
   };
 
   const handlePhotoUpload = (url: string) => {
-    onFormDataChange({ photos: [{ url: url, caption: formData.photos?.[0]?.caption || '' }] });
+    const newPhotos = [{ url: url, caption: '' }];
+    setLocalFormData(prev => ({ ...prev, photos: newPhotos }));
+    onChange({ photos: newPhotos });
   };
 
   const handleRemovePhoto = () => {
-    onFormDataChange({ photos: [] });
+    setLocalFormData(prev => ({ ...prev, photos: [] }));
+    onChange({ photos: [] });
   };
 
   const handleCaptionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (formData.photos && formData.photos[0]) {
-      // Ensure we preserve the URL when changing caption
-      onFormDataChange({ photos: [{ ...formData.photos[0], url: formData.photos[0].url, caption: event.target.value }] });
-    } else {
-      // If for some reason photos[0] doesn't exist but we are trying to set a caption (should not happen with current UI)
-      // We might initialize it with a null URL or handle error, for now, let's assume photos[0] exists if caption is being changed.
-      console.warn("Attempted to change caption but no photo exists in formData");
+    const newCaption = event.target.value;
+    if (localFormData.photos && localFormData.photos[0]) {
+      const updatedPhotos = [{ ...localFormData.photos[0], caption: newCaption }];
+      setLocalFormData(prev => ({ ...prev, photos: updatedPhotos }));
+      onChange({ photos: updatedPhotos });
     }
   };
 
   return (
     <Box sx={{ mt: 2 }}>
       <GlobalStyles />
-      <Typography variant="h6" gutterBottom>{title}</Typography>
+      {title && <Typography variant="h6" gutterBottom>{title}</Typography>}
+      {onMarkForPromotion && (
+        <Button onClick={onMarkForPromotion} disabled={disabled}>
+          Mark as Primary Venue
+        </Button>
+      )}
 
-      {/* Row 1: Venue Name and Website URL */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
           fullWidth
           label="Venue Name"
           name="venueName"
-          value={localVenueName}
+          value={localFormData.venueName || ''}
           onChange={handleChange}
-          onBlur={handleVenueNameBlur}
+          onBlur={handleBlur}
           required
           disabled={disabled}
           error={!!errors?.venueName}
@@ -133,8 +141,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
           fullWidth
           label="Website URL"
           name="websiteUrl"
-          value={formData.websiteUrl || ''}
+          value={localFormData.websiteUrl || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.websiteUrl}
           helperText={errors?.websiteUrl || "e.g., example.com or http://example.com"}
@@ -142,10 +151,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         />
       </Box>
 
-      {/* Row 2: Description */}
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Description</Typography>
       <Editor
-        key={formData.id || (formData as any).tempId || 'primary-venue-editor'}
+        key={value.id || (value as any).tempId || 'primary-venue-editor'}
         apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || 'YOUR_FALLBACK_API_KEY'}
         initialValue={initialDescriptionRef.current || ''}
         disabled={disabled}
@@ -153,31 +161,20 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
           height: 300,
           menubar: false,
           readonly: disabled,
-          plugins:
-            'autolink lists link image charmap preview anchor ' +
-            'searchreplace visualblocks code fullscreen ' +
-            'insertdatetime media table help wordcount',
-          toolbar:
-            'undo redo | formatselect | ' +
-            'bold italic backcolor | alignleft aligncenter ' +
-            'alignright alignjustify | bullist numlist outdent indent | ' +
-            'removeformat | help',
+          plugins: 'autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
+          toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
           content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px } .tox-promotion { display: none !important; } .tox-statusbar__branding { display: none !important; }'
         }}
-        onEditorChange={(content: any, editor: any) => {
-          if (!disabled) {
-            onFormDataChange({ description: content });
-          }
-        }}
+        onEditorChange={handleEditorChange}
       />
 
-      {/* Row 3: Google Maps URL */}
       <TextField
         fullWidth
         label="Google Maps URL"
         name="googleMapsUrl"
-        value={formData.googleMapsUrl || ''}
+        value={localFormData.googleMapsUrl || ''}
         onChange={handleChange}
+        onBlur={handleBlur}
         disabled={disabled}
         error={!!errors?.googleMapsUrl}
         helperText={errors?.googleMapsUrl || ''}
@@ -185,39 +182,40 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
       />
 
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Address</Typography>
-      {/* Row 4: Street Address and City */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
           fullWidth
           label="Street Address"
           name="streetAddress"
-          value={formData.streetAddress || ''}
+          value={localFormData.streetAddress || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.streetAddress}
           helperText={errors?.streetAddress || ''}
-          sx={{ flexGrow: 2, flexBasis: { xs: '100%', md: '66%' } }} // Approx 8/12
+          sx={{ flexGrow: 2, flexBasis: { xs: '100%', md: '66%' } }}
         />
         <TextField
           fullWidth
           label="City"
           name="city"
-          value={formData.city || ''}
+          value={localFormData.city || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.city}
           helperText={errors?.city || ''}
-          sx={{ flexGrow: 1, flexBasis: { xs: '100%', md: '33%' } }} // Approx 4/12
+          sx={{ flexGrow: 1, flexBasis: { xs: '100%', md: '33%' } }}
         />
       </Box>
-      {/* Row 5: State/Region, Postal Code, Country */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
           fullWidth
           label="State / Region"
           name="stateRegion"
-          value={formData.stateRegion || ''}
+          value={localFormData.stateRegion || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.stateRegion}
           helperText={errors?.stateRegion || ''}
@@ -227,8 +225,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
           fullWidth
           label="Postal Code"
           name="postalCode"
-          value={formData.postalCode || ''}
+          value={localFormData.postalCode || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.postalCode}
           helperText={errors?.postalCode || ''}
@@ -238,8 +237,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
           fullWidth
           label="Country"
           name="country"
-          value={formData.country || ''}
+          value={localFormData.country || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.country}
           helperText={errors?.country || ''}
@@ -248,15 +248,15 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
       </Box>
 
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Contact Information</Typography>
-      {/* Row 6: Contact Email and Phone */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
         <TextField
           fullWidth
           label="Contact Email"
           name="contactEmail"
-          value={formData.contactEmail || ''}
-          onChange={handleChange}
           type="email"
+          value={localFormData.contactEmail || ''}
+          onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.contactEmail}
           helperText={errors?.contactEmail || ''}
@@ -266,8 +266,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
           fullWidth
           label="Contact Phone"
           name="contactPhone"
-          value={formData.contactPhone || ''}
+          value={localFormData.contactPhone || ''}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={disabled}
           error={!!errors?.contactPhone}
           helperText={errors?.contactPhone || ''}
@@ -275,64 +276,28 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         />
       </Box>
 
-      {/* Row 8: Amenities */}
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Amenities</Typography>
       <TextField
         fullWidth
+        label="Venue Amenities (one per line)"
+        name="amenitiesPasted"
+        value={(localFormData.amenities || []).join('\n')}
+        onChange={handleChange}
         multiline
         rows={4}
-        name="amenitiesPasted"
-        label="Amenities (one per line)"
-        value={formData.amenities ? formData.amenities.join('\n') : ''}
-        onChange={handleChange}
-        placeholder="Free Wi-Fi&#10;Parking&#10;Air Conditioning&#10;Accessibility Features"
-        helperText="Enter each amenity on a new line"
         disabled={disabled}
-        onKeyDown={(e) => {
-          // Workaround for keyboard event blocking
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.stopPropagation();
-            e.preventDefault();
-
-            const target = e.target as HTMLTextAreaElement;
-            const start = target.selectionStart;
-            const end = target.selectionEnd;
-            const value = target.value;
-
-            let newValue: string;
-            let newCursorPosition: number;
-
-            if (e.key === 'Enter') {
-              // Insert newline
-              newValue = value.substring(0, start) + '\n' + value.substring(end);
-              newCursorPosition = start + 1;
-            } else if (e.key === ' ') {
-              // Insert space
-              newValue = value.substring(0, start) + ' ' + value.substring(end);
-              newCursorPosition = start + 1;
-            } else {
-              return; // Should not happen given our if condition
-            }
-
-            target.value = newValue;
-            target.selectionStart = target.selectionEnd = newCursorPosition;
-
-            // Trigger change event to update React state
-            const changeEvent = new Event('change', { bubbles: true });
-            target.dispatchEvent(changeEvent);
-          }
-        }}
+        helperText="Enter each amenity on a new line."
         sx={{ mb: 2 }}
       />
 
-      <Typography variant="h6" sx={{ mt: 2, mb: 1 }} gutterBottom>Location & Access Information</Typography>
-      {/* Parking Info, Public Transport, Accessibility Notes - each full width */}
+      <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Venue-Specific Information</Typography>
       <TextField
         fullWidth
         label="Parking Information"
         name="parkingInfo"
-        value={formData.parkingInfo || ''}
+        value={localFormData.parkingInfo || ''}
         onChange={handleChange}
+        onBlur={handleBlur}
         multiline
         rows={3}
         disabled={disabled}
@@ -342,8 +307,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         fullWidth
         label="Public Transportation Access"
         name="publicTransportInfo"
-        value={formData.publicTransportInfo || ''}
+        value={localFormData.publicTransportInfo || ''}
         onChange={handleChange}
+        onBlur={handleBlur}
         multiline
         rows={3}
         disabled={disabled}
@@ -353,36 +319,40 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ title = 'Venue Deta
         fullWidth
         label="Overall Accessibility Notes"
         name="overallAccessibilityNotes"
-        value={formData.overallAccessibilityNotes || ''}
+        value={localFormData.overallAccessibilityNotes || ''}
         onChange={handleChange}
+        onBlur={handleBlur}
         multiline
         rows={3}
         disabled={disabled}
         sx={{ mb: 2 }}
       />
 
-      {/* Venue Photo Section - MOVED HERE (to the bottom) */}
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Venue Photo</Typography>
-      <ImageUploadInput
-        label="Upload Venue Photo"
-        currentImageUrl={formData.photos?.[0]?.url || null}
-        onUploadComplete={handlePhotoUpload}
-        onRemoveImage={handleRemovePhoto}
-        disabled={disabled}
-      />
-      {formData.photos && formData.photos.length > 0 && formData.photos[0].url && (
-        <TextField
-          fullWidth
-          label="Photo Caption"
-          name="photoCaption"
-          value={formData.photos[0].caption || ''}
-          onChange={handleCaptionChange}
+      <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+        <ImageUploadInput
+          label="Upload Venue Photo"
+          currentImageUrl={localFormData.photos && localFormData.photos.length > 0 ? localFormData.photos[0].url : null}
+          onUploadComplete={handlePhotoUpload}
+          onRemoveImage={handleRemovePhoto}
           disabled={disabled}
-          sx={{ mt: 1, mb: 2 }}
         />
-      )}
+        {localFormData.photos && localFormData.photos.length > 0 && localFormData.photos[0].url && (
+          <TextField
+            fullWidth
+            label="Photo Caption"
+            name="caption"
+            value={localFormData.photos[0].caption || ''}
+            onChange={handleCaptionChange}
+            disabled={disabled}
+            variant="outlined"
+            size="small"
+            sx={{ mt: 1 }}
+          />
+        )}
+      </Paper>
     </Box>
   );
 };
 
-export default React.memo(PrimaryVenueForm); 
+export default PrimaryVenueForm; 

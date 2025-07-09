@@ -387,10 +387,10 @@ const ConventionScheduleItemBaseSchema = z.object({
     z.number().int().min(0, 'Duration must be a positive number')
   ),
   eventType: z.string().optional(),
-  atPrimaryVenue: z.boolean(),
+  atPrimaryVenue: z.boolean().default(true),
   locationName: z.string().optional(),
   venueId: z.string().uuid().optional().nullable(),
-  hasFee: z.boolean(),
+  hasFee: z.boolean().default(false),
   feeTiers: z.array(ScheduleEventFeeTierSchema).optional(),
 });
 
@@ -404,11 +404,19 @@ export const ConventionScheduleItemCreateSchema = ConventionScheduleItemBaseSche
 export const ConventionScheduleItemUpdateSchema = ConventionScheduleItemBaseSchema.extend({
   id: z.string().cuid(),
   scheduleDayId: z.string().cuid().optional().nullable(),
+  startTimeMinutes: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().min(0, 'Start time must be a positive number').optional().nullable()
+  ),
 });
 
 // Schemas for BULK importing schedule items
 export const ConventionScheduleItemBulkItemSchema = ConventionScheduleItemBaseSchema.extend({
   dayOffset: z.number().int().min(0, 'Day offset must be a positive integer'),
+  startTimeMinutes: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().min(0, 'Start time must be a positive number')
+  ),
 });
 
 export const ConventionScheduleItemBulkInputSchema = z.object({
