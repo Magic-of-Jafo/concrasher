@@ -115,10 +115,14 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
           orderBy: {
             order: 'asc'
           }
-        }
+        },
 
-        // Note: settings relationship temporarily commented out due to type issue
-        // TODO: Re-add settings: true after regenerating Prisma types
+        // Convention settings
+        settings: {
+          include: {
+            currency: true
+          }
+        }
       }
     });
 

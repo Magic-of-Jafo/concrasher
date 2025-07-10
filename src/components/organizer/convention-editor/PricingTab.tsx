@@ -26,13 +26,11 @@ interface PricingTabProps {
   value: PricingTabData;
   onChange: (data: PricingTabData) => void;
   disabled?: boolean;
-  currency?: string; // e.g. '$', '€', etc.
+  currency: string; // e.g. '$', '€', etc.
   timezone?: string; // IANA timezone identifier for the convention
 }
 
-const defaultCurrency = '$';
-
-export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency = defaultCurrency, timezone }) => {
+export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency, timezone }) => {
   // --- CONSOLE LOGS FOR DEBUGGING ---
   // console.log('[PricingTab] Render. conventionId:', conventionId); // Removed for brevity
   // console.log('[PricingTab] Render. value.priceTiers:', JSON.stringify(value.priceTiers)); // Removed for brevity
@@ -479,7 +477,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
                           <DragIndicatorIcon />
                         </span>
                         <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} error={!!errors[`priceTiers.${idx}.label`]} helperText={errors[`priceTiers.${idx}.label`]} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }} />
-                        <TextField label="Amount" value={tier.amount} onChange={e => { const val = e.target.value; if (/^\d*(\.\d{0,2})?$/.test(val) || val === '') { handleTierChange(idx, 'amount', val); } }} disabled={disabled} error={!!errors[`priceTiers.${idx}.amount`]} helperText={errors[`priceTiers.${idx}.amount`]} type="text" InputProps={{ startAdornment: <span>{currency}</span>, inputMode: 'decimal' }} sx={{ minWidth: 100 }} inputProps={{ 'aria-label': `Tier amount ${idx + 1}`, pattern: '\\d+(\\.\\d{1,2})?' }} />
+                        <TextField
+                          type="number"
+                          label="Amount"
+                          value={tier.amount}
+                          onChange={(e) => handleTierChange(idx, 'amount', parseFloat(e.target.value) || 0)}
+                          sx={{ width: '120px' }}
+                          InputProps={{
+                            startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box>,
+                          }}
+                          disabled={disabled}
+                        />
                         <Tooltip title="Remove Tier">
                           <span>
                             <IconButton aria-label="Remove tier" onClick={() => handleRemoveTier(idx)} disabled={disabled || value.priceTiers.length === 0}>
@@ -507,83 +515,92 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         </Button>
       </Box>
 
-      {tiersSaved && (
-        <>
-          <Divider sx={{ my: 4 }} />
-          <Typography variant="h6" gutterBottom>Price Discounts</Typography>
+      <Divider sx={{ my: 4 }} />
 
-          {discountDatePickers.map((discountGroup, groupIdx) => (
-            <Card key={discountGroup.tempId} sx={{ mb: 2, opacity: disabled ? 0.7 : 1 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: discountGroup.date ? 2 : 0 }}>
-                  <DatePicker
-                    label="Discount Cutoff Date"
-                    value={discountGroup.date}
-                    onChange={date => handleDiscountDateChange(groupIdx, date)}
-                    disabled={disabled}
-                    slotProps={{ textField: { error: false, helperText: null } }}
-                  />
-                  <Tooltip title="Remove Discount Date Group">
-                    <IconButton aria-label="Remove discount date group" onClick={() => handleRemoveDiscountDateGroup(groupIdx)} disabled={disabled}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
+      <Box>
+        <Typography variant="h6" gutterBottom>Discount Dates</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Set cutoff dates for special pricing. For example, an "Early Bird" discount could end on a specific date. All discounts apply up to 11:59 PM on the selected day in the convention's timezone.
+        </Typography>
+        {tiersSaved && discountDatePickers.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+            No active discount periods available.
+          </Typography>
+        )}
 
-                {discountGroup.date && (
-                  <Box sx={{ mt: 2 }}>
-                    {discountGroup.tierDiscounts.map((tierDiscount, tdIdx) => (
-                      <Box key={tierDiscount.priceTierId} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                        <Typography sx={{ minWidth: 120, flexShrink: 0 }}>
-                          {tierDiscount.label} ({currency}{value.priceTiers.find(t => t.id === tierDiscount.priceTierId)?.amount || 0})
-                        </Typography>
-                        <TextField
-                          label="Discounted Amount"
-                          value={tierDiscount.amount}
-                          onChange={e => {
-                            const val = e.target.value;
-                            if (/^\d*(\.\d{0,2})?$/.test(val) || val === '') {
-                              handleDiscountAmountChange(groupIdx, tdIdx, val);
-                            }
-                          }}
-                          disabled={disabled || !value.priceTiers.find(t => t.id === tierDiscount.priceTierId)}
-                          type="text"
-                          InputProps={{ startAdornment: <span>{currency}</span>, inputMode: 'decimal' }}
-                          sx={{ minWidth: 100 }}
-                          inputProps={{ 'aria-label': `Discounted amount for ${tierDiscount.label}` }}
-                        />
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={handleAddDiscountDateGroup}
-            disabled={disabled || !value.priceTiers.every(t => t.id)}
-            sx={{ mt: 1 }}
-          >
-            Add Discount Date
-          </Button>
-
-          {(discountDatePickers.length > 0 || value.priceDiscounts.length > 0) && (
-            <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !canSaveDiscounts || !conventionId}>
-                {isSavingDiscounts ? 'Saving Discounts...' : 'Save Price Discounts'}
-              </Button>
+        {discountDatePickers.map((group, groupIndex) => (
+          <Card key={group.tempId} variant="outlined" sx={{ mb: 3, p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <DatePicker
+                label="Discount Cutoff Date"
+                value={group.date}
+                onChange={date => handleDiscountDateChange(groupIndex, date)}
+                disabled={disabled}
+                slotProps={{ textField: { error: false, helperText: null } }}
+              />
+              <Tooltip title="Remove Discount Date Group">
+                <IconButton aria-label="Remove discount date group" onClick={() => handleRemoveDiscountDateGroup(groupIndex)} disabled={disabled}>
+                  <DeleteIcon />
+                </IconButton>
+              </Tooltip>
             </Box>
-          )}
-          {discountDatePickers.length === 0 && value.priceTiers.length > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-              No discount dates added yet. Click "Add Discount Date" to create one.
-            </Typography>
-          )}
-        </>
-      )}
+            {group.date && (
+              <Box sx={{ mt: 2 }}>
+                {group.tierDiscounts.map((tierDiscount, tierDiscountIndex) => (
+                  <Box key={tierDiscount.priceTierId} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Typography sx={{ minWidth: 120, flexShrink: 0 }}>
+                      {tierDiscount.label} ({currency}{value.priceTiers.find(t => t.id === tierDiscount.priceTierId)?.amount || 0})
+                    </Typography>
+                    <TextField
+                      type="number"
+                      placeholder="Discount Amount"
+                      value={tierDiscount.amount}
+                      onChange={(e) => handleDiscountAmountChange(groupIndex, tierDiscountIndex, e.target.value)}
+                      size="small"
+                      sx={{ width: '150px' }}
+                      InputProps={{
+                        startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box>,
+                      }}
+                      disabled={disabled}
+                      onClick={(e) => e.stopPropagation()} // Prevent card click
+                    />
+                    {tierDiscount.originalDiscountId && (
+                      <Tooltip title="Clear this specific discount" placement="top">
+                        <IconButton aria-label="Clear specific discount" onClick={() => handleDeleteIndividualDiscount(tierDiscount.originalDiscountId!)} disabled={disabled} size="small" sx={{ ml: 1 }}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Card>
+        ))}
+
+        <Button
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={handleAddDiscountDateGroup}
+          disabled={disabled || !value.priceTiers.every(t => t.id)}
+          sx={{ mt: 1 }}
+        >
+          Add Discount Date
+        </Button>
+
+        {(discountDatePickers.length > 0 || value.priceDiscounts.length > 0) && (
+          <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !canSaveDiscounts || !conventionId}>
+              {isSavingDiscounts ? 'Saving Discounts...' : 'Save Price Discounts'}
+            </Button>
+          </Box>
+        )}
+        {discountDatePickers.length === 0 && value.priceTiers.length > 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+            No discount dates added yet. Click "Add Discount Date" to create one.
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 }; 

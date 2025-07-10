@@ -28,12 +28,14 @@ import InfoIcon from '@mui/icons-material/Info';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import HotelIcon from '@mui/icons-material/Hotel';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { getProfileImageUrl } from '@/lib/defaults';
 import BasicInfoSection from '@/components/conventions/detail/BasicInfoSection';
 import PricingSection from '@/components/conventions/detail/PricingSection';
-import VenueHotelSection from '@/components/conventions/detail/VenueHotelSection';
+import VenueSection from '@/components/conventions/detail/VenueSection';
+import HotelSection from '@/components/conventions/detail/HotelSection';
 import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
 import DealersSection from '@/components/conventions/detail/DealersSection';
 import MediaGallerySection from '@/components/conventions/detail/MediaGallerySection';
@@ -45,13 +47,14 @@ const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary'
     [ConventionStatus.CANCELLED]: 'error',
 };
 
-type ViewType = 'basic' | 'schedule' | 'pricing' | 'venue' | 'dealers' | 'media';
+type ViewType = 'basic' | 'schedule' | 'pricing' | 'venue' | 'hotel' | 'dealers' | 'media';
 
 const navigationItems = [
     { id: 'basic' as ViewType, label: 'Basic Info', icon: InfoIcon },
     { id: 'schedule' as ViewType, label: 'Schedule', icon: ScheduleIcon },
     { id: 'pricing' as ViewType, label: 'Pricing', icon: AttachMoneyIcon },
-    { id: 'venue' as ViewType, label: 'Venue/Hotel', icon: LocationOnIcon },
+    { id: 'venue' as ViewType, label: 'Venue', icon: LocationOnIcon },
+    { id: 'hotel' as ViewType, label: 'Hotel', icon: HotelIcon },
     { id: 'dealers' as ViewType, label: 'Dealers', icon: StorefrontIcon },
     { id: 'media' as ViewType, label: 'Media', icon: PhotoLibraryIcon },
 ];
@@ -466,7 +469,9 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
             case 'pricing':
                 return <PricingSection convention={convention} />;
             case 'venue':
-                return <VenueHotelSection convention={convention} />;
+                return <VenueSection convention={convention} />;
+            case 'hotel':
+                return <HotelSection convention={convention} />;
             case 'schedule':
                 return <ScheduleSection convention={convention} />;
             case 'dealers':

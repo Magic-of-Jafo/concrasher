@@ -1,26 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText, Button, Divider } from '@mui/material';
 import { Grid } from '@mui/material';
 import { ConventionSettingData } from '@/lib/validators';
 import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { deleteConvention } from '@/lib/actions';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
 import { useSnackbar } from 'notistack';
 
-// Currency options commonly used in magic conventions
-const CURRENCIES = [
-    { code: 'USD', label: 'USD - United States Dollar' },
-    { code: 'EUR', label: 'EUR - Euro' },
-    { code: 'GBP', label: 'GBP - British Pound' },
-    { code: 'CAD', label: 'CAD - Canadian Dollar' },
-    { code: 'AUD', label: 'AUD - Australian Dollar' },
-    { code: 'CHF', label: 'CHF - Swiss Franc' },
-    { code: 'JPY', label: 'JPY - Japanese Yen' },
-];
+// Define the type here to match the data fetched from the API
+interface Currency {
+    id: number;
+    code: string;
+    name: string;
+    demonym: string | null;
+    majorSingle: string;
+    majorPlural: string;
+    ISOnum: number | null;
+    symbol: string;
+    symbolNative: string;
+    minorSingle: string;
+    minorPlural: string;
+    ISOdigits: number;
+    decimals: number;
+    numToBasic: number | null;
+}
 
-
+const fetchCurrencies = async (): Promise<Currency[]> => {
+    const response = await fetch('/api/currencies');
+    if (!response.ok) {
+        throw new Error('Failed to fetch currencies');
+    }
+    return response.json();
+};
 
 interface SettingsTabProps {
     value: ConventionSettingData;
@@ -45,6 +58,48 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const router = useRouter();
     const { enqueueSnackbar } = useSnackbar();
     const queryClient = useQueryClient();
+
+    const { data: currencies, isLoading: isLoadingCurrencies } = useQuery<Currency[]>({
+        queryKey: ['currencies'],
+        queryFn: fetchCurrencies,
+        staleTime: Infinity, // This is static data
+    });
+
+    const sortedAndFormattedCurrencies = useMemo(() => {
+        if (!currencies) return [];
+
+        const top10Codes = ['USD', 'EUR', 'JPY', 'GBP', 'CNY', 'AUD', 'CAD', 'CHF', 'HKD', 'SGD'];
+
+        const top10: Currency[] = [];
+        const rest: Currency[] = [];
+
+        currencies.forEach(currency => {
+            if (top10Codes.includes(currency.code)) {
+                top10.push(currency);
+            } else {
+                rest.push(currency);
+            }
+        });
+
+        // Sort top10 according to the predefined order
+        top10.sort((a, b) => top10Codes.indexOf(a.code) - top10Codes.indexOf(b.code));
+
+        const allSorted = [...top10, ...rest];
+
+        return allSorted.map(currency => {
+            let displayLabel = '';
+            if (currency.demonym) {
+                displayLabel = `${currency.symbol} - ${currency.demonym} ${currency.majorSingle}`;
+            } else {
+                displayLabel = `${currency.symbol} - ${currency.name}`;
+            }
+            return {
+                code: currency.code,
+                label: displayLabel,
+            };
+        });
+    }, [currencies]);
+
 
     useEffect(() => {
         setLocalValue(value);
@@ -76,61 +131,41 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     const handleChange = (field: keyof ConventionSettingData) => async (event: any) => {
         const newValue = event.target.value;
-        console.log(`[SettingsTab] handleChange called for ${field} with value:`, newValue);
-        console.log(`[SettingsTab] conventionId:`, conventionId);
-        console.log(`[SettingsTab] isEditing:`, isEditing);
-
         setLocalValue(prev => ({ ...prev, [field]: newValue }));
         onFormChange(field, newValue);
 
-        // Auto-save immediately when timezone changes
-        if (field === 'timezone' && conventionId && isEditing) {
-            console.log('[SettingsTab] Starting auto-save for timezone...');
+        // Auto-save immediately when currency or timezone changes
+        if ((field === 'currency') && conventionId && isEditing) {
+            console.log(`[SettingsTab] Starting auto-save for ${field}...`);
             setIsSaving(true);
             try {
-                console.log('[SettingsTab] Auto-saving timezone:', newValue);
-                console.log('[SettingsTab] Current currency:', localValue.currency);
+                // Ensure we are sending both currency and timezone
+                const payload = {
+                    currency: newValue,
+                    timezone: localValue.timezone,
+                };
 
-                // Update ConventionSetting table only
                 const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        currency: localValue.currency || 'USD',
-                        timezone: newValue
-                    }),
+                    body: JSON.stringify(payload),
                 });
 
-                console.log('[SettingsTab] Settings response status:', settingsResponse.status);
-
                 if (settingsResponse.ok) {
-                    console.log('[SettingsTab] Timezone auto-saved successfully to ConventionSetting table');
-                    const responseData = await settingsResponse.json();
-                    console.log('[SettingsTab] Success response:', responseData);
+                    enqueueSnackbar(`Currency updated successfully.`, { variant: 'success' });
+                    // Optionally refetch related data if needed
+                    queryClient.invalidateQueries({ queryKey: ['convention', conventionId] });
                 } else {
-                    console.error('[SettingsTab] Failed to auto-save timezone');
-                    const settingsError = await settingsResponse.text();
-                    console.error('Settings response error:', settingsError);
-
-                    // Try to parse the error for more details
-                    try {
-                        const errorData = JSON.parse(settingsError);
-                        console.error('Parsed error details:', errorData);
-                    } catch (e) {
-                        console.error('Could not parse error response');
-                    }
+                    const errorData = await settingsResponse.json();
+                    enqueueSnackbar(errorData.error || `Failed to update currency.`, { variant: 'error' });
+                    console.error('[SettingsTab] Failed to auto-save currency', errorData);
                 }
             } catch (error) {
-                console.error('[SettingsTab] Error auto-saving timezone:', error);
+                enqueueSnackbar(`An error occurred while saving currency.`, { variant: 'error' });
+                console.error('[SettingsTab] Error auto-saving currency:', error);
             } finally {
                 setIsSaving(false);
             }
-        } else {
-            console.log('[SettingsTab] Auto-save conditions not met:', {
-                isTimezone: field === 'timezone',
-                hasConventionId: !!conventionId,
-                isEditing
-            });
         }
     };
 
@@ -147,19 +182,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
                     <Box sx={{ flex: 1 }}>
                         <FormControl fullWidth error={!!errors.currency}>
-                            <InputLabel id="currency-label">Default Currency</InputLabel>
+                            <InputLabel id="currency-label" shrink>Default Currency</InputLabel>
                             <Select
                                 labelId="currency-label"
-                                value={localValue.currency || 'USD'}
+                                value={localValue.currency || ''}
                                 onChange={handleChange('currency')}
                                 label="Default Currency"
-                                disabled={!isEditing}
+                                disabled={!isEditing || isLoadingCurrencies}
+                                displayEmpty
                             >
-                                {CURRENCIES.map((currency) => (
-                                    <MenuItem key={currency.code} value={currency.code}>
-                                        {currency.label}
-                                    </MenuItem>
-                                ))}
+                                <MenuItem value="" disabled>
+                                    <em>Select Currency</em>
+                                </MenuItem>
+                                {isLoadingCurrencies ? (
+                                    <MenuItem disabled>Loading currencies...</MenuItem>
+                                ) : (
+                                    sortedAndFormattedCurrencies.map((currency) => (
+                                        <MenuItem key={currency.code} value={currency.code}>
+                                            {currency.label}
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
                             {errors.currency && (
                                 <FormHelperText>{errors.currency}</FormHelperText>
@@ -186,18 +229,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                             method: 'PUT',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({
-                                                currency: localValue.currency || 'USD',
+                                                currency: localValue.currency || '',
                                                 timezone: timezoneId
                                             }),
                                         });
 
                                         if (settingsResponse.ok) {
+                                            enqueueSnackbar('Timezone updated successfully.', { variant: 'success' });
                                             console.log('[SettingsTab] Timezone auto-saved successfully');
                                         } else {
                                             console.error('[SettingsTab] Failed to auto-save timezone');
+                                            enqueueSnackbar('Failed to update timezone.', { variant: 'error' });
                                         }
                                     } catch (error) {
                                         console.error('[SettingsTab] Error auto-saving timezone:', error);
+                                        enqueueSnackbar('An error occurred while saving the timezone.', { variant: 'error' });
                                     } finally {
                                         setIsSaving(false);
                                     }

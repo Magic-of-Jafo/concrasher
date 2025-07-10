@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   VenueHotelTabData,
   VenueHotelTabSchema,
@@ -21,49 +21,56 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
 interface VenueHotelTabProps {
   conventionId: string | null;
-  value: VenueHotelTabData;
+  value: VenueHotelTabData & { venues?: VenueData[] }; // Allow venues array in prop type
   onChange: (data: VenueHotelTabData, isValid: boolean) => void;
   onValidationChange: (isValid: boolean) => void;
   disabled?: boolean;
   schema?: typeof VenueHotelTabSchema;
 }
 
-const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawValue, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
-  const [localState, setLocalState] = useState<VenueHotelTabData>(() => {
-    const secondaryVenues = (rawValue as any).secondaryVenues ?? (rawValue as any).venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
-    const primaryVenue = (rawValue as any).primaryVenue ?? ((rawValue as any).venues?.find((v: any) => v.isPrimaryVenue) ?? createDefaultVenue(true));
-    return {
-      primaryVenue,
-      secondaryVenues,
-      primaryHotelDetails: (rawValue as any).primaryHotelDetails,
-      hotels: (rawValue as any).hotels ?? [],
-      guestsStayAtPrimaryVenue: (rawValue as any).guestsStayAtPrimaryVenue ?? false,
-    };
-  });
-
+const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>('primaryVenue');
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<{ originalIndex: number, displayIndex: number } | null>(null);
 
-  useEffect(() => {
-    const secondaryVenues = (rawValue as any).secondaryVenues ?? (rawValue as any).venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
-    const primaryVenue = (rawValue as any).primaryVenue ?? ((rawValue as any).venues?.find((v: any) => v.isPrimaryVenue) ?? createDefaultVenue(true));
-
-    setLocalState({
-      primaryVenue,
-      secondaryVenues,
-      primaryHotelDetails: (rawValue as any).primaryHotelDetails,
-      hotels: (rawValue as any).hotels ?? [],
-      guestsStayAtPrimaryVenue: (rawValue as any).guestsStayAtPrimaryVenue ?? false,
-    });
-  }, [JSON.stringify(rawValue)]);
+  const { primaryVenue, secondaryVenues } = useMemo(() => {
+    const pVenue = value.primaryVenue ?? value.venues?.find((v: VenueData) => v.isPrimaryVenue) ?? createDefaultVenue(true);
+    const sVenues = value.secondaryVenues ?? value.venues?.filter((v: VenueData) => !v.isPrimaryVenue) ?? [];
+    return { primaryVenue: pVenue, secondaryVenues: sVenues };
+  }, [value]);
 
   const isNewConvention = !conventionId;
+
+  const validateAndNotify = useCallback((data: VenueHotelTabData) => {
+    const result = schema.safeParse(data);
+    const isValid = result.success;
+    setZodErrors(isValid ? null : result.error.issues);
+    onValidationChange(isValid);
+
+    const combinedVenues = [
+      ...(data.primaryVenue ? [data.primaryVenue] : []),
+      ...(data.secondaryVenues ?? [])
+    ];
+    const finalData = { ...data, venues: combinedVenues };
+    delete (finalData as any).secondaryVenues; // Clean up before sending up
+
+    onChange(finalData as VenueHotelTabData & { venues: VenueData[] }, isValid);
+  }, [onChange, onValidationChange, schema]);
+
+  useEffect(() => {
+    const result = schema.safeParse(value);
+    const isValid = result.success;
+    if (!isValid) {
+      setZodErrors(result.error.issues);
+    } else {
+      setZodErrors(null);
+    }
+  }, [value, schema]);
 
   const handleConfirmDeleteVenue = async () => {
     if (venueToDelete === null || !conventionId) return;
 
-    const venue = localState.secondaryVenues[venueToDelete.originalIndex];
+    const venue = secondaryVenues[venueToDelete.originalIndex];
     if (!venue || !venue.id) {
       // If there's no ID, it's a new venue that hasn't been saved. Just remove from state.
       handleRemoveSecondaryVenue(venueToDelete.originalIndex);
@@ -123,99 +130,62 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
     return errors;
   }, [zodErrors]);
 
-  const validateAndNotify = useCallback((data: VenueHotelTabData) => {
-    const result = schema.safeParse(data);
-    const isValid = result.success;
-    setZodErrors(isValid ? null : result.error.issues);
-    onValidationChange(isValid);
-
-    const combinedVenues = [
-      ...(data.primaryVenue ? [data.primaryVenue] : []),
-      ...(data.secondaryVenues ?? [])
-    ];
-
-    onChange({ ...data, venues: combinedVenues } as VenueHotelTabData & { venues: VenueData[] }, isValid);
-  }, [onChange, onValidationChange, schema]);
-
-  useEffect(() => {
-    validateAndNotify(localState);
-  }, [localState, validateAndNotify]);
-
   const handleAccordionChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpandedAccordion(isExpanded ? panel : false);
   };
 
   const handlePrimaryVenueChange = (updatedData: Partial<VenueData>) => {
-    setLocalState(prevState => ({
-      ...prevState,
-      primaryVenue: { ...prevState.primaryVenue, ...updatedData } as VenueData
-    }));
+    const newPrimaryVenue = { ...primaryVenue, ...updatedData } as VenueData;
+    validateAndNotify({ ...value, primaryVenue: newPrimaryVenue, secondaryVenues });
   };
 
   const handleSecondaryVenueChange = (index: number, updatedData: Partial<VenueData>) => {
-    setLocalState(prevState => {
-      const newSecondaryVenues = [...(prevState.secondaryVenues || [])];
-      newSecondaryVenues[index] = { ...newSecondaryVenues[index], ...updatedData };
-      return { ...prevState, secondaryVenues: newSecondaryVenues };
-    });
+    const newSecondaryVenues = [...secondaryVenues];
+    newSecondaryVenues[index] = { ...newSecondaryVenues[index], ...updatedData };
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues: newSecondaryVenues });
   };
 
   const handleRemoveSecondaryVenue = (index: number) => {
-    setLocalState(prevState => {
-      const newSecondaryVenues = [...(prevState.secondaryVenues || [])];
-      newSecondaryVenues.splice(index, 1);
-      return { ...prevState, secondaryVenues: newSecondaryVenues };
-    });
+    const newSecondaryVenues = [...secondaryVenues];
+    newSecondaryVenues.splice(index, 1);
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues: newSecondaryVenues });
   };
 
   const handleHotelChange = (index: number, updatedHotelData: Partial<HotelData>) => {
-    setLocalState(prevState => {
-      const newHotels = [...prevState.hotels];
-      newHotels[index] = { ...newHotels[index], ...updatedHotelData };
-      return { ...prevState, hotels: newHotels };
-    });
+    const newHotels = [...(value.hotels || [])];
+    newHotels[index] = { ...newHotels[index], ...updatedHotelData };
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels: newHotels });
   };
 
   const handleAddHotel = () => {
-    setLocalState(prevState => ({
-      ...prevState,
-      hotels: [...(prevState.hotels ?? []), createDefaultHotel(false)]
-    }));
+    const newHotels = [...(value.hotels || []), createDefaultHotel(false)];
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels: newHotels });
   };
 
   const handleAddVenue = () => {
-    setLocalState(prevState => ({
-      ...prevState,
-      secondaryVenues: [...(prevState.secondaryVenues ?? []), createDefaultVenue(false)]
-    }));
+    const newSecondaryVenues = [...secondaryVenues, createDefaultVenue(false)];
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues: newSecondaryVenues });
   };
 
   const handleRemoveHotel = (index: number) => {
-    setLocalState(prevState => {
-      const hotels = prevState.hotels.filter((_, i) => i !== index);
-      return { ...prevState, hotels };
-    });
+    const hotels = (value.hotels || []).filter((_, i) => i !== index);
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels });
   };
 
   const handleGuestsStayAtPrimaryVenueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const guestsStayAtPrimaryVenue = event.target.checked;
-    setLocalState(prevState => {
-      let hotels = [...prevState.hotels];
-      if (guestsStayAtPrimaryVenue) {
-        hotels = hotels.filter(h => !h.isPrimaryHotel);
-      } else {
-        if (!hotels.some(h => h.isPrimaryHotel)) {
-          hotels.unshift(createDefaultHotel(true));
-        }
+    let hotels = [...(value.hotels || [])];
+    if (guestsStayAtPrimaryVenue) {
+      hotels = hotels.filter(h => !h.isPrimaryHotel);
+    } else {
+      if (!hotels.some(h => h.isPrimaryHotel)) {
+        hotels.unshift(createDefaultHotel(true));
       }
-      return { ...prevState, guestsStayAtPrimaryVenue, hotels };
-    });
+    }
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue, hotels });
   };
 
   const renderVenueForms = () => {
-    const primaryVenue = localState.primaryVenue;
-    const secondaryVenues = localState.secondaryVenues || [];
-
     if (!primaryVenue) return null; // Guard against undefined primary venue
 
     return (
@@ -230,6 +200,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
               onChange={handlePrimaryVenueChange}
               disabled={disabled}
               errors={structuredErrors.venues[0]}
+              isPrimary={true}
             />
           </AccordionDetails>
         </Accordion>
@@ -248,16 +219,10 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
                 disabled={disabled}
                 errors={structuredErrors.venues[index + 1]}
                 title={`Secondary Venue ${index + 1}`}
+                onRemove={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
+                isNew={!venue.id}
+                isPrimary={false}
               />
-              <Button
-                startIcon={<DeleteIcon />}
-                onClick={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
-                color="error"
-                sx={{ mt: 1 }}
-                disabled={disabled}
-              >
-                Remove Venue (Permanent)
-              </Button>
             </AccordionDetails>
           </Accordion>
         ))}
@@ -269,7 +234,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
   };
 
   const renderHotelForms = () => {
-    const hotels = localState.hotels || [];
+    const hotels = value.hotels || [];
     const primaryHotel = hotels.find(h => h.isPrimaryHotel);
 
     return (
@@ -279,7 +244,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
           <FormControlLabel
             control={
               <Checkbox
-                checked={localState.guestsStayAtPrimaryVenue}
+                checked={value.guestsStayAtPrimaryVenue}
                 onChange={handleGuestsStayAtPrimaryVenueChange}
                 name="guestsStayAtPrimaryVenue"
                 disabled={disabled}
@@ -289,7 +254,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
           />
         </Paper>
 
-        {!localState.guestsStayAtPrimaryVenue && hotels.map((hotel, index) => (
+        {!value.guestsStayAtPrimaryVenue && hotels.map((hotel, index) => (
           <Accordion key={hotel.id || `hotel-${index}`} defaultExpanded={hotel.isPrimaryHotel}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
@@ -316,7 +281,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value: rawV
             </AccordionDetails>
           </Accordion>
         ))}
-        {!localState.guestsStayAtPrimaryVenue && (
+        {!value.guestsStayAtPrimaryVenue && (
           <Button startIcon={<AddIcon />} onClick={handleAddHotel} sx={{ mt: 2 }} disabled={disabled}>
             Add Another Hotel
           </Button>

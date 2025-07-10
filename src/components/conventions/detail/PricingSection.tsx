@@ -14,27 +14,35 @@ import {
     Chip,
     Stack,
     Alert,
+    Button,
 } from '@mui/material';
 import { format } from 'date-fns';
+import { ConventionStatus } from '@prisma/client';
 
 interface PricingSectionProps {
     convention: any;
 }
 
 // Helper function to format price
-function formatPrice(amount: number | string, currency: string = 'USD'): string {
+function formatPrice(amount: number | string, currencySymbol: string = '$', currencyCode: string = 'USD'): string {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     if (numAmount === 0) return 'FREE';
 
-    try {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: currency,
-        }).format(numAmount);
-    } catch (error) {
-        // Fallback if currency is not supported
-        return `${currency} ${numAmount.toFixed(2)}`;
+    // For currencies that don't have a simple symbol, Intl.NumberFormat is better
+    if (['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'].includes(currencyCode)) {
+        try {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currencyCode,
+            }).format(numAmount);
+        } catch (error) {
+            // Fallback for safety
+            return `${currencySymbol}${numAmount.toFixed(2)}`;
+        }
     }
+
+    // Fallback for other currencies to just use the symbol
+    return `${currencySymbol}${numAmount.toFixed(2)}`;
 }
 
 // Helper function to format discount cutoff date in "mmm dd" format
@@ -63,10 +71,15 @@ function formatDiscountDate(date: Date, timezone?: string): string {
 }
 
 export default function PricingSection({ convention }: PricingSectionProps) {
-    // Use your original clean implementation
     const priceTiers = convention.priceTiers || [];
     const priceDiscounts = convention.priceDiscounts || [];
     const conventionTimezone = convention.timezone || convention.displayTimezone;
+
+    // Find the currency setting from the array of settings
+    const currencySetting = convention.settings?.find((s: any) => s.key === 'currency');
+    const currencySymbol = currencySetting?.currency?.symbol || '$';
+    const currencyCode = currencySetting?.currency?.code || 'USD';
+
 
     // Debug timezone conversion
     console.log('Convention timezone:', conventionTimezone);
@@ -111,6 +124,10 @@ export default function PricingSection({ convention }: PricingSectionProps) {
 
     // Sort price tiers by order
     const sortedTiers = [...priceTiers].sort((a: any, b: any) => a.order - b.order);
+
+    // Registration button logic from BasicInfoSection
+    const hasRegistrationUrl = convention.registrationUrl &&
+        convention.status === ConventionStatus.PUBLISHED;
 
     return (
         <Paper sx={{ p: 3, mb: 3 }}>
@@ -207,14 +224,14 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                                 sx={{ backgroundColor: 'grey.100' }}
                                             >
                                                 <Typography variant="body1">
-                                                    {formatPrice(discountPrice)}
+                                                    {formatPrice(discountPrice, currencySymbol, currencyCode)}
                                                 </Typography>
                                             </TableCell>
                                         );
                                     })}
                                     <TableCell align="center">
                                         <Typography variant="body1">
-                                            {formatPrice(Number(tier.amount))}
+                                            {formatPrice(Number(tier.amount), currencySymbol, currencyCode)}
                                         </Typography>
                                     </TableCell>
                                 </TableRow>
@@ -224,11 +241,28 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                 </Table>
             </TableContainer>
 
-            {uniqueCutoffDates.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    No active discount periods available.
-                </Typography>
-            )}
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                    variant="contained"
+                    size="large"
+                    href={hasRegistrationUrl ? convention.registrationUrl : undefined}
+                    target={hasRegistrationUrl ? "_blank" : undefined}
+                    rel={hasRegistrationUrl ? "noopener noreferrer" : undefined}
+                    disabled={!hasRegistrationUrl}
+                    sx={{
+                        minWidth: 200, // Ensure button has a good size
+                        ...(hasRegistrationUrl ? {} : {
+                            bgcolor: 'grey.400',
+                            color: 'grey.600',
+                            '&:hover': {
+                                bgcolor: 'grey.500',
+                            }
+                        })
+                    }}
+                >
+                    {hasRegistrationUrl ? 'Click here to Register' : 'Check back for register link'}
+                </Button>
+            </Box>
         </Paper>
     );
 } 

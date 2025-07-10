@@ -1761,6 +1761,14 @@ export async function updateConventionSettings(
 
     // Also handle ConventionSetting for currency (if needed in the future)
     if (validatedData.data.currency) {
+      const currencyRecord = await db.currency.findUnique({
+        where: { code: validatedData.data.currency },
+      });
+
+      if (!currencyRecord) {
+        return { success: false, error: 'Invalid currency code provided.' };
+      }
+
       await db.conventionSetting.upsert({
         where: {
           conventionId_key: {
@@ -1770,12 +1778,14 @@ export async function updateConventionSettings(
         },
         update: {
           value: validatedData.data.currency,
+          currencyId: currencyRecord.id,
           updatedAt: new Date(),
         },
         create: {
           conventionId: conventionId,
           key: 'currency',
           value: validatedData.data.currency,
+          currencyId: currencyRecord.id,
         },
       });
     }
@@ -1833,7 +1843,7 @@ export async function getConventionSettings(
     });
 
     const settingsData: ConventionSettingData = {
-      currency: currencySetting?.value || 'USD',
+      currency: currencySetting?.value || '',
       timezone: convention.timezoneId || '',
     };
 

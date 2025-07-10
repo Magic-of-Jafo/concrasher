@@ -19,13 +19,14 @@ import {
   ButtonGroup,
   ToggleButton,
   InputAdornment,
+  Grid,
 } from '@mui/material';
-import { Grid } from '@mui/material';
 import { format } from 'date-fns';
 import { Convention, ConventionStatus } from '@prisma/client';
 import NextLink from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import ClearIcon from '@mui/icons-material/Clear';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
 import { deleteConvention } from '@/lib/actions';
@@ -191,80 +192,85 @@ export default function AdminConventionList({ error, setError }: AdminConvention
 
   return (
     <Grid container spacing={3}>
-      <Grid item xs={12} md={3} component={Paper} sx={{ p: 2, position: 'sticky', top: '80px' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Box>
-            <Typography variant="subtitle1" gutterBottom component="div" sx={{ fontWeight: 'bold' }}>
-              Status
-            </Typography>
-            <ButtonGroup
-              orientation="vertical"
-              fullWidth
-              sx={{
-                '& .MuiButtonGroup-grouped': {
-                  border: '1px solid rgba(0, 0, 0, 0.23)',
-                  '&:not(:last-of-type)': {
-                    borderBottom: 0,
-                  },
-                }
-              }}
-            >
-              {filterOptions.map(({ label, value }) => (
-                <Button
-                  key={value}
-                  variant={activeFilter === value ? 'contained' : 'outlined'}
-                  onClick={() => setActiveFilter(value)}
-                  sx={{ display: 'flex', justifyContent: 'space-between' }}
-                >
-                  <span>{label}</span>
-                  {matchCounts && matchCounts[value] > 0 && activeFilter !== value && (
-                    <Box sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor: 'success.main',
-                      ml: 1
-                    }} />
-                  )}
-                </Button>
-              ))}
-            </ButtonGroup>
-          </Box>
+      <Grid item xs={12} md={3}>
+        <Paper sx={{ p: 2, position: 'sticky', top: '80px' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box>
+              <Typography variant="subtitle1" gutterBottom component="div" sx={{ fontWeight: 'bold' }}>
+                Status
+              </Typography>
+              <ButtonGroup
+                orientation="vertical"
+                fullWidth
+                sx={{
+                  '& .MuiButtonGroup-grouped': {
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
+                    '&:not(:last-of-type)': {
+                      borderBottom: 0,
+                    },
+                  }
+                }}
+              >
+                {filterOptions.map(({ label, value }) => (
+                  <Button
+                    key={value}
+                    variant={activeFilter === value ? 'contained' : 'outlined'}
+                    onClick={() => setActiveFilter(value)}
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
+                    <span>{label}</span>
+                    {matchCounts && matchCounts[value] > 0 && activeFilter !== value && (
+                      <Box sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: 'success.main',
+                        ml: 1
+                      }} />
+                    )}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </Box>
 
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleFindExpired}
-            disabled={isExpiring}
-          >
-            {isExpiring ? 'Working...' : 'Set Expired'}
-          </Button>
-          <TextField
-            label="Search"
-            variant="outlined"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            fullWidth
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  {searchQuery && (
-                    <IconButton
-                      aria-label="clear search"
-                      onClick={() => setSearchQuery('')}
-                      edge="end"
-                    >
-                      <ClearIcon />
-                    </IconButton>
-                  )}
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleFindExpired}
+              disabled={isExpiring}
+            >
+              {isExpiring ? 'Working...' : 'Set Expired'}
+            </Button>
+            <TextField
+              label="Search"
+              variant="outlined"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {searchQuery && (
+                      <IconButton
+                        aria-label="clear search"
+                        onClick={() => setSearchQuery('')}
+                        edge="end"
+                      >
+                        <ClearIcon />
+                      </IconButton>
+                    )}
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+        </Paper>
       </Grid>
       <Grid item xs={12} md={9}>
+        <Typography variant="h4" gutterBottom>
+          {currentFilterLabel}
+        </Typography>
         {loading ? (
           <CircularProgress />
         ) : (
@@ -300,7 +306,16 @@ export default function AdminConventionList({ error, setError }: AdminConvention
                     </TableCell>
                     <TableCell>{convention.city && convention.stateAbbreviation ? `${convention.city}, ${convention.stateAbbreviation}` : 'TBD'}</TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                        <IconButton
+                          component={NextLink}
+                          href={`/conventions/${convention.id}`}
+                          aria-label="view"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
                         <IconButton component={NextLink} href={`/organizer/conventions/${convention.id}/edit`} aria-label="edit">
                           <EditIcon />
                         </IconButton>
@@ -331,16 +346,15 @@ export default function AdminConventionList({ error, setError }: AdminConvention
             </Table>
           </TableContainer>
         )}
+        <ConfirmationModal
+          isOpen={!!conventionToDelete}
+          onClose={() => setConventionToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          title={`Delete ${conventionToDelete?.name}?`}
+          description="Are you sure you want to delete this convention? This action cannot be undone."
+          isConfirming={isDeleting}
+        />
       </Grid>
-
-      <ConfirmationModal
-        isOpen={!!conventionToDelete}
-        onClose={() => setConventionToDelete(null)}
-        onConfirm={handleConfirmDelete}
-        title="Confirm Deletion"
-        description={`Are you sure you want to delete the convention "${conventionToDelete?.name}"? This action is permanent.`}
-        isConfirming={isDeleting}
-      />
     </Grid>
   );
 } 

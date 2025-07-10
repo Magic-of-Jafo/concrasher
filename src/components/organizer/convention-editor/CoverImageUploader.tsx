@@ -383,7 +383,7 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                                     maxWidth: '400px',
                                     height: 'auto',
                                     aspectRatio: '851/315',
-                                    objectFit: 'cover',
+                                    objectFit: 'contain',
                                     borderRadius: '4px',
                                 }}
                             />
@@ -447,7 +447,6 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                                 onCropChange={setCrop}
                                 onZoomChange={setZoom}
                                 onCropComplete={onCropComplete}
-                                objectFit="cover"
                             />
                         )}
                     </Box>

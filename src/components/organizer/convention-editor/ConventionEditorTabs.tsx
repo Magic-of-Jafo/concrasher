@@ -13,6 +13,33 @@ import { type ConventionMediaData } from '@/lib/validators';
 import { SettingsTab } from './SettingsTab';
 import { type ConventionSettingData } from '@/lib/validators';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+
+interface Currency {
+  id: number;
+  code: string;
+  name: string;
+  demonym: string | null;
+  majorSingle: string;
+  majorPlural: string;
+  ISOnum: number | null;
+  symbol: string;
+  symbolNative: string;
+  minorSingle: string;
+  minorPlural: string;
+  ISOdigits: number;
+  decimals: number;
+  numToBasic: number | null;
+}
+
+const fetchCurrencies = async (): Promise<Currency[]> => {
+  const response = await fetch('/api/currencies');
+  if (!response.ok) {
+    throw new Error('Failed to fetch currencies');
+  }
+  return response.json();
+};
+
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -86,7 +113,12 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   onCancel,
 }) => {
   const router = useRouter();
-  // console.log('[ConventionEditorTabs] Received initialConventionData:', initialConventionData);
+  const { data: currencies } = useQuery<Currency[]>({
+    queryKey: ['currencies'],
+    queryFn: fetchCurrencies,
+    staleTime: Infinity,
+  });
+
   const [activeTab, setActiveTab] = useState(0);
   const [hasVenueHotelTabBeenInteractedWith, setHasVenueHotelTabBeenInteractedWith] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -146,9 +178,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   );
 
   const [settingsData, setSettingsData] = useState<ConventionSettingData>(() => ({
-    currency: initialConventionData?.settings?.currency || 'USD',
+    currency: initialConventionData?.settings?.currency || '',
     timezone: initialConventionData?.settings?.timezone || '',
   }));
+
+  const currencySymbol = useMemo(() => {
+    if (!currencies || !settingsData.currency) {
+      return ''; // Return empty string instead of '$' when no currency is set
+    }
+    const selectedCurrency = currencies.find(c => c.code === settingsData.currency);
+    return selectedCurrency?.symbol || ''; // Default to empty string if not found
+  }, [currencies, settingsData.currency]);
 
   const conventionId = initialConventionData?.id;
   const conventionName = initialConventionData?.name || 'this convention';
@@ -174,7 +214,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     });
     setMediaData(media || []);
     setSettingsData({
-      currency: settings?.currency || 'USD',
+      currency: settings?.currency || '',
       timezone: settings?.timezone || '',
     });
     setVenueHotelData(venueHotel || defaultVenueHotelData);
@@ -290,6 +330,8 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           conventionId={conventionId}
           value={pricingTabData}
           onChange={handlePricingDataChange}
+          disabled={!isEditing}
+          currency={currencySymbol}
           timezone={settingsData.timezone}
         />
       </TabPanel>

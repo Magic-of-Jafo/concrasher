@@ -13,7 +13,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:vitest": "vitest run",
-    "test:vitest:ui": "vitest --ui"
+    "test:vitest:ui": "vitest --ui",
+    "prisma:generate": "prisma generate",
+    "db:seed-lookups": "dotenv -e .env.local -- tsx prisma/seed-lookups.ts",
+    "db:seed-timezones": "dotenv -e .env.local -- tsx prisma/seed-timezones.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
