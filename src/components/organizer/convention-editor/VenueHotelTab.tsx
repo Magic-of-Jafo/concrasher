@@ -48,14 +48,17 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     onValidationChange(isValid);
 
     const combinedVenues = [
-      ...(data.primaryVenue ? [data.primaryVenue] : []),
+      ...(data.primaryVenue ? [data.primaryVenue] : [primaryVenue]),
       ...(data.secondaryVenues ?? [])
     ];
     const finalData = { ...data, venues: combinedVenues };
     delete (finalData as any).secondaryVenues; // Clean up before sending up
+    delete (finalData as any).primaryVenue; // Clean up before sending up
+
+    console.log('[VenueHotelTab] Firing onChange with final data:', finalData);
 
     onChange(finalData as VenueHotelTabData & { venues: VenueData[] }, isValid);
-  }, [onChange, onValidationChange, schema]);
+  }, [onChange, onValidationChange, schema, primaryVenue]);
 
   useEffect(() => {
     const result = schema.safeParse(value);

@@ -4,32 +4,13 @@
 // Those are handled exclusively in jest.polyfills.js.
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event'; // Use userEvent for realistic interactions
 import '@testing-library/jest-dom'; // For extended Jest DOM matchers
 import HotelForm from './HotelForm';
 import { type HotelData, createDefaultHotel } from '@/lib/validators'; // Ensure HotelData and createDefaultHotel are correctly typed/structured
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-
-// --- Mocks for external components (ensure these are accurate to your component's dependencies) ---
-
-// Mock the TinyMCE Editor component
-jest.mock('@tinymce/tinymce-react', () => ({
-  Editor: jest.fn((props) => (
-    <textarea
-      data-testid="mock-tinymce-editor"
-      value={props.initialValue || props.value}
-      onChange={(e) => {
-        if (props.onEditorChange) {
-          // Simulate TinyMCE's onEditorChange which passes content as first arg
-          props.onEditorChange(e.target.value, {} as any);
-        }
-      }}
-      disabled={props.disabled}
-    />
-  )),
-}));
 
 // Mock ImageUploadInput
 jest.mock('@/components/shared/ImageUploadInput', () => {
@@ -49,23 +30,29 @@ jest.mock('@/components/shared/ImageUploadInput', () => {
 
 // Mock DatePicker (MUI X Date Pickers)
 jest.mock('@mui/x-date-pickers/DatePicker', () => ({
-  DatePicker: jest.fn((props) => ( // Use props directly here, not destructuring many individual props
+  DatePicker: jest.fn(({ label, value, onChange, disabled }) => (
     <input
-      data-testid={`mock-datepicker-${props.label?.toString().toLowerCase().replace(/\s+/g, '-') || 'date'}`}
+      data-testid={`mock-datepicker-${label}`}
       type="date"
-      // Convert Date object to YYYY-MM-DD string for input value
-      value={props.value ? new Date(props.value).toISOString().split('T')[0] : ''}
-      onChange={(e) => {
-        // Simulate onChange providing a Date object or null
-        props.onChange(e.target.value ? new Date(e.target.value) : null);
-      }}
-      disabled={props.disabled}
-      data-helpertext={props.slotProps?.textField?.helperText} // Helper text in data-attribute
-      aria-invalid={props.slotProps?.textField?.error ? 'true' : 'false'} // Set aria-invalid based on error prop
-      aria-describedby={props.slotProps?.textField?.helperText ? `${props.label}-helper-text` : undefined}
+      value={value ? new Date(value).toISOString().split('T')[0] : ''}
+      onChange={(e) => onChange(new Date(e.target.value))}
+      disabled={disabled}
     />
   )),
 }));
+
+// Mock ProseMirrorEditor
+jest.mock('@/components/ui/ProseMirrorEditor', () => ({
+  __esModule: true,
+  default: ({ value, onChange }: { value: string, onChange: (v: string) => void }) => (
+    <textarea
+      data-testid="mock-prosemirror-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 
 // --- Test Setup ---
 
@@ -109,7 +96,7 @@ describe('HotelForm', () => {
     renderComponent();
     expect(screen.getByLabelText(/hotel name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/website url/i)).toBeInTheDocument();
-    expect(screen.getByTestId('mock-tinymce-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-prosemirror-editor')).toBeInTheDocument();
     expect(screen.getByLabelText(/google maps url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address/i)).toBeInTheDocument();
     expect(screen.getByTestId('mock-image-upload-input')).toBeInTheDocument();
@@ -120,7 +107,7 @@ describe('HotelForm', () => {
 
   test('pre-populates with initial formData', () => {
     const initialData: HotelData = {
-      ...createDefaultHotel(true), // Ensure amenities and other new fields are defaulted correctly here
+      ...createDefaultHotel(), // Ensure amenities and other new fields are defaulted correctly here
       hotelName: 'Grand Hotel',
       websiteUrl: 'http://grandhotel.com',
       photos: [{ url: 'http://grandhotel.com/photo.jpg', caption: 'Grand view' }],
@@ -174,7 +161,7 @@ describe('HotelForm', () => {
 
   test('calls onFormDataChange when description is changed', async () => {
     renderComponent();
-    const editor = screen.getByTestId('mock-tinymce-editor'); // This is your mocked textarea for TinyMCE
+    const editor = screen.getByTestId('mock-prosemirror-editor'); // This is your mocked textarea for TinyMCE
 
     // user.type is appropriate for textareas as well
     await user.type(editor, 'New description for the hotel.');
@@ -211,7 +198,7 @@ describe('HotelForm', () => {
   test('disables all fields when disabled prop is true', () => {
     renderComponent({ disabled: true });
     expect(screen.getByLabelText(/hotel name/i)).toBeDisabled();
-    expect(screen.getByTestId('mock-tinymce-editor')).toBeDisabled();
+    expect(screen.getByTestId('mock-prosemirror-editor')).toBeDisabled();
     expect(screen.getByTestId('mock-upload-btn')).toBeDisabled();
     expect(screen.getByLabelText(/website url/i)).toBeDisabled();
     expect(screen.getByLabelText(/google maps url/i)).toBeDisabled();

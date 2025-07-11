@@ -151,8 +151,10 @@ export async function PUT(
 
   try {
     const body = await request.json();
+    console.log(`[API PUT /organizer/conventions/${conventionId}] Received body:`, JSON.stringify(body, null, 2));
     const {
-      venueHotel,
+      venues: incomingVenues,
+      hotels: incomingHotels,
       name,
       slug,
       startDate: rawStartDate,
@@ -178,14 +180,14 @@ export async function PUT(
     // Check if this is an image-only update
     const isImageOnlyUpdate = (coverImageUrl !== undefined || profileImageUrl !== undefined) &&
       Object.keys(body).length <= 2 && // Only cover/profile image fields
-      !venueHotel && !name && !slug; // No other major fields
+      !incomingVenues && !name && !slug; // No other major fields
 
-    let primaryVenueData = venueHotel?.primaryVenue;
-    let secondaryVenuesData = venueHotel?.secondaryVenues || [];
-    const guestsStayAtPrimaryVenue = venueHotel?.guestsStayAtPrimaryVenue;
-    const primaryHotelDetailsFromRequest = venueHotel?.primaryHotelDetails;
-    const additionalHotelsFromRequest = venueHotel?.hotels || [];
+    const allVenuesFromRequest = incomingVenues || [];
+    console.log('[API] Parsed allVenuesFromRequest:', JSON.stringify(allVenuesFromRequest, null, 2));
+    let primaryVenueData = allVenuesFromRequest.find((v: any) => v.isPrimaryVenue);
+    let secondaryVenuesData = allVenuesFromRequest.filter((v: any) => !v.isPrimaryVenue);
 
+    const guestsStayAtPrimaryVenue = body.guestsStayAtPrimaryVenue;
 
     // --- Process Venue Promotion ---
     const promotedVenueIndex = secondaryVenuesData.findIndex(
@@ -211,267 +213,130 @@ export async function PUT(
     }
     // --- End Process Venue Promotion ---
 
-    // Build update data based on what's being updated
-    const conventionDataForUpdate: any = {
-      updatedAt: new Date(),
-    };
-
-    if (isImageOnlyUpdate) {
-      // For image-only updates, only include the image fields
-      if (coverImageUrl !== undefined) {
-        conventionDataForUpdate.coverImageUrl = coverImageUrl;
-      }
-      if (profileImageUrl !== undefined) {
-        conventionDataForUpdate.profileImageUrl = profileImageUrl;
-      }
-      // Update the convention with only the image URLs
-      const updatedConvention = await prisma.convention.update({
-        where: { id: conventionId },
-        data: conventionDataForUpdate,
-      });
-      return NextResponse.json(updatedConvention);
-    }
-
-    // For full updates, include all fields
-    Object.assign(conventionDataForUpdate, {
-      name, slug, city, stateAbbreviation, stateName, country, status, seriesId,
-      descriptionShort, descriptionMain, isOneDayEvent, isTBD,
-      websiteUrl, registrationUrl,
-      guestsStayAtPrimaryVenue,
-    });
-
-    // Add cover and profile image URLs if provided
-    if (coverImageUrl !== undefined) {
-      conventionDataForUpdate.coverImageUrl = coverImageUrl;
-    }
-    if (profileImageUrl !== undefined) {
-      conventionDataForUpdate.profileImageUrl = profileImageUrl;
-    }
-
-    if (!isImageOnlyUpdate) {
-      const startDate = rawStartDate ? new Date(rawStartDate) : null;
-      const endDate = rawEndDate ? new Date(rawEndDate) : null;
-      conventionDataForUpdate.startDate = startDate;
-      conventionDataForUpdate.endDate = endDate;
-    }
-
+    // --- Main Transaction ---
     const updatedConvention = await prisma.$transaction(async (tx) => {
+      const conventionUpdatePayload: Prisma.ConventionUpdateInput = {
+        name, slug, city, stateAbbreviation, stateName, country, status,
+        descriptionShort, descriptionMain, isOneDayEvent, isTBD,
+        websiteUrl, registrationUrl,
+        guestsStayAtPrimaryVenue,
+        updatedAt: new Date(),
+      };
+
+      if (seriesId) {
+        conventionUpdatePayload.series = { connect: { id: seriesId } };
+      }
+      if (coverImageUrl !== undefined) conventionUpdatePayload.coverImageUrl = coverImageUrl;
+      if (profileImageUrl !== undefined) conventionUpdatePayload.profileImageUrl = profileImageUrl;
+
       // Step 1: Update the core convention details
-      await tx.convention.update({
+      const convention = await tx.convention.update({
         where: { id: conventionId },
-        data: conventionDataForUpdate,
+        data: conventionUpdatePayload,
       });
 
-      // Step 2: Handle Primary Venue (Upsert is fine here as there's only one)
-      if (primaryVenueData) {
-        const venuePayload: Omit<Prisma.VenueCreateInput, 'convention'> = {
-          isPrimaryVenue: true,
-          venueName: primaryVenueData.venueName,
-          description: primaryVenueData.description,
-          websiteUrl: primaryVenueData.websiteUrl,
-          googleMapsUrl: primaryVenueData.googleMapsUrl,
-          streetAddress: primaryVenueData.streetAddress,
-          city: primaryVenueData.city,
-          stateRegion: primaryVenueData.stateRegion,
-          postalCode: primaryVenueData.postalCode,
-          country: primaryVenueData.country,
-          contactEmail: primaryVenueData.contactEmail,
-          contactPhone: primaryVenueData.contactPhone,
-          amenities: primaryVenueData.amenities,
-          parkingInfo: primaryVenueData.parkingInfo,
-          publicTransportInfo: primaryVenueData.publicTransportInfo,
-          overallAccessibilityNotes: primaryVenueData.overallAccessibilityNotes,
-        };
-        const upsertedPrimaryVenue = await tx.venue.upsert({
-          where: { id: primaryVenueData.id || generateShortRandomId() },
-          create: { ...venuePayload, convention: { connect: { id: conventionId } } },
-          update: venuePayload,
-        });
-        await processPhotos(upsertedPrimaryVenue.id, primaryVenueData.photos, tx.venuePhoto, 'venueId');
-      }
+      // Step 2: Handle Venues
+      if (incomingVenues) {
+        const incomingVenueIds = allVenuesFromRequest.map((v: any) => v.id).filter(Boolean);
 
-      // Step 3: Handle Secondary Venues with explicit Sync logic
-      const existingSecondaryVenues = await tx.venue.findMany({
-        where: { conventionId: conventionId, isPrimaryVenue: false },
-      });
-      const existingVenueIds = existingSecondaryVenues.map(v => v.id);
-      const incomingVenueIds = secondaryVenuesData.map((v: any) => v.id).filter(Boolean);
-
-      // 3a: Delete venues that are no longer present
-      const venuesToDelete = existingVenueIds.filter(id => !incomingVenueIds.includes(id));
-      if (venuesToDelete.length > 0) {
+        // Delete venues that are no longer present
         await tx.venue.deleteMany({
-          where: { id: { in: venuesToDelete } }
-        });
-      }
-
-      // 3b: Update existing venues and create new ones
-      for (const venueData of secondaryVenuesData) {
-        const venuePayload = {
-          isPrimaryVenue: false,
-          venueName: venueData.venueName,
-          description: venueData.description,
-          websiteUrl: venueData.websiteUrl,
-          googleMapsUrl: venueData.googleMapsUrl,
-          streetAddress: venueData.streetAddress,
-          city: venueData.city,
-          stateRegion: venueData.stateRegion,
-          postalCode: venueData.postalCode,
-          country: venueData.country,
-          contactEmail: venueData.contactEmail,
-          contactPhone: venueData.contactPhone,
-          amenities: venueData.amenities,
-          parkingInfo: venueData.parkingInfo,
-          publicTransportInfo: venueData.publicTransportInfo,
-          overallAccessibilityNotes: venueData.overallAccessibilityNotes,
-        };
-
-        let upsertedVenue;
-        if (venueData.id && existingVenueIds.includes(venueData.id)) {
-          // Update existing venue
-          upsertedVenue = await tx.venue.update({
-            where: { id: venueData.id },
-            data: venuePayload,
-          });
-        } else {
-          // Create new venue
-          upsertedVenue = await tx.venue.create({
-            data: {
-              ...venuePayload,
-              convention: { connect: { id: conventionId } }
-            },
-          });
-        }
-        await processPhotos(upsertedVenue.id, venueData.photos, tx.venuePhoto, 'venueId');
-      }
-
-      // Step 4: Handle Hotel Logic (Primary & Additional)
-      // This section needs to correctly identify the primary hotel and manage its data,
-      // If guests stay at primary venue, there should be no primary hotel.
-      // If there is one in the DB, it should be demoted.
-      if (guestsStayAtPrimaryVenue) {
-        await tx.hotel.updateMany({
-          where: { conventionId, isPrimaryHotel: true },
-          data: { isPrimaryHotel: false },
-        });
-      }
-
-      // Determine the ID of the primary hotel from the request, if it exists
-      const primaryHotelIdFromRequest = primaryHotelDetailsFromRequest?.id;
-
-      // Demote any existing primary hotels in the DB that are not the one from the request
-      if (primaryHotelIdFromRequest) {
-        await tx.hotel.updateMany({
           where: {
-            conventionId,
-            isPrimaryHotel: true,
-            id: { not: primaryHotelIdFromRequest },
+            conventionId: conventionId,
+            id: { notIn: incomingVenueIds },
           },
-          data: { isPrimaryHotel: false },
         });
-      }
 
-      // Upsert the primary hotel details if they exist
-      if (primaryHotelDetailsFromRequest && !guestsStayAtPrimaryVenue) {
-        const hotelPayload = {
-          isPrimaryHotel: true,
-          isAtPrimaryVenueLocation: primaryHotelDetailsFromRequest.isAtPrimaryVenueLocation || false,
-          hotelName: primaryHotelDetailsFromRequest.hotelName,
-          description: primaryHotelDetailsFromRequest.description,
-          websiteUrl: primaryHotelDetailsFromRequest.websiteUrl,
-          googleMapsUrl: primaryHotelDetailsFromRequest.googleMapsUrl,
-          streetAddress: primaryHotelDetailsFromRequest.streetAddress,
-          city: primaryHotelDetailsFromRequest.city,
-          stateRegion: primaryHotelDetailsFromRequest.stateRegion,
-          postalCode: primaryHotelDetailsFromRequest.postalCode,
-          country: primaryHotelDetailsFromRequest.country,
-          contactEmail: primaryHotelDetailsFromRequest.contactEmail,
-          contactPhone: primaryHotelDetailsFromRequest.contactPhone,
+        // Upsert all venues from the request
+        for (const venueData of allVenuesFromRequest) {
+          const venuePayload: any = {
+            venueName: venueData.venueName,
+            isPrimaryVenue: venueData.isPrimaryVenue,
+            description: venueData.description,
+            websiteUrl: venueData.websiteUrl,
+            googleMapsUrl: venueData.googleMapsUrl,
+            streetAddress: venueData.streetAddress,
+            city: venueData.city,
+            stateRegion: venueData.stateRegion,
+            postalCode: venueData.postalCode,
+            country: venueData.country,
+            contactEmail: venueData.contactEmail,
+            contactPhone: venueData.contactPhone,
+            parkingInfo: venueData.parkingInfo,
+            publicTransportInfo: venueData.publicTransportInfo,
+            overallAccessibilityNotes: venueData.overallAccessibilityNotes,
+            amenities: venueData.amenities,
+            convention: { connect: { id: conventionId } },
+          };
 
-          amenities: primaryHotelDetailsFromRequest.amenities,
-          parkingInfo: primaryHotelDetailsFromRequest.parkingInfo,
-          publicTransportInfo: primaryHotelDetailsFromRequest.publicTransportInfo,
-          overallAccessibilityNotes: primaryHotelDetailsFromRequest.overallAccessibilityNotes,
+          console.log(`[API] Upserting venue with payload:`, JSON.stringify(venuePayload, null, 2));
 
-          bookingLink: primaryHotelDetailsFromRequest.bookingLink,
-          bookingCutoffDate: primaryHotelDetailsFromRequest.bookingCutoffDate ? new Date(primaryHotelDetailsFromRequest.bookingCutoffDate) : null,
-          groupRateOrBookingCode: primaryHotelDetailsFromRequest.groupRateOrBookingCode,
-          groupPrice: primaryHotelDetailsFromRequest.groupPrice,
-        };
-
-        const upsertedPrimaryHotel = await tx.hotel.upsert({
-          where: { id: primaryHotelDetailsFromRequest.id || generateShortRandomId() },
-          create: { ...hotelPayload, convention: { connect: { id: conventionId } } },
-          update: hotelPayload,
-        });
-        await processPhotos(upsertedPrimaryHotel.id, primaryHotelDetailsFromRequest.photos, tx.hotelPhoto, 'hotelId');
-      }
-
-      // Step 5: Handle Additional Hotels with explicit sync logic
-      const existingAdditionalHotels = await tx.hotel.findMany({
-        where: {
-          conventionId,
-          isPrimaryHotel: false
-        },
-      });
-      const existingHotelIds = existingAdditionalHotels.map(h => h.id);
-      const incomingHotelIds = additionalHotelsFromRequest.map((h: any) => h.id).filter(Boolean);
-
-      const hotelsToDelete = existingHotelIds.filter(id => !incomingHotelIds.includes(id));
-      if (hotelsToDelete.length > 0) {
-        await tx.hotel.deleteMany({
-          where: { id: { in: hotelsToDelete } },
-        });
-      }
-
-      for (const hotelData of additionalHotelsFromRequest) {
-        const hotelPayload = {
-          isPrimaryHotel: false,
-          isAtPrimaryVenueLocation: hotelData.isAtPrimaryVenueLocation || false,
-          hotelName: hotelData.hotelName,
-          description: hotelData.description,
-          websiteUrl: hotelData.websiteUrl,
-          googleMapsUrl: hotelData.googleMapsUrl,
-          streetAddress: hotelData.streetAddress,
-          city: hotelData.city,
-          stateRegion: hotelData.stateRegion,
-          postalCode: hotelData.postalCode,
-          country: hotelData.country,
-          contactEmail: hotelData.contactEmail,
-          contactPhone: hotelData.contactPhone,
-          amenities: hotelData.amenities,
-          parkingInfo: hotelData.parkingInfo,
-          publicTransportInfo: hotelData.publicTransportInfo,
-          overallAccessibilityNotes: hotelData.overallAccessibilityNotes,
-          bookingLink: hotelData.bookingLink,
-          bookingCutoffDate: hotelData.bookingCutoffDate ? new Date(hotelData.bookingCutoffDate) : null,
-          groupRateOrBookingCode: hotelData.groupRateOrBookingCode,
-          groupPrice: hotelData.groupPrice,
-        };
-
-        let upsertedHotel;
-        if (hotelData.id && existingHotelIds.includes(hotelData.id)) {
-          upsertedHotel = await tx.hotel.update({
-            where: { id: hotelData.id },
-            data: hotelPayload,
+          const upsertedVenue = await tx.venue.upsert({
+            where: { id: venueData.id || generateShortRandomId() },
+            create: venuePayload,
+            update: venuePayload,
           });
-        } else {
-          upsertedHotel = await tx.hotel.create({
-            data: {
-              ...hotelPayload,
-              convention: { connect: { id: conventionId } }
-            },
-          });
+
+          // Process photos for the venue
+          await processPhotos(upsertedVenue.id, venueData.photos, tx.venuePhoto, 'venueId');
         }
-        await processPhotos(upsertedHotel.id, hotelData.photos, tx.hotelPhoto, 'hotelId');
       }
 
-      // Step 6: Return the updated convention object (or at least its ID)
-      return { id: conventionId };
+      // Step 3: Handle Hotels
+      if (incomingHotels) {
+        const incomingHotelIds = incomingHotels.map((h: any) => h.id).filter(Boolean);
+
+        // Delete hotels that are no longer present
+        await tx.hotel.deleteMany({
+          where: {
+            conventionId: conventionId,
+            id: { notIn: incomingHotelIds },
+          },
+        });
+
+        // Upsert all hotels from the request
+        for (const hotelData of incomingHotels) {
+          const hotelPayload: any = {
+            hotelName: hotelData.hotelName,
+            isPrimaryHotel: hotelData.isPrimaryHotel,
+            description: hotelData.description,
+            websiteUrl: hotelData.websiteUrl,
+            googleMapsUrl: hotelData.googleMapsUrl,
+            streetAddress: hotelData.streetAddress,
+            city: hotelData.city,
+            stateRegion: hotelData.stateRegion,
+            postalCode: hotelData.postalCode,
+            country: hotelData.country,
+            contactEmail: hotelData.contactEmail,
+            contactPhone: hotelData.contactPhone,
+            parkingInfo: hotelData.parkingInfo,
+            amenities: hotelData.amenities,
+            bookingLink: hotelData.bookingLink,
+            groupPrice: hotelData.groupPrice,
+            bookingCutoffDate: hotelData.bookingCutoffDate,
+            groupRateOrBookingCode: hotelData.groupRateOrBookingCode,
+            convention: { connect: { id: conventionId } },
+          };
+
+          const upsertedHotel = await tx.hotel.upsert({
+            where: { id: hotelData.id || generateShortRandomId() },
+            create: hotelPayload,
+            update: hotelPayload,
+          });
+
+          // Process photos for the hotel
+          await processPhotos(upsertedHotel.id, hotelData.photos, tx.hotelPhoto, 'hotelId');
+        }
+      }
+
+      return convention;
     });
+
 
     return NextResponse.json(updatedConvention);
+
   } catch (error) {
+    console.error(`[API PUT /organizer/conventions/:id] Error updating convention ${conventionId}:`, error);
     return NextResponse.json(
       { error: 'Failed to update convention', details: (error as Error).message },
       { status: 500 }

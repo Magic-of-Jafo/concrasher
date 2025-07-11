@@ -3,23 +3,40 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ProfileSchema, type ProfileSchemaInput } from '@/lib/validators'; // Assuming aliased path
-import { updateUserProfile } from '@/lib/actions'; // Assuming aliased path
+import { ProfileSchema, type ProfileSchemaInput } from '@/lib/validators';
+import { updateUserProfile } from '@/lib/actions';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 
 interface ProfileFormProps {
-  currentName?: string | null;
+  currentFirstName?: string | null;
+  currentLastName?: string | null;
+  currentStageName?: string | null;
   currentBio?: string | null;
-  onProfileUpdate?: (updatedData: { name?: string | null; bio?: string | null }) => void;
+  onProfileUpdate?: (updatedData: ProfileSchemaInput) => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export default function ProfileForm({ currentName, currentBio, onProfileUpdate }: ProfileFormProps) {
+export default function ProfileForm({
+  currentFirstName,
+  currentLastName,
+  currentStageName,
+  currentBio,
+  onProfileUpdate,
+  onSuccess,
+  onCancel
+}: ProfileFormProps) {
   const [serverMessage, setServerMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined> | null>(null);
+  const [useStageNamePublicly, setUseStageNamePublicly] = useState(false);
 
   const {
     control,
@@ -29,43 +46,49 @@ export default function ProfileForm({ currentName, currentBio, onProfileUpdate }
   } = useForm<ProfileSchemaInput>({
     resolver: ProfileSchema ? zodResolver(ProfileSchema) : undefined,
     defaultValues: {
-      name: currentName || '',
+      firstName: currentFirstName || '',
+      lastName: currentLastName || '',
+      stageName: currentStageName || '',
       bio: currentBio || '',
     },
   });
 
   useEffect(() => {
     reset({
-      name: currentName || '',
+      firstName: currentFirstName || '',
+      lastName: currentLastName || '',
+      stageName: currentStageName || '',
       bio: currentBio || '',
     });
-  }, [currentName, currentBio, reset]);
+  }, [currentFirstName, currentLastName, currentStageName, currentBio, reset]);
 
   const onSubmit = async (data: ProfileSchemaInput) => {
     setServerMessage(null);
     setFieldErrors(null);
 
-    // Only submit if there are actual changes
-    // However, user might want to submit an empty bio to clear it, or change name to empty (if allowed by schema)
-    // The current schema allows optional fields, so if they are unchanged from initial empty/null, they won't be submitted by RHF default behavior if not dirty.
-    // If the initial values are set, and user clears them, it becomes dirty.
-
     const result = await updateUserProfile(data);
 
     if (result.success && result.user) {
       setServerMessage({ type: 'success', message: result.message || 'Profile updated successfully!' });
-      reset({ name: result.user.name || '', bio: result.user.bio || '' }); // Reset form with new values
+      const newValues = {
+        firstName: result.user.firstName || '',
+        lastName: result.user.lastName || '',
+        stageName: result.user.stageName || '',
+        bio: result.user.bio || '',
+      };
+      reset(newValues);
       if (onProfileUpdate) {
-        onProfileUpdate({ name: result.user.name, bio: result.user.bio });
+        onProfileUpdate(newValues);
+      }
+      if (onSuccess) {
+        // Delay hiding the form to allow success message to be seen
+        setTimeout(() => onSuccess(), 1500);
       }
     } else {
       setServerMessage({ type: 'error', message: result.error || 'Failed to update profile.' });
       if (result.fieldErrors) {
-        // Convert Zod fieldErrors to a format suitable for display if needed
-        // For now, logging and displaying a general message for field errors.
         console.error("Field errors:", result.fieldErrors);
         setFieldErrors(result.fieldErrors as Record<string, string[] | undefined>);
-        // You might want to map these to specific RHF errors using setError
       }
     }
   };
@@ -78,52 +101,101 @@ export default function ProfileForm({ currentName, currentBio, onProfileUpdate }
         </Alert>
       )}
 
-      <Controller
-        name="name"
-        control={control}
-        render={({ field }) => (
-          <TextField
-            {...field}
-            margin="normal"
-            fullWidth
-            id="name"
-            label="Display Name"
-            autoComplete="name"
-            error={!!errors.name || !!fieldErrors?.name}
-            helperText={errors.name?.message || (fieldErrors?.name ? fieldErrors.name[0] : '')}
-            disabled={isSubmitting}
-          />
-        )}
-      />
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Controller
+          name="firstName"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              id="firstName"
+              label="First Name"
+              autoComplete="given-name"
+              error={!!errors.firstName || !!fieldErrors?.firstName}
+              helperText={errors.firstName?.message || (fieldErrors?.firstName ? fieldErrors.firstName[0] : '')}
+              disabled={isSubmitting}
+            />
+          )}
+        />
+        <Controller
+          name="lastName"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              id="lastName"
+              label="Last Name"
+              autoComplete="family-name"
+              error={!!errors.lastName || !!fieldErrors?.lastName}
+              helperText={errors.lastName?.message || (fieldErrors?.lastName ? fieldErrors.lastName[0] : '')}
+              disabled={isSubmitting}
+            />
+          )}
+        />
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+        <Controller
+          name="stageName"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              fullWidth
+              id="stageName"
+              label="Stage Name (Optional)"
+              autoComplete="nickname"
+              error={!!errors.stageName || !!fieldErrors?.stageName}
+              helperText={errors.stageName?.message || (fieldErrors?.stageName ? fieldErrors.stageName[0] : '')}
+              disabled={isSubmitting}
+            />
+          )}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={useStageNamePublicly}
+              onChange={(e) => setUseStageNamePublicly(e.target.checked)}
+              name="useStageNamePublicly"
+            />
+          }
+          label="Use stage name publicly"
+        />
+      </Box>
 
       <Controller
         name="bio"
         control={control}
         render={({ field }) => (
-          <TextField
-            {...field}
-            margin="normal"
-            fullWidth
-            id="bio"
-            label="Bio (max 200 characters)"
-            multiline
-            rows={4}
-            error={!!errors.bio || !!fieldErrors?.bio}
-            helperText={errors.bio?.message || (fieldErrors?.bio ? fieldErrors.bio[0] : '')}
-            disabled={isSubmitting}
+          <ProseMirrorEditor
+            value={field.value || ''}
+            onChange={field.onChange}
           />
         )}
       />
 
-      <Button
-        type="submit"
-        fullWidth
-        variant="contained"
-        sx={{ mt: 3, mb: 2 }}
-        disabled={isSubmitting || !isDirty}
-      >
-        {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
-      </Button>
+      <Box sx={{ display: 'flex', gap: 2, mt: 3, mb: 2 }}>
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          disabled={isSubmitting || !isDirty}
+        >
+          {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
+        </Button>
+        {onCancel && (
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+        )}
+      </Box>
     </Box>
   );
 } 

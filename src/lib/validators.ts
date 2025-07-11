@@ -70,8 +70,10 @@ export const LoginSchema = z.object({
 });
 
 export const ProfileSchema = z.object({
-  name: z.string().min(1, { message: "Display name is required" }).optional().nullable().transform(val => val === null ? undefined : val),
-  bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional().nullable().transform(val => val === null ? undefined : val),
+  firstName: z.string().max(50, { message: "First name must be 50 characters or less" }).optional().nullable(),
+  lastName: z.string().max(50, { message: "Last name must be 50 characters or less" }).optional().nullable(),
+  stageName: z.string().max(50, { message: "Stage name must be 50 characters or less" }).optional().nullable(),
+  bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional().nullable(),
 });
 
 export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;
@@ -90,6 +92,22 @@ export const BrandUpdateSchema = BrandCreateSchema.extend({
 });
 
 export type BrandUpdateInput = z.infer<typeof BrandUpdateSchema>;
+
+export const TalentProfileCreateSchema = z.object({
+  displayName: z.string().min(2, { message: "Display name must be at least 2 characters." }).max(50, { message: "Display name must be 50 characters or less." }),
+  tagline: z.string().max(100, { message: "Tagline must be 100 characters or less." }).optional(),
+  bio: z.string().max(2000, { message: "Bio must be 2000 characters or less." }).optional(),
+  profilePictureUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+  contactEmail: z.string().email().optional().or(z.literal('')),
+  skills: z.array(z.string()).optional(),
+});
+
+export type TalentProfileCreateInput = z.infer<typeof TalentProfileCreateSchema>;
+
+export const TalentProfileUpdateSchema = TalentProfileCreateSchema.partial();
+
+export type TalentProfileUpdateInput = z.infer<typeof TalentProfileUpdateSchema>;
 
 // Use the Prisma generated enum for ConventionStatus
 export const ConventionStatusEnum = z.nativeEnum(PrismaConventionStatusEnum);

@@ -7,7 +7,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import slugify from 'slugify';
 import { BasicInfoFormSchema, type BasicInfoFormData } from '@/lib/validators';
 import { ZodError } from 'zod';
-import { Editor } from '@tinymce/tinymce-react';
+import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import { FuzzyStateInput } from '@/components/ui/FuzzyStateInput';
 
 // Define the country list with common countries at the top based on magic conventions
@@ -474,38 +474,19 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               fullWidth
               sx={{ mb: 2 }}
             />
-            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>Main Description</Typography>
-            <Editor
-              apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY}
-              value={value.descriptionMain ?? ''}
-              onEditorChange={handleEditorChange('descriptionMain')}
-              init={{
-                height: 300,
-                menubar: false,
-                plugins: [
-                  'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                  'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                  'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
-                ],
-                toolbar: 'undo redo | blocks | ' +
-                  'bold italic forecolor | alignleft aligncenter ' +
-                  'alignright alignjustify | bullist numlist outdent indent | ' +
-                  'removeformat | help',
-                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
-                branding: false,
-                statusbar: false
-              }}
-            />
-            <style jsx global>{`
-              .tox-statusbar__branding {
-                display: none !important;
-              }
-            `}</style>
-            {errors.descriptionMain && (
-              <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
-                {errors.descriptionMain}
-              </Typography>
-            )}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>Main Description</Typography>
+              <ProseMirrorEditor
+                value={value.descriptionMain ?? ''}
+                onChange={handleEditorChange('descriptionMain')}
+                disabled={!isEditing}
+              />
+              {errors.descriptionMain && (
+                <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
+                  {errors.descriptionMain}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Box>
       </Paper>

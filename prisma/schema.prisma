@@ -27,7 +27,9 @@ model Timezone {
 
 model User {
   id               String             @id @default(cuid())
-  name             String?
+  firstName        String?
+  lastName         String?
+  stageName        String?
   email            String?            @unique
   emailVerified    DateTime?
   image            String?
@@ -45,6 +47,7 @@ model User {
   brandMemberships BrandUser[]
   conventionSeries ConventionSeries[]
   roleApplications RoleApplication[]
+  talentProfile    TalentProfile?
   sessions         Session[]
 }
 
@@ -168,6 +171,7 @@ model Convention {
   priceDiscounts           PriceDiscount[]
   priceTiers               PriceTier[]
   scheduleDays             ScheduleDay[]
+  talent                   ConventionTalent[]
   venues                   Venue[]
   settings                 ConventionSetting[]
 }
@@ -442,4 +446,58 @@ enum ProfileType {
 enum MediaType {
   IMAGE
   VIDEO_LINK
+}
+
+// --- Talent Profile & Related Models ---
+model TalentProfile {
+  id                String    @id @default(cuid())
+  userId            String    @unique // 1:1 with User
+  displayName       String
+  tagline           String?
+  bio               String?   @db.Text
+  profilePictureUrl String?
+  websiteUrl        String?
+  contactEmail      String?
+  skills            String[]  @default([])
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conventions       ConventionTalent[]
+  media             TalentProfileMedia[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model ConventionTalent {
+  id                String        @id @default(cuid())
+  conventionId      String
+  talentProfileId   String
+  
+  overrideDisplayName String?
+  overrideBio         String?   @db.Text
+
+  convention      Convention    @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  talentProfile   TalentProfile @relation(fields: [talentProfileId], references: [id], onDelete: Cascade)
+
+  assignedAt      DateTime      @default(now())
+  
+  @@unique([conventionId, talentProfileId])
+  @@index([conventionId])
+  @@index([talentProfileId])
+}
+
+model TalentProfileMedia {
+  id              String    @id @default(cuid())
+  talentProfileId String
+  url             String
+  type            MediaType
+  caption         String?
+  order           Int?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  talentProfile   TalentProfile @relation(fields: [talentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([talentProfileId])
 }

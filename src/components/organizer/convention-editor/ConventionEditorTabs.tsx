@@ -91,6 +91,9 @@ export interface ConventionDataForEditor extends BasicInfoFormData {
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
   venueHotel?: VenueHotelTabData;
+  venues?: any[]; // Venue data array for API
+  hotels?: any[]; // Hotel data array for API
+  guestsStayAtPrimaryVenue?: boolean;
   media?: ConventionMediaData[];
   coverImageUrl?: string;
   profileImageUrl?: string;
@@ -285,10 +288,15 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         id: conventionId,
         priceTiers: pricingTabData.priceTiers,
         priceDiscounts: pricingTabData.priceDiscounts,
-        venueHotel: venueHotelData,
+        venues: (venueHotelData as any).venues,
+        hotels: venueHotelData.hotels,
+        guestsStayAtPrimaryVenue: venueHotelData.guestsStayAtPrimaryVenue,
         media: mediaData,
         settings: settingsData,
       };
+
+      console.log('[ConventionEditorTabs] Sending data to API:', JSON.stringify(fullDataToSave, null, 2));
+
       await onSave(fullDataToSave);
       // The onSave function is now responsible for navigation.
       // router.push('/organizer/conventions?toastMessage=Convention+updated+successfully');

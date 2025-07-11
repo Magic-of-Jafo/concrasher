@@ -1,22 +1,16 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Button, Paper } from '@mui/material';
 import { VenueData, VenuePhotoData } from '@/lib/validators';
-import { Editor } from '@tinymce/tinymce-react';
+import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ImageUploadInput from '@/components/shared/ImageUploadInput';
-
-const GlobalStyles = () => (
-  <style jsx global>{`
-    .tox-statusbar__branding {
-      display: none !important;
-    }
-  `}</style>
-);
 
 interface PrimaryVenueFormProps {
   value: VenueData;
   onChange: (data: Partial<VenueData>) => void;
   onMarkForPromotion?: () => void;
+  onRemove?: () => void;
   disabled?: boolean;
+  isNew?: boolean;
   errors?: {
     venueName?: string;
     websiteUrl?: string;
@@ -89,7 +83,6 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ value, onChange, on
 
   return (
     <Box sx={{ mt: 2 }}>
-      <GlobalStyles />
       {title && <Typography variant="h6" gutterBottom>{title}</Typography>}
       {onMarkForPromotion && (
         <Button onClick={onMarkForPromotion} disabled={disabled}>
@@ -126,20 +119,9 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ value, onChange, on
       </Box>
 
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Description</Typography>
-      <Editor
-        key={value.id || (value as any).tempId || 'primary-venue-editor'}
-        apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || 'YOUR_FALLBACK_API_KEY'}
-        initialValue={initialDescriptionRef.current || ''}
-        disabled={disabled}
-        init={{
-          height: 300,
-          menubar: false,
-          readonly: disabled,
-          plugins: 'autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
-          toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
-          content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px } .tox-promotion { display: none !important; } .tox-statusbar__branding { display: none !important; }'
-        }}
-        onEditorChange={handleEditorChange}
+      <ProseMirrorEditor
+        value={value.description || ''}
+        onChange={handleEditorChange}
       />
 
       <TextField
@@ -267,7 +249,10 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ value, onChange, on
           </Button>
         </Box>
       ) : (
-        <ImageUploadInput onUpload={handlePhotoUpload} disabled={disabled} />
+        <ImageUploadInput
+          onUploadComplete={handlePhotoUpload}
+          disabled={disabled}
+        />
       )}
 
       <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>Amenities</Typography>

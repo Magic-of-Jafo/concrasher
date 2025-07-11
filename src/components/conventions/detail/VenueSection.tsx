@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Paper, Button, Grid, Stack } from '@mui/material';
+import { Box, Typography, Paper, Button, Stack } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import MapIcon from '@mui/icons-material/Map';
 
@@ -11,6 +12,18 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any, isCompact?: boole
     return (
         <Paper sx={{ p: isCompact ? 1.5 : 2, mb: 2, height: '100%' }}>
             <Typography variant={isCompact ? 'subtitle1' : 'h6'} sx={{ fontWeight: 'bold' }}>{venue.venueName}</Typography>
+            {venue.description && (
+                <Box
+                    sx={{
+                        mt: 1,
+                        mb: 2,
+                        '& p': { margin: '0.5rem 0' },
+                        '& ul, & ol': { paddingLeft: '1.5rem' },
+                        '& h1, & h2, & h3, & h4, & h5, & h6': { margin: '1rem 0 0.5rem 0' }
+                    }}
+                    dangerouslySetInnerHTML={{ __html: venue.description }}
+                />
+            )}
             {venue.streetAddress && <Typography variant={isCompact ? 'body2' : 'body1'}>{venue.streetAddress}</Typography>}
             {(venue.city || venue.stateRegion || venue.postalCode) &&
                 <Typography variant={isCompact ? 'body2' : 'body1'}>{`${venue.city || ''}, ${venue.stateRegion || ''} ${venue.postalCode || ''}`.replace(/ ,|,$/g, '')}</Typography>

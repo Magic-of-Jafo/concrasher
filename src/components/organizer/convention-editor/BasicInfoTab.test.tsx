@@ -3,18 +3,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { BasicInfoTab } from './BasicInfoTab';
 import { type BasicInfoFormData } from '@/lib/validators';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-// Mock the TinyMCE Editor component
-jest.mock('@tinymce/tinymce-react', () => ({
-  Editor: jest.fn((props) => (
+jest.mock('@/components/ui/ProseMirrorEditor', () => ({
+  __esModule: true,
+  default: ({ value, onChange }: { value: string, onChange: (v: string) => void }) => (
     <textarea
-      data-testid="mock-tinymce-editor"
-      value={props.value}
-      onChange={(e) => props.onEditorChange(e.target.value, {} as any)}
+      data-testid="mock-prosemirror"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
     />
-  )),
+  ),
 }));
 
 // Mock FuzzyStateInput

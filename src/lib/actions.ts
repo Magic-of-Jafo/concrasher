@@ -212,7 +212,9 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
     const user = await db.user.update({
       where: { id: session.user.id },
       data: {
-        name: validatedData.data.name,
+        firstName: validatedData.data.firstName,
+        lastName: validatedData.data.lastName,
+        stageName: validatedData.data.stageName,
         bio: validatedData.data.bio,
       },
     });
@@ -224,7 +226,9 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
       message: "Profile updated successfully.",
       user: { // Return relevant parts of the updated user, excluding sensitive data
         id: user.id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        stageName: user.stageName,
         email: user.email,
         bio: user.bio,
         image: user.image,
@@ -238,6 +242,45 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
       error: "An unexpected error occurred. Please try again.",
       fieldErrors: null,
     };
+  }
+}
+
+export async function updateUserProfileImage(imageUrl: string) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { image: imageUrl },
+    });
+    revalidatePath('/profile');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user profile image:', error);
+    return { success: false, message: 'Failed to update profile image.' };
+  }
+}
+
+export async function clearUserProfileImage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error('Not authenticated');
+  }
+
+  try {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { image: null },
+    });
+    revalidatePath('/profile');
+    return { success: true };
+  } catch (error) {
+    console.error('Error clearing user profile image from db:', error);
+    return { success: false, message: 'Failed to update database.' };
   }
 }
 
@@ -476,18 +519,24 @@ export async function searchProfiles(
     if (profileType === 'USER') {
       const users = await db.user.findMany({
         where: {
-          name: {
-            contains: query,
-            mode: 'insensitive',
-          },
+          OR: [
+            { firstName: { contains: query, mode: 'insensitive' } },
+            { lastName: { contains: query, mode: 'insensitive' } },
+            { stageName: { contains: query, mode: 'insensitive' } },
+          ]
         },
         select: {
           id: true,
-          name: true,
+          firstName: true,
+          lastName: true,
+          stageName: true,
         },
         take: 10, // Limit results
       });
-      return users;
+      return users.map(user => ({
+        id: user.id,
+        name: user.stageName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      }));
     } else if (profileType === 'BRAND') {
       const brands = await db.brand.findMany({
         where: {
@@ -702,10 +751,16 @@ export async function getDealerLinks(conventionId: string) {
       dealerLinks.map(async (link) => {
         let profile: { id: string; name: string | null } | null = null;
         if (link.profileType === 'USER') {
-          profile = await db.user.findUnique({
+          const userProfile = await db.user.findUnique({
             where: { id: link.linkedProfileId },
-            select: { id: true, name: true },
+            select: { id: true, firstName: true, lastName: true, stageName: true },
           });
+          if (userProfile) {
+            profile = {
+              id: userProfile.id,
+              name: userProfile.stageName || `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim()
+            };
+          }
         } else if (link.profileType === 'BRAND') {
           profile = await db.brand.findUnique({
             where: { id: link.linkedProfileId },
@@ -814,7 +869,9 @@ export async function getPendingOrganizerApplicationsAction(): Promise<{
         user: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
+            stageName: true,
             email: true,
           },
         },
@@ -825,12 +882,18 @@ export async function getPendingOrganizerApplicationsAction(): Promise<{
     });
 
     // Ensure dates are stringified for client component
-    const serializableApplications = applications.map(app => ({
-      ...app,
-      createdAt: app.createdAt.toISOString(),
-      updatedAt: app.updatedAt.toISOString(), // Though not explicitly used in UI, good practice
-      user: app.user // user object is already serializable as selected
-    }));
+    const serializableApplications = applications.map(app => {
+      const userWithName = {
+        ...app.user,
+        name: app.user.stageName || `${app.user.firstName || ''} ${app.user.lastName || ''}`.trim()
+      };
+      return {
+        ...app,
+        user: userWithName,
+        createdAt: app.createdAt.toISOString(),
+        updatedAt: app.updatedAt.toISOString(),
+      };
+    });
 
     return { success: true, applications: serializableApplications };
   } catch (error) {

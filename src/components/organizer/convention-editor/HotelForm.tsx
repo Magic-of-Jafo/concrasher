@@ -4,17 +4,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Button, Paper, Switch } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { HotelData, HotelPhotoData } from '@/lib/validators';
-import { Editor } from '@tinymce/tinymce-react';
+import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ImageUploadInput from '@/components/shared/ImageUploadInput';
-
-// ADD THIS STYLE BLOCK
-const GlobalStyles = () => (
-  <style jsx global>{`
-    .tox-statusbar__branding {
-      display: none !important;
-    }
-  `}</style>
-);
 
 interface HotelFormProps {
   formData: HotelData;
@@ -130,7 +121,6 @@ const HotelForm: React.FC<HotelFormProps> = ({
 
   return (
     <Box component="form" noValidate autoComplete="off" sx={{ mt: 2, mb: 3, p: isPrimaryHotel ? 0 : 2, border: isPrimaryHotel ? 'none' : '1px dashed grey', borderRadius: isPrimaryHotel ? 0 : 1 }}>
-      <GlobalStyles />
       <Typography variant="h6" gutterBottom>{title}</Typography>
 
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 2 }}>
@@ -162,20 +152,9 @@ const HotelForm: React.FC<HotelFormProps> = ({
       </Box>
 
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Description / Notes</Typography>
-      <Editor
-        key={formData.id || (formData as any).tempId || `hotel-editor-${title}`}
-        apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || 'YOUR_FALLBACK_API_KEY'}
-        initialValue={initialDescriptionRef.current || ''}
-        disabled={disabled}
-        init={{
-          height: 300,
-          menubar: false,
-          readonly: disabled,
-          plugins: 'autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount',
-          toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
-          content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px } .tox-promotion { display: none !important; } .tox-statusbar__branding { display: none !important; }'
-        }}
-        onEditorChange={handleEditorChange}
+      <ProseMirrorEditor
+        value={localFormData.description || ''}
+        onChange={handleEditorChange}
       />
 
       {showLocationDetails && (
