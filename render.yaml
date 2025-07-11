@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: conventioncrasher
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+    autoDeploy: false 
