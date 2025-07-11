@@ -25,11 +25,11 @@ export function ConventionViewToggle({ currentStatus }: ConventionViewToggleProp
   };
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      alignItems: 'center', 
+    <Box sx={{
+      display: 'flex',
+      alignItems: 'center',
       gap: 2,
-      mb: 3 
+      mb: 3
     }}>
       <Typography variant="subtitle1" color="text.secondary">
         View:
@@ -41,7 +41,7 @@ export function ConventionViewToggle({ currentStatus }: ConventionViewToggleProp
         aria-label="convention view"
         size="small"
       >
-        <ToggleButton value={ConventionStatus.ACTIVE} aria-label="active conventions">
+        <ToggleButton value={ConventionStatus.PUBLISHED} aria-label="active conventions">
           Active
         </ToggleButton>
         <ToggleButton value={ConventionStatus.PAST} aria-label="past conventions">

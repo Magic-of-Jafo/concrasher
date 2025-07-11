@@ -7,6 +7,7 @@ import ThemeProviders from "@/components/providers/theme-provider";
 import { NotificationProvider } from "@/components/NotificationContext";
 import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
+import { Suspense } from 'react';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -40,7 +41,9 @@ export default function RootLayout({
           <AuthProvider>
             <QueryProvider>
               <NotificationProvider>
-                <ErrorHandler />
+                <Suspense fallback={null}>
+                  <ErrorHandler />
+                </Suspense>
                 {/* Skip link for keyboard users */}
                 <a
                   href="#main-content"
@@ -49,7 +52,9 @@ export default function RootLayout({
                   Skip to main content
                 </a>
                 <Header />
-                {children}
+                <Suspense fallback={<div>Loading...</div>}>
+                  {children}
+                </Suspense>
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>

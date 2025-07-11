@@ -14,7 +14,8 @@ async function testUserRoles() {
     user = await db.user.create({
       data: {
         email: testEmail,
-        name: 'Role Test User',
+        firstName: 'Role Test',
+        lastName: 'User',
         roles: [Role.USER], // Initial role
       },
     });

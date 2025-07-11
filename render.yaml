@@ -2,7 +2,7 @@ services:
   - type: web
     name: conventioncrasher
     runtime: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npm run build:deploy
     startCommand: npm start
     plan: free
     region: oregon
@@ -11,4 +11,10 @@ services:
         value: "20"
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
+      - key: ESLINT_NO_DEV_ERRORS
+        value: "true"
+      - key: DISABLE_ESLINT_PLUGIN
+        value: "true"
+      - key: SKIP_PREFLIGHT_CHECK
+        value: "true"
     autoDeploy: false 

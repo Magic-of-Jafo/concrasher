@@ -149,7 +149,7 @@ async function main() {
       const user = await prisma.user.upsert({
         where: { email: userData.email },
         update: {
-          name: userData.name,
+          // name: userData.name, // Commented out - User model uses firstName/lastName
           hashedPassword: userData.hashedPassword, // Assuming CSV contains already hashed passwords
           roles: rolesArray,
           bio: userData.bio,
@@ -158,7 +158,7 @@ async function main() {
         },
         create: {
           email: userData.email,
-          name: userData.name,
+          // name: userData.name, // Commented out - User model uses firstName/lastName
           hashedPassword: userData.hashedPassword, // Assuming CSV contains already hashed passwords
           roles: rolesArray,
           bio: userData.bio,
@@ -166,7 +166,7 @@ async function main() {
           // image: userData.image, // Handle if present
         },
       });
-      console.log(`Upserted user: ${user.name} (${user.email})`);
+      console.log(`Upserted user: ${user.firstName || user.email} (${user.email})`);
 
       // Identify the organizer for convention series
       if (user.email === 'jafo@getjafo.com') {

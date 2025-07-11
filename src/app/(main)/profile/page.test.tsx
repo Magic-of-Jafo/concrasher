@@ -31,7 +31,7 @@ jest.mock('next/navigation', () => ({
 
 // Mock ProfileForm component as it's tested separately and is a client component
 jest.mock('@/components/features/ProfileForm', () => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   return function DummyProfileForm({ currentName, currentBio }: { currentName?: string | null; currentBio?: string | null }) { // Added types
     return (
       <div>

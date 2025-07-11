@@ -29,7 +29,7 @@ export async function PUT(
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series && convention.series.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
 
@@ -68,7 +68,7 @@ export async function PUT(
       // Update core venue details
       // Do not allow changing conventionId or isPrimaryVenue directly here (should be managed by specific logic if needed)
       const { conventionId: _convId, isPrimaryVenue: _isPrimary, id: _id, ...dataForUpdate } = venueDataToUpdate;
-      
+
       await tx.venue.update({
         where: { id: venueIdToUpdate },
         data: {
@@ -116,7 +116,7 @@ export async function PUT(
   } catch (error) {
     console.error(`Error updating venue ${venueIdToUpdate}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return NextResponse.json({ message: 'Venue not found for update' }, { status: 404 });
+      return NextResponse.json({ message: 'Venue not found for update' }, { status: 404 });
     }
     return NextResponse.json({ message: 'Failed to update venue' }, { status: 500 });
   }
@@ -146,7 +146,7 @@ export async function DELETE(
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series && convention.series.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
 

@@ -68,14 +68,29 @@ export async function PUT(
       console.log('Current user roles:', user.roles);
       console.log('Requested role:', application.requestedRole);
 
+      // Map RequestedRole to Role
+      let roleToAdd: Role;
+      if (application.requestedRole === 'ORGANIZER') {
+        roleToAdd = Role.ORGANIZER;
+      } else if (application.requestedRole === 'BRAND_CREATOR') {
+        // For now, map BRAND_CREATOR to USER (adjust as needed)
+        roleToAdd = Role.USER;
+      } else {
+        console.log('Unknown requested role:', application.requestedRole);
+        return NextResponse.json(
+          { error: 'Unknown requested role' },
+          { status: 400 }
+        );
+      }
+
       // Only add the role if it doesn't already exist
-      if (!user.roles.includes(application.requestedRole)) {
+      if (!user.roles.includes(roleToAdd)) {
         console.log('Adding new role to user');
         await prisma.user.update({
           where: { id: application.userId },
           data: {
             roles: {
-              push: application.requestedRole
+              push: roleToAdd
             }
           }
         });

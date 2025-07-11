@@ -161,7 +161,8 @@ describe('LoginSchema', () => {
 describe('ProfileSchema', () => {
   it('should validate a correct profile', () => {
     const result = ProfileSchema.safeParse({
-      name: 'Test User',
+      firstName: 'Test',
+      lastName: 'User',
       bio: 'This is a test bio.',
     });
     expect(result.success).toBe(true);
@@ -171,38 +172,30 @@ describe('ProfileSchema', () => {
     const result = ProfileSchema.safeParse({});
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBeUndefined();
+      expect(result.data.firstName).toBeUndefined();
+      expect(result.data.lastName).toBeUndefined();
       expect(result.data.bio).toBeUndefined();
     }
   });
 
-  it('should allow name to be explicitly undefined or null (becomes undefined)', () => {
-    let result = ProfileSchema.safeParse({ name: undefined, bio: 'A bio' });
+  it('should allow firstName to be explicitly undefined or null', () => {
+    let result = ProfileSchema.safeParse({ firstName: undefined });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.name).toBeUndefined();
+    if (result.success) expect(result.data.firstName).toBeUndefined();
 
-    // Note: Zod typically converts null to undefined for optional strings if not explicitly .nullable()
-    result = ProfileSchema.safeParse({ name: null, bio: 'A bio' });
+    result = ProfileSchema.safeParse({ firstName: null });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.name).toBeUndefined();
+    if (result.success) expect(result.data.firstName).toBeNull();
   });
 
-  it('should allow bio to be explicitly undefined or null (becomes undefined)', () => {
-    let result = ProfileSchema.safeParse({ bio: undefined, name: 'A name' });
+  it('should allow bio to be explicitly undefined or null', () => {
+    let result = ProfileSchema.safeParse({ bio: undefined });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.bio).toBeUndefined();
 
-    result = ProfileSchema.safeParse({ bio: null, name: 'A name' });
+    result = ProfileSchema.safeParse({ bio: null });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.bio).toBeUndefined();
-  });
-
-  it('should invalidate an empty name string if name field is provided', () => {
-    const result = ProfileSchema.safeParse({ name: '' });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.flatten().fieldErrors.name).toContain('Display name is required');
-    }
+    if (result.success) expect(result.data.bio).toBeNull();
   });
 
   it('should invalidate a bio longer than 200 characters', () => {
@@ -214,17 +207,27 @@ describe('ProfileSchema', () => {
     }
   });
 
+  it('should invalidate a first name longer than 50 characters', () => {
+    const longName = 'a'.repeat(51);
+    const result = ProfileSchema.safeParse({ firstName: longName });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.firstName).toContain('First name must be 50 characters or less');
+    }
+  });
+
   it('should pass with a bio exactly 200 characters long', () => {
     const bioAtMaxLength = 'a'.repeat(200);
     const result = ProfileSchema.safeParse({ bio: bioAtMaxLength });
     expect(result.success).toBe(true);
   });
 
-  it('should pass if only name is provided', () => {
-    const result = ProfileSchema.safeParse({ name: 'Only Name' });
+  it('should pass if only names are provided', () => {
+    const result = ProfileSchema.safeParse({ firstName: 'Test', lastName: 'User' });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe('Only Name');
+      expect(result.data.firstName).toBe('Test');
+      expect(result.data.lastName).toBe('User');
       expect(result.data.bio).toBeUndefined();
     }
   });
@@ -234,7 +237,7 @@ describe('ProfileSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.bio).toBe('Only Bio');
-      expect(result.data.name).toBeUndefined();
+      expect(result.data.firstName).toBeUndefined();
     }
   });
 });

@@ -40,21 +40,21 @@ describe('Organizer Middleware', () => {
   it('should allow access for admin users to /organizer/conventions', async () => {
     mockedGetToken.mockResolvedValueOnce({ roles: [Role.ADMIN], sub: 'admin-user-id' });
     const request = new NextRequest(new URL('http://localhost/organizer/conventions')) as NextRequestWithAuth;
-    const response = await middleware(request);
+    const response = await middleware(request, {} as any);
     expect(response).toBeTruthy();
   });
 
   it('should redirect non-organizer users from /organizer/conventions to /unauthorized', async () => {
     mockedGetToken.mockResolvedValueOnce({ roles: [Role.USER], sub: 'user-id' });
     const request = new NextRequest(new URL('http://localhost/organizer/conventions')) as NextRequestWithAuth;
-    const response = await middleware(request);
+    const response = await middleware(request, {} as any);
     expect(response?.url).toContain('/unauthorized');
   });
 
   it('should redirect unauthenticated users from /organizer/conventions to /login', async () => {
     mockedGetToken.mockResolvedValueOnce(null);
     const request = new NextRequest(new URL('http://localhost/organizer/conventions')) as NextRequestWithAuth;
-    const response = await middleware(request);
+    const response = await middleware(request, {} as any);
     expect(response?.url).toContain('/login?from=');
   });
 
@@ -62,13 +62,13 @@ describe('Organizer Middleware', () => {
     delete process.env.NEXTAUTH_SECRET; // Simulate missing secret
     mockedGetToken.mockResolvedValueOnce(null); // getToken will fail without secret
     const request = new NextRequest(new URL('http://localhost/organizer/conventions')) as NextRequestWithAuth;
-    const response = await middleware(request);
+    const response = await middleware(request, {} as any);
     expect(response?.url).toContain('/login?from=');
   });
 
   it('should allow access to non-protected routes', async () => {
     const request = new NextRequest(new URL('http://localhost/some/other/page')) as NextRequestWithAuth;
-    const response = await middleware(request);
+    const response = await middleware(request, {} as any);
     // This route is not in the matcher config, so middleware should pass through
     expect(response).toBeTruthy();
   });

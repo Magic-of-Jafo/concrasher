@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+export const dynamic = 'force-dynamic'; // Force dynamic rendering
+
 // Smart filter function to handle array searches and variations
 function smartFilterTimezones(timezones: any[], search: string) {
     const searchTerm = search.toLowerCase().trim();

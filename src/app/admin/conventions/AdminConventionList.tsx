@@ -191,8 +191,8 @@ export default function AdminConventionList({ error, setError }: AdminConvention
   const currentFilterLabel = filterOptions.find(f => f.value === activeFilter)?.label || 'Conventions';
 
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={3}>
+    <Box sx={{ display: 'flex', gap: 3 }}>
+      <Box sx={{ minWidth: '300px', maxWidth: '350px' }}>
         <Paper sx={{ p: 2, position: 'sticky', top: '80px' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box>
@@ -266,8 +266,8 @@ export default function AdminConventionList({ error, setError }: AdminConvention
             />
           </Box>
         </Paper>
-      </Grid>
-      <Grid item xs={12} md={9}>
+      </Box>
+      <Box sx={{ flex: 1 }}>
         <Typography variant="h4" gutterBottom>
           {currentFilterLabel}
         </Typography>
@@ -354,7 +354,7 @@ export default function AdminConventionList({ error, setError }: AdminConvention
           description="Are you sure you want to delete this convention? This action cannot be undone."
           isConfirming={isDeleting}
         />
-      </Grid>
-    </Grid>
+      </Box>
+    </Box>
   );
 } 

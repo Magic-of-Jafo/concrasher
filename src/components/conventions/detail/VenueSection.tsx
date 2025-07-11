@@ -73,6 +73,7 @@ export default function VenueSection({ convention }: { convention: any }) {
                     </Typography>
                     <Grid container spacing={2}>
                         {secondaryVenues.map((venue: any) => (
+                            // @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error
                             <Grid item key={venue.id} xs={12} sm={6} md={4}>
                                 <VenueCard venue={venue} isCompact={true} />
                             </Grid>

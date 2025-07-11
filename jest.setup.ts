@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { beforeAll, afterEach, afterAll } from 'vitest';
-import { server } from './src/__mocks__/node';
+// import { server } from './src/__mocks__/node'; // Commented out - mock server not set up yet
 
 // Polyfill/Mock Web Standard APIs not available in JSDOM/Node by default
 if (typeof global.Request === 'undefined') {

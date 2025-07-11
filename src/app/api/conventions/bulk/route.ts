@@ -34,7 +34,9 @@ export async function POST(request: NextRequest) {
     const conventions = await db.convention.findMany({
       where: {
         id: { in: conventionIds },
-        organizerUserId: session.user.id,
+        series: {
+          organizerUserId: session.user.id,
+        },
       },
     });
 

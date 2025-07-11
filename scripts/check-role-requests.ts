@@ -5,11 +5,12 @@ const prisma = new PrismaClient();
 async function main() {
   try {
     // Check role requests
-    const roleRequests = await prisma.roleRequest.findMany({
+    const roleRequests = await prisma.roleApplication.findMany({
       include: {
         user: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             roles: true
           }
@@ -22,13 +23,12 @@ async function main() {
     // Check users with role requests
     const users = await prisma.user.findMany({
       where: {
-        roleRequests: {
+        roleApplications: {
           some: {}
         }
       },
       include: {
-        roleRequests: true,
-        roles: true
+        roleApplications: true
       }
     });
 

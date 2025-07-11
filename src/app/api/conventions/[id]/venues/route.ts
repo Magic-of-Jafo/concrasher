@@ -34,7 +34,7 @@ export async function POST(
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
 
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series && convention.series.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
   } catch (error) {
@@ -93,7 +93,7 @@ export async function POST(
           })),
         });
       }
-      
+
       return tx.venue.findUnique({
         where: { id: createdVenue.id },
         include: { photos: true }, // Include the created photos in the response

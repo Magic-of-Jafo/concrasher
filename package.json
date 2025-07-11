@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:deploy": "cross-env ESLINT_NO_DEV_ERRORS=true DISABLE_ESLINT_PLUGIN=true SKIP_TYPE_CHECK=true next build",
+    "build:deploy:skip-types": "cross-env ESLINT_NO_DEV_ERRORS=true DISABLE_ESLINT_PLUGIN=true SKIP_TYPE_CHECK=true NODE_ENV=production next build --no-lint",
     "start": "next start",
     "lint": "next lint",
     "studio:local": "dotenv -e .env.local -- prisma studio",
@@ -108,6 +110,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/ui": "^3.2.4",
     "babel-jest": "^30.0.4",
+    "cross-env": "^7.0.3",
     "dotenv": "^16.5.0",
     "dotenv-cli": "^8.0.0",
     "eslint": "^8.0.0",

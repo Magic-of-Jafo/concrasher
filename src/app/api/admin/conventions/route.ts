@@ -25,10 +25,15 @@ export async function GET(request: NextRequest) {
     const [conventions, total] = await Promise.all([
       db.convention.findMany({
         include: {
-          organizer: {
-            select: {
-              name: true,
-              email: true,
+          series: {
+            include: {
+              organizer: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
             },
           },
         },

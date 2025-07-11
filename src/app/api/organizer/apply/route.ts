@@ -16,10 +16,13 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, bio, experience } = body;
+    const { name, bio } = body;
+    const [firstName, ...lastNameParts] = name.split(' ');
+    const lastName = lastNameParts.join(' ');
+
 
     // Validate required fields
-    if (!name || !bio || !experience) {
+    if (!name || !bio) {
       return NextResponse.json(
         { message: 'Missing required fields' },
         { status: 400 }
@@ -57,7 +60,8 @@ export async function POST(req: Request) {
     await db.user.update({
       where: { id: session.user.id },
       data: {
-        name,
+        firstName,
+        lastName,
         bio
       }
     });

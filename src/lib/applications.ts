@@ -1,4 +1,5 @@
 import { PrismaClient, RoleApplication, User, RequestedRole, ApplicationStatus } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -40,12 +41,19 @@ export async function approveApplication(id: string): Promise<ApplicationWithUse
     include: { user: true },
   });
 
+  // Map RequestedRole to Role
+  const roleToPush = application.requestedRole as unknown as Role;
+
+  if (!roleToPush || !Object.values(Role).includes(roleToPush)) {
+    throw new Error(`Invalid requested role: ${application.requestedRole}`);
+  }
+
   // Update user roles
   await prisma.user.update({
     where: { id: application.userId },
     data: {
       roles: {
-        push: application.requestedRole,
+        push: roleToPush,
       },
     },
   });

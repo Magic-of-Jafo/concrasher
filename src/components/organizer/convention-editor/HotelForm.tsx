@@ -56,12 +56,14 @@ const HotelForm: React.FC<HotelFormProps> = ({
     });
   }, [formData]);
 
+  /*
   useEffect(() => {
     // Keep the initial description ref updated if the entity changes
     if (formData.id !== initialDescriptionRef.current?.id && formData.tempId !== initialDescriptionRef.current?.tempId) {
       initialDescriptionRef.current = formData.description;
     }
   }, [formData.id, formData.tempId, formData.description]);
+  */
 
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

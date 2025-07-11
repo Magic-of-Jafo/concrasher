@@ -64,11 +64,12 @@ describe('updateUserProfile Server Action', () => {
   });
 
   const mockSession = {
-    user: { id: 'test-user-id', email: 'test@example.com', name: 'Old Name' },
+    user: { id: 'test-user-id', email: 'test@example.com', firstName: 'Old', lastName: 'Name' },
   };
 
   const validProfileData = {
-    name: 'New Name',
+    firstName: 'New',
+    lastName: 'Name',
     bio: 'New Bio',
   };
 
@@ -81,24 +82,24 @@ describe('updateUserProfile Server Action', () => {
   });
 
   it('should return validation error for invalid data', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
-    const invalidData = { name: '' }; // name is required if provided
+    mockGetServerSession.mockResolvedValue(mockSession as any);
+    const invalidData = { firstName: '' }; // firstName is required
     const result = await updateUserProfile(invalidData);
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Invalid input.');
     expect(result.fieldErrors).toBeDefined();
-    expect(result.fieldErrors?.name).toContain('Display name is required');
+    expect(result.fieldErrors?.firstName).toContain('First name must be 50 characters or less');
     expect(mockUserUpdate).not.toHaveBeenCalled();
   });
 
   it('should successfully update profile and revalidate path for valid data', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
+    mockGetServerSession.mockResolvedValue(mockSession as any);
     const updatedUser = {
       id: mockSession.user.id,
       email: mockSession.user.email,
       ...validProfileData,
-      image: null, // Assuming image is part of user model
+      image: null,
     };
     mockUserUpdate.mockResolvedValue(updatedUser as any);
 
@@ -115,7 +116,7 @@ describe('updateUserProfile Server Action', () => {
   });
 
   it('should handle database update errors gracefully', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
+    mockGetServerSession.mockResolvedValue(mockSession as any);
     mockUserUpdate.mockRejectedValue(new Error('DB update failed'));
 
     const result = await updateUserProfile(validProfileData);
@@ -130,9 +131,9 @@ describe('updateUserProfile Server Action', () => {
   });
 
   it('should allow updating only name', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
-    const partialData = { name: 'Only New Name' };
-    const expectedDbData = { name: 'Only New Name', bio: undefined }; // Zod makes unspecified optionals undefined
+    mockGetServerSession.mockResolvedValue(mockSession as any);
+    const partialData = { firstName: 'Only New First' };
+    const expectedDbData = { firstName: 'Only New First' };
     const updatedUser = { ...mockSession.user, ...expectedDbData };
     mockUserUpdate.mockResolvedValue(updatedUser as any);
 
@@ -141,15 +142,20 @@ describe('updateUserProfile Server Action', () => {
     expect(result.success).toBe(true);
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: mockSession.user.id },
-      data: expectedDbData,
+      data: {
+        firstName: "Only New First",
+        lastName: undefined,
+        stageName: undefined,
+        bio: undefined,
+      },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
   });
 
   it('should allow updating only bio', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
+    mockGetServerSession.mockResolvedValue(mockSession as any);
     const partialData = { bio: 'Only New Bio' };
-    const expectedDbData = { name: undefined, bio: 'Only New Bio' };
+    const expectedDbData = { firstName: undefined, lastName: undefined, stageName: undefined, bio: 'Only New Bio' };
     const updatedUser = { ...mockSession.user, ...expectedDbData };
     mockUserUpdate.mockResolvedValue(updatedUser as any);
 
@@ -164,9 +170,9 @@ describe('updateUserProfile Server Action', () => {
   });
 
   it('should allow clearing bio by passing an empty string (if schema allows, current does)', async () => {
-    mockGetServerSession.mockResolvedValue(mockSession);
-    const dataToClearBio = { name: 'Keep Name', bio: '' };
-    const expectedDbData = { name: 'Keep Name', bio: '' };
+    mockGetServerSession.mockResolvedValue(mockSession as any);
+    const dataToClearBio = { firstName: 'Keep', lastName: 'Name', bio: '' };
+    const expectedDbData = { firstName: 'Keep', lastName: 'Name', bio: '' };
     const updatedUser = { ...mockSession.user, ...expectedDbData };
     mockUserUpdate.mockResolvedValue(updatedUser as any);
 
@@ -206,7 +212,8 @@ describe('reviewOrganizerApplication', () => {
     user: {
       id: applicantUserId,
       roles: [Role.USER] as Role[],
-      name: 'Test User',
+      firstName: 'Test',
+      lastName: 'User',
       email: 'test@example.com',
     } as User & { roles: Role[] }, // More specific type for user within application
     createdAt: new Date(),

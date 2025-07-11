@@ -28,7 +28,7 @@ export async function POST(
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series?.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
   } catch (error) {
@@ -51,32 +51,34 @@ export async function POST(
     );
   }
 
-  const { photos: inputPhotos, ...hotelData } = validationResult.data as HotelData;
+  const { photos: inputPhotos, ...hotelData } = validationResult.data;
 
   try {
     const newHotelWithPhotos = await prisma.$transaction(async (tx) => {
       const createdHotel = await tx.hotel.create({
         data: {
-          ...hotelData,
           conventionId: conventionId,
-          description: hotelData.description || undefined,
-          websiteUrl: hotelData.websiteUrl || undefined,
-          googleMapsUrl: hotelData.googleMapsUrl || undefined,
-          streetAddress: hotelData.streetAddress || undefined,
-          city: hotelData.city || undefined,
-          stateRegion: hotelData.stateRegion || undefined,
-          postalCode: hotelData.postalCode || undefined,
-          country: hotelData.country || undefined,
-          contactEmail: hotelData.contactEmail || undefined,
-          contactPhone: hotelData.contactPhone || undefined,
-          groupRateOrBookingCode: hotelData.groupRateOrBookingCode || undefined,
-          groupPrice: hotelData.groupPrice || undefined,
-          bookingLink: hotelData.bookingLink || undefined,
-          bookingCutoffDate: hotelData.bookingCutoffDate || undefined, // Zod coerces to Date or null
-          parkingInfo: hotelData.parkingInfo || undefined,
-          publicTransportInfo: hotelData.publicTransportInfo || undefined,
-          overallAccessibilityNotes: hotelData.overallAccessibilityNotes || undefined,
-          // amenities, isPrimaryHotel, isAtPrimaryVenueLocation use Zod defaults or input values
+          hotelName: hotelData.hotelName!, // Non-null assertion
+          isPrimaryHotel: hotelData.isPrimaryHotel,
+          isAtPrimaryVenueLocation: hotelData.isAtPrimaryVenueLocation,
+          description: hotelData.description,
+          websiteUrl: hotelData.websiteUrl,
+          googleMapsUrl: hotelData.googleMapsUrl,
+          streetAddress: hotelData.streetAddress,
+          city: hotelData.city,
+          stateRegion: hotelData.stateRegion,
+          postalCode: hotelData.postalCode,
+          country: hotelData.country,
+          contactEmail: hotelData.contactEmail,
+          contactPhone: hotelData.contactPhone,
+          groupRateOrBookingCode: hotelData.groupRateOrBookingCode,
+          groupPrice: hotelData.groupPrice,
+          bookingLink: hotelData.bookingLink,
+          bookingCutoffDate: hotelData.bookingCutoffDate,
+          parkingInfo: hotelData.parkingInfo,
+          publicTransportInfo: hotelData.publicTransportInfo,
+          overallAccessibilityNotes: hotelData.overallAccessibilityNotes,
+          amenities: hotelData.amenities,
         },
       });
 
@@ -89,7 +91,7 @@ export async function POST(
           })),
         });
       }
-      
+
       return tx.hotel.findUnique({
         where: { id: createdHotel.id },
         include: { photos: true },

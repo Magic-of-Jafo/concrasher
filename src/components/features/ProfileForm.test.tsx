@@ -13,7 +13,9 @@ jest.mock('@/lib/actions', () => ({
 // Mock the validators module
 jest.mock('@/lib/validators', () => ({
   ProfileSchema: z.object({
-    name: z.string().min(1, 'Display name is required').optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    stageName: z.string().optional().nullable(),
     bio: z.string().max(200, 'Bio must be 200 characters or less').optional().nullable(),
   }),
 }));
@@ -27,25 +29,34 @@ describe('ProfileForm', () => {
 
   const renderComponent = (props = {}) => {
     return render(
-      <ProfileForm currentName="Initial Name" currentBio="Initial Bio" {...props} />
+      <ProfileForm
+        currentFirstName="Initial"
+        currentLastName="Name"
+        currentBio="Initial Bio"
+        {...props}
+      />
     );
   };
 
   it('renders with initial values', () => {
     renderComponent();
-    expect(screen.getByLabelText(/Display Name/i)).toHaveValue('Initial Name');
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue('Initial');
+    expect(screen.getByLabelText(/Last Name/i)).toHaveValue('Name');
     expect(screen.getByLabelText(/Bio/i)).toHaveValue('Initial Bio');
   });
 
   it('allows typing in fields', () => {
     renderComponent();
-    const nameInput = screen.getByLabelText(/Display Name/i);
+    const firstNameInput = screen.getByLabelText(/First Name/i);
+    const lastNameInput = screen.getByLabelText(/Last Name/i);
     const bioInput = screen.getByLabelText(/Bio/i);
 
-    fireEvent.change(nameInput, { target: { value: 'New Name' } });
+    fireEvent.change(firstNameInput, { target: { value: 'New First' } });
+    fireEvent.change(lastNameInput, { target: { value: 'New Last' } });
     fireEvent.change(bioInput, { target: { value: 'New Bio' } });
 
-    expect(nameInput).toHaveValue('New Name');
+    expect(firstNameInput).toHaveValue('New First');
+    expect(lastNameInput).toHaveValue('New Last');
     expect(bioInput).toHaveValue('New Bio');
   });
 
@@ -55,7 +66,8 @@ describe('ProfileForm', () => {
       message: 'Profile updated!',
       user: {
         id: '1',
-        name: 'Updated Name',
+        firstName: 'Updated First',
+        lastName: 'Updated Last',
         bio: 'Updated Bio',
         email: 'test@test.com',
         image: null,
@@ -64,8 +76,11 @@ describe('ProfileForm', () => {
 
     renderComponent();
 
-    fireEvent.change(screen.getByLabelText(/Display Name/i), {
-      target: { value: 'Updated Name' },
+    fireEvent.change(screen.getByLabelText(/First Name/i), {
+      target: { value: 'Updated First' },
+    });
+    fireEvent.change(screen.getByLabelText(/Last Name/i), {
+      target: { value: 'Updated Last' },
     });
     fireEvent.change(screen.getByLabelText(/Bio/i), {
       target: { value: 'Updated Bio' },
@@ -74,13 +89,16 @@ describe('ProfileForm', () => {
 
     await waitFor(() => {
       expect(mockUpdateUserProfile).toHaveBeenCalledWith({
-        name: 'Updated Name',
+        firstName: 'Updated First',
+        lastName: 'Updated Last',
+        stageName: '', // Assuming stage name is optional and empty
         bio: 'Updated Bio',
       });
     });
     expect(await screen.findByText('Profile updated!')).toBeInTheDocument();
     // Form should reset to new values
-    expect(screen.getByLabelText(/Display Name/i)).toHaveValue('Updated Name');
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue('Updated First');
+    expect(screen.getByLabelText(/Last Name/i)).toHaveValue('Updated Last');
     expect(screen.getByLabelText(/Bio/i)).toHaveValue('Updated Bio');
   });
 
@@ -92,8 +110,8 @@ describe('ProfileForm', () => {
 
     renderComponent();
 
-    fireEvent.change(screen.getByLabelText(/Display Name/i), {
-      target: { value: 'Bad Name' },
+    fireEvent.change(screen.getByLabelText(/First Name/i), {
+      target: { value: 'Bad First' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Save Changes/i }));
 
@@ -104,7 +122,7 @@ describe('ProfileForm', () => {
       await screen.findByText('Update failed on server')
     ).toBeInTheDocument();
     // Form should not reset
-    expect(screen.getByLabelText(/Display Name/i)).toHaveValue('Bad Name');
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue('Bad First');
   });
 
   it('submit button is initially disabled if form is not dirty (no changes)', () => {
@@ -119,7 +137,7 @@ describe('ProfileForm', () => {
     expect(
       screen.getByRole('button', { name: /Save Changes/i })
     ).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/Display Name/i), {
+    fireEvent.change(screen.getByLabelText(/First Name/i), {
       target: { value: 'Made a change' },
     });
     expect(
@@ -131,7 +149,9 @@ describe('ProfileForm', () => {
     const mockOnProfileUpdate = jest.fn();
     const updatedUserData = {
       id: '1',
-      name: 'Callback Name',
+      firstName: 'Callback First',
+      lastName: 'Callback Last',
+      stageName: '',
       bio: 'Callback Bio',
       email: 'test@test.com',
       image: null,
@@ -144,8 +164,11 @@ describe('ProfileForm', () => {
 
     renderComponent({ onProfileUpdate: mockOnProfileUpdate });
 
-    fireEvent.change(screen.getByLabelText(/Display Name/i), {
-      target: { value: 'Callback Name' },
+    fireEvent.change(screen.getByLabelText(/First Name/i), {
+      target: { value: 'Callback First' },
+    });
+    fireEvent.change(screen.getByLabelText(/Last Name/i), {
+      target: { value: 'Callback Last' },
     });
     fireEvent.change(screen.getByLabelText(/Bio/i), {
       target: { value: 'Callback Bio' },
@@ -154,7 +177,9 @@ describe('ProfileForm', () => {
 
     await waitFor(() => {
       expect(mockOnProfileUpdate).toHaveBeenCalledWith({
-        name: 'Callback Name',
+        firstName: 'Callback First',
+        lastName: 'Callback Last',
+        stageName: '',
         bio: 'Callback Bio',
       });
     });

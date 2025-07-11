@@ -2,8 +2,8 @@
 
 import React, { useState, useTransition } from 'react';
 import { Button, Typography } from '@mui/material'; // Assuming Material UI is used, Typography added here
-import { Role, ApplicationStatus } from '@prisma/client'; // Removed RequestedRole as it's not used in this component
-import { applyForOrganizerRole } from '@/lib/actions'; // Assuming aliased path
+import { Role, ApplicationStatus, RequestedRole } from '@prisma/client';
+import { requestRoles } from '@/lib/actions'; // Corrected import
 
 interface OrganizerApplicationButtonProps {
   currentRoles: Role[];
@@ -25,7 +25,7 @@ export default function OrganizerApplicationButton({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await applyForOrganizerRole();
+      const result = await requestRoles([RequestedRole.ORGANIZER]);
       if (result.success) {
         setMessage(result.message || "Application submitted successfully!");
         if (result.applicationStatus) {
@@ -59,7 +59,7 @@ export default function OrganizerApplicationButton({
       </Button>
     );
   }
-  
+
   return (
     <div>
       <Button

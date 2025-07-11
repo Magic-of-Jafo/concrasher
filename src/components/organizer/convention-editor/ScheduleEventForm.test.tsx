@@ -22,10 +22,10 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe('ScheduleEventForm', () => {
     beforeEach(() => {
         global.fetch = jest.fn(() =>
-            Promise.resolve({
-                json: () => Promise.resolve([]),
-                ok: true,
-            })
+            Promise.resolve(new Response(JSON.stringify([]), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }))
         ) as jest.Mock;
     });
 

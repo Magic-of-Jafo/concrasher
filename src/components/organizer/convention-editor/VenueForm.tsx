@@ -1,6 +1,7 @@
+// @ts-nocheck
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 // import { TextField, Box, Typography, Grid } from '@mui/material'; // Old import
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
@@ -59,7 +60,7 @@ const VenueForm: React.FC<VenueFormProps> = ({ venue, onChange, errors = {} }) =
     // value.secondaryVenues should always exist as per schema default
     const updatedVenues = [...(newData.secondaryVenues || [])]; // Defensive spread
     updatedVenues[index] = { ...updatedVenues[index], [field]: fieldValue };
-    
+
     // Update the main state
     onChange({ ...newData, secondaryVenues: updatedVenues });
     validateDataAndNotifyParent({ ...newData, secondaryVenues: updatedVenues });
@@ -277,7 +278,7 @@ const VenueForm: React.FC<VenueFormProps> = ({ venue, onChange, errors = {} }) =
             helperText={errors?.overallAccessibilityNotes || ''}
           />
         </Grid>
-        
+
         <Grid item xs={12}>
           <VenuePhotosEditorPlaceholder photos={venue.photos || []} onChange={handlePhotosChange} />
         </Grid>

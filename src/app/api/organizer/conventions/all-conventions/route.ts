@@ -74,13 +74,13 @@ export async function POST(request: Request) {
     if (!name || !slug || !startDate || !endDate || !seriesId || !city || !country) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    
+
     // Basic slug format validation (Zod in form handles stricter rules)
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-        return NextResponse.json(
-            { error: 'Invalid slug format. Slug must be lowercase alphanumeric with hyphens and no spaces.' },
-            { status: 400 }
-        );
+      return NextResponse.json(
+        { error: 'Invalid slug format. Slug must be lowercase alphanumeric with hyphens and no spaces.' },
+        { status: 400 }
+      );
     }
 
     // Check for slug uniqueness
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       data: {
         name,
         slug,
-        description,
+        descriptionMain: description,
         startDate: start,
         endDate: end,
         city,
@@ -135,10 +135,10 @@ export async function POST(request: Request) {
     console.error('Error creating convention:', error);
     // Check for Prisma unique constraint violation if slug check somehow missed (e.g., race condition or deletedAt was involved)
     if (error instanceof Error && error.message.includes('Unique constraint failed') && error.message.includes('slug')) {
-        return NextResponse.json(
-            { error: 'Slug already in use. Please choose a unique slug.' }, 
-            { status: 409 }
-        );
+      return NextResponse.json(
+        { error: 'Slug already in use. Please choose a unique slug.' },
+        { status: 409 }
+      );
     }
     return NextResponse.json({ error: 'Failed to create convention' }, { status: 500 });
   }

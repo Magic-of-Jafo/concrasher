@@ -307,18 +307,17 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
       }
 
       if (result.success) {
-        setSaveSuccessMessage('Event saved successfully!');
-        setTimeout(() => setSaveSuccessMessage(null), 3000);
-
         const updatedItem = result.item;
-
-        if (isUpdating) {
-          setScheduleItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
-        } else {
-          setScheduleItems(prev => [...prev, updatedItem]);
+        if (updatedItem) {
+          if (data.id) { // It was an update
+            setScheduleItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
+          } else { // It was a create
+            setScheduleItems(prev => [...prev, updatedItem]);
+          }
         }
-
-        handleCloseForm();
+        setSaveSuccessMessage('Event saved!');
+        setTimeout(() => setSaveSuccessMessage(null), 3000);
+        setFormOpen(false); // Close the form on successful save
       } else {
         setSaveError(result.error || 'An unknown error occurred.');
       }

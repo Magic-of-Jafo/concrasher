@@ -49,7 +49,6 @@ export async function POST(req: Request) {
     let ActiveConventionCreateSchema: typeof StaticConventionCreateSchema | undefined = StaticConventionCreateSchema;
     if (!ActiveConventionCreateSchema?.safeParse) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         ActiveConventionCreateSchema = (await import('@/lib/validators')).ConventionCreateSchema as typeof StaticConventionCreateSchema;
       } catch {
         // ignore – will handle undefined below

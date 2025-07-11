@@ -29,7 +29,7 @@ export async function PUT(
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series?.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
 
@@ -65,7 +65,7 @@ export async function PUT(
   try {
     const updatedHotelWithPhotos = await prisma.$transaction(async (tx) => {
       const { conventionId: _convId, isPrimaryHotel: _isPrimary, isAtPrimaryVenueLocation: _isAtPVL, id: _id, ...dataForUpdate } = hotelDataToUpdate;
-      
+
       await tx.hotel.update({
         where: { id: hotelIdToUpdate },
         data: {
@@ -115,7 +115,7 @@ export async function PUT(
   } catch (error) {
     console.error(`Error updating hotel ${hotelIdToUpdate}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return NextResponse.json({ message: 'Hotel not found for update' }, { status: 404 });
+      return NextResponse.json({ message: 'Hotel not found for update' }, { status: 404 });
     }
     return NextResponse.json({ message: 'Failed to update hotel' }, { status: 500 });
   }
@@ -145,7 +145,7 @@ export async function DELETE(
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    if (convention.series.organizerUserId !== session.user.id) {
+    if (convention.series?.organizerUserId !== session.user.id) {
       return NextResponse.json({ message: 'Forbidden: You are not the organizer of this convention series' }, { status: 403 });
     }
 

@@ -2,9 +2,8 @@
 
 import React from "react";
 import ConventionCard from "@/components/features/ConventionCard";
-import { Box, Grid, Paper, Typography } from "@mui/material";
-import styled from "@emotion/styled";
-import { Theme } from "@mui/material";
+import { Box, Grid, Paper, Typography, Theme } from "@mui/material";
+import { styled } from "@mui/material/styles";
 
 const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
   padding: theme.spacing(2),

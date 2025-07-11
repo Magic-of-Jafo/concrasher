@@ -60,7 +60,8 @@ describe('Auth.js Configuration', () => {
       const mockCredentials = { email: 'test@example.com', password: 'password123' };
       const mockUserFromDb = {
         id: 'user-id-1',
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'test@example.com',
         hashedPassword: 'hashed-password',
         roles: [Role.USER, Role.ADMIN],
@@ -90,14 +91,16 @@ describe('Auth.js Configuration', () => {
       // The result that should be returned
       const result = {
         id: user!.id,
-        name: user!.name,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
         email: user!.email,
         roles: user!.roles,
       };
 
       expect(result).toEqual({
         id: mockUserFromDb.id,
-        name: mockUserFromDb.name,
+        firstName: mockUserFromDb.firstName,
+        lastName: mockUserFromDb.lastName,
         email: mockUserFromDb.email,
         roles: mockUserFromDb.roles,
       });
@@ -111,7 +114,8 @@ describe('Auth.js Configuration', () => {
       const mockCredentials = { email: 'test@example.com', password: 'wrong-password' };
       const mockUserFromDb = {
         id: 'user-id-1',
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'test@example.com',
         hashedPassword: 'hashed-password',
         roles: [Role.USER],
@@ -142,7 +146,8 @@ describe('Auth.js Configuration', () => {
       const mockCredentials = { email: 'test@example.com', password: 'password123' };
       const mockUserFromDb = {
         id: 'user-id-1',
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'test@example.com',
         hashedPassword: null, // No password set (e.g. OAuth user)
         roles: [Role.USER],
@@ -179,7 +184,8 @@ describe('Auth.js Configuration', () => {
     it('should add id and roles to token if user object with roles is provided (initial sign-in)', async () => {
       const mockUser = {
         id: 'user-id-jwt-1',
-        name: 'JWT User',
+        firstName: 'JWT',
+        lastName: 'User',
         email: 'jwt@example.com',
         roles: [Role.USER, Role.ORGANIZER],
       } as any; // Cast to any to satisfy NextAuthUser type which might not have roles yet by default
@@ -196,7 +202,8 @@ describe('Auth.js Configuration', () => {
     it('should fetch roles from DB if user object is provided without roles (initial sign-in)', async () => {
       const mockUserNoRoles = {
         id: 'user-id-jwt-2',
-        name: 'JWT User No Roles',
+        firstName: 'JWT User',
+        lastName: 'No Roles',
         email: 'jwt-no-roles@example.com',
         // roles are missing
       } as any;

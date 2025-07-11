@@ -46,16 +46,16 @@ export async function POST(request: Request) {
     console.log('TESTING: Password reset URL:', resetUrl);
     console.log('TESTING: Reset token:', resetToken);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'If an account exists, you will receive a password reset email.',
       // Include the token in the response for testing
-      resetToken 
+      resetToken
     });
   } catch (error) {
     console.error('Password reset error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace',
     });
     return NextResponse.json(
       { message: 'An error occurred while processing your request.' },

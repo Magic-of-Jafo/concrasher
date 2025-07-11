@@ -28,20 +28,20 @@ export async function POST(
       return NextResponse.json({ error: "Convention not found" }, { status: 404 });
     }
 
-    if (!isAdmin && originalConvention.series.organizerUserId !== currentUserId) {
+    if (!isAdmin && originalConvention.series?.organizerUserId !== currentUserId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { 
-      id, 
-      createdAt, 
-      updatedAt, 
+    const {
+      id,
+      createdAt,
+      updatedAt,
       deletedAt,
-      slug: originalSlug, 
-      name: originalName, 
-      status: originalStatus, 
+      slug: originalSlug,
+      name: originalName,
+      status: originalStatus,
       series,
-      ...restOfConventionData 
+      ...restOfConventionData
     } = originalConvention;
 
     let newSlug = `${originalSlug}-copy`;
@@ -51,7 +51,7 @@ export async function POST(
       existingBySlug = await db.convention.count({ where: { slug: newSlug, deletedAt: null } });
       if (existingBySlug > 0) {
         newSlug = `${originalSlug}-copy-${Date.now()}-${generateShortRandomId(4)}`;
-      } 
+      }
     }
 
     const newName = `${originalName} (Copy)`;
@@ -70,10 +70,10 @@ export async function POST(
   } catch (error) {
     console.error("Error duplicating convention:", error);
     if (error instanceof Error && error.message.includes("Unique constraint failed")) {
-        return NextResponse.json(
-            { error: "Failed to generate a unique slug for the duplicated convention. Please try again or rename the original if it's very long." }, 
-            { status: 409 }
-        );
+      return NextResponse.json(
+        { error: "Failed to generate a unique slug for the duplicated convention. Please try again or rename the original if it's very long." },
+        { status: 409 }
+      );
     }
     return NextResponse.json(
       { error: "Failed to duplicate convention" },
