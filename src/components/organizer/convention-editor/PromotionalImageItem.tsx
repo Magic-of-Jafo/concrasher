@@ -3,6 +3,7 @@ import { Box, TextField, IconButton, Card, CardContent, Typography } from '@mui/
 import { Delete as DeleteIcon, DragIndicator as DragIcon } from '@mui/icons-material';
 import { Draggable } from '@hello-pangea/dnd';
 import { type ConventionMediaData } from '@/lib/validators';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface PromotionalImageItemProps {
     media: ConventionMediaData;
@@ -101,7 +102,7 @@ export const PromotionalImageItem: React.FC<PromotionalImageItemProps> = ({
                                 <Box sx={{ flexShrink: 0, width: 120, height: 90 }}>
                                     <Box
                                         component="img"
-                                        src={media.url}
+                                        src={getS3ImageUrl(media.url)}
                                         alt="Promotional image"
                                         sx={{
                                             width: '100%',

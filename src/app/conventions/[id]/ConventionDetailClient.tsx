@@ -31,7 +31,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import HotelIcon from '@mui/icons-material/Hotel';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
-import { getProfileImageUrl } from '@/lib/defaults';
+import { getProfileImageUrl, getS3ImageUrl } from '@/lib/defaults';
 import BasicInfoSection from '@/components/conventions/detail/BasicInfoSection';
 import PricingSection from '@/components/conventions/detail/PricingSection';
 import VenueSection from '@/components/conventions/detail/VenueSection';
@@ -277,7 +277,7 @@ function BasicInfoView({ convention }: { convention: any }) {
                 <Box sx={{ position: 'relative', height: 300, mb: 3 }}>
                     <Box
                         component="img"
-                        src={convention.coverImageUrl || '/images/default-convention.jpg'}
+                        src={getS3ImageUrl(convention.coverImageUrl)}
                         alt={convention.name}
                         sx={{
                             width: '100%',
@@ -330,7 +330,7 @@ function BasicInfoView({ convention }: { convention: any }) {
                         <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
                             <Box
                                 component="img"
-                                src={getProfileImageUrl(convention.profileImageUrl)}
+                                src={getS3ImageUrl(convention.profileImageUrl)}
                                 alt={`${convention.name} profile`}
                                 sx={{
                                     width: '100%',

@@ -14,6 +14,7 @@ import {
     Tabs,
     Tab,
 } from '@mui/material';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface ConventionMedia {
     id: string;
@@ -69,7 +70,7 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
                             <ImageListItem key={img.id}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
-                                    src={img.url}
+                                    src={getS3ImageUrl(img.url)}
                                     alt={img.caption || 'Convention image'}
                                     loading="lazy"
                                     style={{ width: '100%', height: 'auto' }}

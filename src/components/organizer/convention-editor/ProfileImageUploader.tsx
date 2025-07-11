@@ -16,6 +16,7 @@ import {
 import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface ProfileImageUploaderProps {
     conventionId: string;
@@ -360,7 +361,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                     <Box>
                         <Box sx={{ mb: 2 }}>
                             <img
-                                src={currentImageUrl}
+                                src={getS3ImageUrl(currentImageUrl)}
                                 alt="Profile Image"
                                 style={{
                                     width: '200px',

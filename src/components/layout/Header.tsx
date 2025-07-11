@@ -10,6 +10,7 @@ import Box from '@mui/material/Box';
 import Link from 'next/link';
 import Avatar from '@mui/material/Avatar';
 import eventBus from '@/lib/event-bus';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -65,7 +66,7 @@ export default function Header() {
                 Logout
               </Button>
               <Button color="inherit" component={Link} href="/profile" sx={{ p: 0, minWidth: 0 }}>
-                <Avatar alt="Profile" src={imageUrl || undefined} />
+                <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
               </Button>
             </>
           ) : (

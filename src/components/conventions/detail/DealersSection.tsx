@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid'; // Specific import for Grid
 import NextLink from 'next/link';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 // Based on prisma/schema.prisma
 // NOTE: The actual data passed in will need to be populated with the
@@ -65,7 +66,7 @@ export default function DealersSection({ convention }: DealersSectionProps) {
                                     <CardContent sx={{ textAlign: 'center', p: '12px' }}>
                                         <Avatar
                                             variant="square"
-                                            src={dealer.profileImageUrl || undefined}
+                                            src={getS3ImageUrl(dealer.profileImageUrl) || undefined}
                                             alt={dealer.displayNameOverride || dealer.name}
                                             sx={{ width: 120, height: 120, margin: '0 auto 8px', bgcolor: 'transparent', '& img': { objectFit: 'contain' } }}
                                         />

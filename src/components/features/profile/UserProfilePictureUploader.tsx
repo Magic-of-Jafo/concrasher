@@ -22,6 +22,7 @@ import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon, Clos
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { updateUserProfileImage, clearUserProfileImage } from '@/lib/actions';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface UserProfilePictureUploaderProps {
     currentImageUrl?: string | null;
@@ -212,7 +213,7 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
-                <Avatar src={currentImageUrl || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
+                <Avatar src={getS3ImageUrl(currentImageUrl) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
                 {currentImageUrl && (
                     <IconButton
                         aria-label="remove profile picture"

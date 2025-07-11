@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardMedia, Typography, Box, Chip, Button, Stack } from '@mui/material';
 import Link from 'next/link';
-import { getProfileImageUrl } from '@/lib/defaults';
+import { getProfileImageUrl, getS3ImageUrl } from '@/lib/defaults';
 
 interface ConventionCardProps {
   convention: any; // TODO: Replace with proper type
@@ -49,7 +49,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
     >
       <CardMedia
         component="img"
-        image={getProfileImageUrl(profileImageUrl || imageUrl)}
+        image={getS3ImageUrl(profileImageUrl || imageUrl)}
         alt={name}
         sx={{ width: { xs: '100%', sm: 120 }, height: 120, borderRadius: 2, objectFit: 'cover', mr: { sm: 2 }, mb: { xs: 2, sm: 0 } }}
       />

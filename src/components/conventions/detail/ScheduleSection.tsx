@@ -96,7 +96,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                 <Paper sx={{ p: 3, mb: 3, position: 'relative' }}>
                     <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
                         <Image
-                            src="/images/pre-con-schedule.png"
+                            src="https://convention-crasher.s3.amazonaws.com/images/pre-con-schedule.png"
                             alt="Pre-convention schedule graphic"
                             width={200}
                             height={200}
@@ -153,7 +153,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                     {(preConventionDays.length > 0 || postConventionDays.length > 0) && (
                         <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
                             <Image
-                                src="/images/main-schedule.png"
+                                src="https://convention-crasher.s3.amazonaws.com/images/main-schedule.png"
                                 alt="Main schedule graphic"
                                 width={200}
                                 height={200}
@@ -211,7 +211,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                 <Paper sx={{ p: 3, mb: 3, position: 'relative' }}>
                     <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
                         <Image
-                            src="/images/post-con-schedule.png"
+                            src="https://convention-crasher.s3.amazonaws.com/images/post-con-schedule.png"
                             alt="Post-convention schedule graphic"
                             width={200}
                             height={200}

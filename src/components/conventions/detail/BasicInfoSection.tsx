@@ -19,7 +19,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EventIcon from '@mui/icons-material/Event';
 import WebIcon from '@mui/icons-material/Web';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import { getProfileImageUrl } from '@/lib/defaults';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface BasicInfoSectionProps {
     convention: any;
@@ -40,8 +40,8 @@ const statusLabels: Record<ConventionStatus, string> = {
 };
 
 export default function BasicInfoSection({ convention }: BasicInfoSectionProps) {
-    const profileImageUrl = getProfileImageUrl(convention.profileImageUrl);
-    const coverImageUrl = convention.coverImageUrl;
+    const profileImageUrl = getS3ImageUrl(convention.profileImageUrl);
+    const coverImageUrl = getS3ImageUrl(convention.coverImageUrl);
 
     // Format location display
     const locationDisplay = [
