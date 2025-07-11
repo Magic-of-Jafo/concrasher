@@ -10,6 +10,7 @@ import { Role } from '@prisma/client';
 // Define your NextAuth configuration for v4
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(db),
+  url: process.env.NEXTAUTH_URL, // Explicitly set the URL
   session: { strategy: 'jwt' },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
