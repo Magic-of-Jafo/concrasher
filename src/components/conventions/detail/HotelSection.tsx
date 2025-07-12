@@ -41,7 +41,7 @@ export default function HotelSection({ convention }: { convention: any }) {
     if (!primaryHotel) {
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h4" component="h2" gutterBottom>
+                <Typography variant="h1" component="h2" gutterBottom>
                     Hotel
                 </Typography>
                 <Typography>Hotel information is not yet available.</Typography>
@@ -51,7 +51,7 @@ export default function HotelSection({ convention }: { convention: any }) {
 
     return (
         <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h4" component="h2" gutterBottom>
+            <Typography variant="h1" component="h2" gutterBottom>
                 Hotel
             </Typography>
             {primaryHotel?.websiteUrl && (

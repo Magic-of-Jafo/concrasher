@@ -41,7 +41,7 @@ export default function DealersSection({ convention }: DealersSectionProps) {
     if (dealers.length === 0) {
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
+                <Typography variant="h1" component="h1" gutterBottom>
                     Dealers
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
@@ -53,7 +53,7 @@ export default function DealersSection({ convention }: DealersSectionProps) {
 
     return (
         <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
+            <Typography variant="h1" component="h1" gutterBottom>
                 Dealers
             </Typography>
             <Grid container spacing={3}>

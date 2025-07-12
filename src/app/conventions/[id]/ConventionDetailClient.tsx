@@ -50,7 +50,7 @@ const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary'
 type ViewType = 'basic' | 'schedule' | 'pricing' | 'venue' | 'hotel' | 'dealers' | 'media';
 
 const navigationItems = [
-    { id: 'basic' as ViewType, label: 'Basic Info', icon: InfoIcon },
+    { id: 'basic' as ViewType, label: 'Details', icon: InfoIcon },
     { id: 'schedule' as ViewType, label: 'Schedule', icon: ScheduleIcon },
     { id: 'pricing' as ViewType, label: 'Pricing', icon: AttachMoneyIcon },
     { id: 'venue' as ViewType, label: 'Venue', icon: LocationOnIcon },
@@ -129,6 +129,16 @@ function PricingView({ convention }: { convention: any }) {
         .map((discount: any) => new Date(discount.cutoffDate))
         .filter((date: Date) => date > now)
         .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+    // New helper function to get the current price for a tier
+    const getCurrentPrice = (tier: any, tierDiscounts: any[]) => {
+        const activeDiscounts = tierDiscounts.filter((d: any) => new Date(d.cutoffDate) > now);
+        if (activeDiscounts.length === 0) {
+            return { current: Number(tier.amount), original: Number(tier.amount) };
+        }
+        const lowestDiscountPrice = Math.min(...activeDiscounts.map((d: any) => Number(d.discountedAmount)));
+        return { current: lowestDiscountPrice, original: Number(tier.amount) };
+    };
 
     // Remove duplicate dates
     const uniqueCutoffDates = allCutoffDates.filter((date: Date, index: number) =>
@@ -489,7 +499,7 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
                 {/* Left Sidebar Navigation */}
                 <Paper
                     sx={{
-                        width: 200,
+                        width: 160,
                         height: 'fit-content',
                         position: 'sticky',
                         top: 20,

@@ -13,7 +13,7 @@ import Alert from '@mui/material/Alert';
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams()!;
-  const callbackUrl = searchParams.get('callbackUrl') || '/conventions';
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -60,6 +60,14 @@ export const PromotionalImageItem: React.FC<PromotionalImageItemProps> = ({
         };
     }, []);
 
+    const getFileName = (url: string) => {
+        try {
+            return url.substring(url.lastIndexOf('/') + 1);
+        } catch (e) {
+            return url; // Fallback to full URL if parsing fails
+        }
+    };
+
     return (
         <Draggable draggableId={media.id || `new-${index}`} index={index}>
             {(provided, snapshot) => (
@@ -130,7 +138,7 @@ export const PromotionalImageItem: React.FC<PromotionalImageItemProps> = ({
                                 {/* Image Info */}
                                 <Box sx={{ flexGrow: 1 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem', wordBreak: 'break-word', mb: 1 }}>
-                                        {media.url}
+                                        {getFileName(media.url)}
                                     </Typography>
                                     <Box sx={{ position: 'relative' }}>
                                         <TextField

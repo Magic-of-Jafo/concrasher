@@ -122,6 +122,16 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         index === 0 || date.getTime() !== allCutoffDates[index - 1].getTime()
     );
 
+    // New helper function to get the current price for a tier
+    const getCurrentPrice = (tier: any, tierDiscounts: any[]) => {
+        const activeDiscounts = tierDiscounts.filter((d: any) => new Date(d.cutoffDate) > now);
+        if (activeDiscounts.length === 0) {
+            return { current: Number(tier.amount), original: Number(tier.amount) };
+        }
+        const lowestDiscountPrice = Math.min(...activeDiscounts.map((d: any) => Number(d.discountedAmount)));
+        return { current: lowestDiscountPrice, original: Number(tier.amount) };
+    };
+
     // Sort price tiers by order
     const sortedTiers = [...priceTiers].sort((a: any, b: any) => a.order - b.order);
 
@@ -131,7 +141,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
 
     return (
         <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h4" component="h1" gutterBottom color="text.primary">
+            <Typography variant="h1" component="h1" gutterBottom color="text.primary">
                 {convention.name} Pricing Tiers
             </Typography>
 
@@ -193,7 +203,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                 }}
                             >
                                 <Typography variant="h6" sx={{ color: 'white' }}>
-                                    Regular Price
+                                    {uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}
                                 </Typography>
                             </TableCell>
                         </TableRow>
@@ -201,6 +211,8 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                     <TableBody>
                         {sortedTiers.map((tier: any) => {
                             const tierDiscounts = discountsByTier[tier.id] || [];
+                            const { current, original } = getCurrentPrice(tier, tierDiscounts);
+                            const hasDiscount = current < original;
 
                             return (
                                 <TableRow key={tier.id}>
@@ -230,9 +242,16 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                         );
                                     })}
                                     <TableCell align="center">
-                                        <Typography variant="body1">
-                                            {formatPrice(Number(tier.amount), currencySymbol, currencyCode)}
-                                        </Typography>
+                                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                                            {hasDiscount && (
+                                                <Typography variant="body1" sx={{ textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'bold' }}>
+                                                    {formatPrice(original, currencySymbol, currencyCode)}
+                                                </Typography>
+                                            )}
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                                {formatPrice(current, currencySymbol, currencyCode)}
+                                            </Typography>
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
                             );

@@ -25,6 +25,18 @@ import {
   type ConventionSettingData,
   // ConventionScheduleItemBulkUploadSchema, // Corrected: Removed the problematic one, this is the main schema for the array - THIS LINE IS THE CULPRIT
 } from './validators';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
+// Configure S3 Client for deletion
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
+const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
 
 // ... existing code ...
 
@@ -272,14 +284,44 @@ export async function clearUserProfileImage() {
   }
 
   try {
+    // First, find the user to get the current image URL
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { image: true },
+    });
+
+    const imageUrl = user?.image;
+
+    // If there's an image, delete it from S3
+    if (imageUrl) {
+      try {
+        const url = new URL(imageUrl);
+        const s3Key = url.pathname.substring(1); // Remove leading '/'
+
+        if (s3Key) {
+          console.log(`[clearUserProfileImage] Deleting ${s3Key} from S3.`);
+          const deleteCommand = new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: s3Key,
+          });
+          await s3Client.send(deleteCommand);
+        }
+      } catch (s3Error) {
+        // Log the S3 error but don't block the profile update
+        console.error(`Failed to delete profile image from S3: ${imageUrl}`, s3Error);
+      }
+    }
+
+    // Then, update the database
     await db.user.update({
       where: { id: session.user.id },
       data: { image: null },
     });
+
     revalidatePath('/profile');
     return { success: true };
   } catch (error) {
-    console.error('Error clearing user profile image from db:', error);
+    console.error('Error clearing user profile image:', error);
     return { success: false, message: 'Failed to update database.' };
   }
 }
@@ -1616,23 +1658,92 @@ export async function updateConventionMedia(
     }
 
     // Update media in transaction
-    await db.$transaction(async (prisma) => {
-      // Delete existing media for this convention
-      await prisma.conventionMedia.deleteMany({
-        where: { conventionId }
+    await db.$transaction(async (tx) => {
+      // Determine which media items to delete from S3 and the database
+      const existingMedia = await tx.conventionMedia.findMany({
+        where: { conventionId },
       });
 
-      // Create new media records
-      if (validatedMediaData.length > 0) {
-        await prisma.conventionMedia.createMany({
-          data: validatedMediaData.map((media, index) => ({
-            conventionId,
-            type: media.type,
-            url: media.url,
-            caption: media.caption || null,
-            order: media.order ?? index,
-          }))
+      const newMediaUrls = new Set(mediaData.map(m => m.url));
+      const mediaToDelete = existingMedia.filter(m => !newMediaUrls.has(m.url));
+
+      if (mediaToDelete.length > 0) {
+        // Delete from S3
+        for (const media of mediaToDelete) {
+          try {
+            // Extract the key from the full S3 URL
+            const url = new URL(media.url);
+            const s3Key = url.pathname.substring(1); // Remove leading '/'
+
+            if (s3Key) {
+              const deleteCommand = new DeleteObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: s3Key,
+              });
+              await s3Client.send(deleteCommand);
+              console.log(`[updateConventionMedia] Deleted ${s3Key} from S3.`);
+            }
+          } catch (s3Error) {
+            // Log the error but don't block the database update
+            console.error(`[updateConventionMedia] Failed to delete ${media.url} from S3:`, s3Error);
+          }
+        }
+
+        // Delete from database
+        await tx.conventionMedia.deleteMany({
+          where: {
+            id: {
+              in: mediaToDelete.map(m => m.id),
+            },
+          },
         });
+      }
+
+      // Upsert the new/updated media data
+      for (const media of mediaData) {
+        const validationResult = ConventionMediaSchema.safeParse(media);
+        if (!validationResult.success) {
+          console.error(`[updateConventionMedia] Validation failed for media item during upsert:`, validationResult.error);
+          console.error(`[updateConventionMedia] Detailed validation issues:`, validationResult.error.issues);
+          console.error(`[updateConventionMedia] Failed media item:`, media);
+          return {
+            success: false,
+            error: "Invalid media data provided.",
+            fieldErrors: validationResult.error.flatten().fieldErrors,
+          };
+        }
+        const validatedMedia = validationResult.data;
+
+        // Check if media with the same URL already exists
+        const existingMediaWithSameUrl = await tx.conventionMedia.findFirst({
+          where: {
+            conventionId,
+            url: validatedMedia.url,
+          },
+        });
+
+        if (existingMediaWithSameUrl) {
+          // Update existing media
+          await tx.conventionMedia.update({
+            where: { id: existingMediaWithSameUrl.id },
+            data: {
+              type: validatedMedia.type,
+              caption: validatedMedia.caption || null,
+              order: validatedMedia.order,
+            },
+          });
+        } else {
+          // Create new media
+          await tx.conventionMedia.create({
+            data: {
+              conventionId,
+              type: validatedMedia.type,
+              url: validatedMedia.url,
+              caption: validatedMedia.caption || null,
+              order: validatedMedia.order,
+            },
+          });
+        }
       }
     });
 

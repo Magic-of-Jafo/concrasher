@@ -456,13 +456,15 @@ export const ConventionMediaSchema = z.object({
   conventionId: z.string().cuid().optional(),
   type: z.enum(['IMAGE', 'VIDEO_LINK']),
   url: z.string().min(1, 'URL is required').refine((val) => {
-    // Accept relative upload paths or supported video host URLs (YouTube, Vimeo)
-    if (val.startsWith('/uploads/')) return true;
+    // Accept S3 URLs, relative upload paths, or supported video host URLs
+    if (val.startsWith('/uploads/') || val.startsWith('https://convention-crasher.s3.amazonaws.com')) {
+      return true;
+    }
 
     // Allow only specific video hosts for external URLs
     const supportedHostsRegex = /^(https?:\/\/(?:www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com|player\.vimeo\.com))/i;
     return supportedHostsRegex.test(val);
-  }, 'Invalid URL format'),
+  }, 'Invalid URL format. Must be a valid S3 link or video provider (YouTube, Vimeo).'),
   caption: z.string().optional().nullable().transform((val) => val || undefined),
   order: z.number().int().min(0),
 });

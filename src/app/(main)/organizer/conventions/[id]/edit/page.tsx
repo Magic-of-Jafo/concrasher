@@ -110,6 +110,48 @@ interface ApiHotelData {
   bookingLink?: string; bookingCutoffDate?: Date | string | null; groupRateOrBookingCode?: string; groupPrice?: string;
 }
 
+// Component for status selection
+function StatusSelector({ currentStatus, onStatusChange, isUpdating }: {
+  currentStatus: ConventionStatus | undefined;
+  onStatusChange: (newStatus: ConventionStatus) => void;
+  isUpdating: boolean;
+}) {
+  if (!currentStatus) return null;
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Chip
+        label={statusLabels[currentStatus]}
+        color={statusColors[currentStatus]}
+        size="small"
+      />
+      <FormControl size="small" sx={{ minWidth: 120 }}>
+        <InputLabel id="status-select-label">Status</InputLabel>
+        <Select
+          labelId="status-select-label"
+          value={currentStatus}
+          label="Status"
+          onChange={(e) => onStatusChange(e.target.value as ConventionStatus)}
+          disabled={isUpdating}
+        >
+          <MenuItem value={ConventionStatus.PUBLISHED}>
+            {statusLabels[ConventionStatus.PUBLISHED]}
+          </MenuItem>
+          <MenuItem value={ConventionStatus.DRAFT}>
+            {statusLabels[ConventionStatus.DRAFT]}
+          </MenuItem>
+          <MenuItem value={ConventionStatus.PAST}>
+            {statusLabels[ConventionStatus.PAST]}
+          </MenuItem>
+          <MenuItem value={ConventionStatus.CANCELLED}>
+            {statusLabels[ConventionStatus.CANCELLED]}
+          </MenuItem>
+        </Select>
+      </FormControl>
+    </Box>
+  );
+}
+
 function ConventionEditPage() { // Remove params from props
   const router = useRouter();
   const params = useParams(); // Use the hook here
@@ -513,48 +555,22 @@ function ConventionEditPage() { // Remove params from props
   }
 
   return (
-    <Container maxWidth="lg" sx={{ my: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ flex: 1 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h1" component="h1">
           {isEditing ? `Edit ${conventionPageData.name || 'Convention'}` : 'Create New Convention'}
         </Typography>
-
-        {isEditing && conventionPageData.status && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Chip
-              label={statusLabels[conventionPageData.status]}
-              color={statusColors[conventionPageData.status]}
-              size="small"
-            />
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={conventionPageData.status}
-                label="Status"
-                onChange={(e) => handleStatusChange(e.target.value as ConventionStatus)}
-                disabled={isUpdatingStatus}
-              >
-                <MenuItem value={ConventionStatus.PUBLISHED}>
-                  {statusLabels[ConventionStatus.PUBLISHED]}
-                </MenuItem>
-                <MenuItem value={ConventionStatus.DRAFT}>
-                  {statusLabels[ConventionStatus.DRAFT]}
-                </MenuItem>
-                <MenuItem value={ConventionStatus.PAST}>
-                  {statusLabels[ConventionStatus.PAST]}
-                </MenuItem>
-                <MenuItem value={ConventionStatus.CANCELLED}>
-                  {statusLabels[ConventionStatus.CANCELLED]}
-                </MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+        {isEditing && (
+          <StatusSelector
+            currentStatus={conventionPageData.status}
+            onStatusChange={handleStatusChange}
+            isUpdating={isUpdatingStatus}
+          />
         )}
       </Box>
 
-      {/* Display any errors */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}

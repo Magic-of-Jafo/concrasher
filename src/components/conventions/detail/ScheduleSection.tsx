@@ -75,7 +75,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     if (scheduleDays.length === 0) {
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
+                <Typography variant="h1" component="h1" gutterBottom>
                     Schedule
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
@@ -100,9 +100,10 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             alt="Pre-convention schedule graphic"
                             width={200}
                             height={200}
+                            unoptimized
                         />
                     </Box>
-                    <Typography variant="h5" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
                         Pre-Convention Schedule
                     </Typography>
                     {preConventionDays.map(day => {
@@ -157,10 +158,11 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                 alt="Main schedule graphic"
                                 width={200}
                                 height={200}
+                                unoptimized
                             />
                         </Box>
                     )}
-                    <Typography variant="h5" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
                         Convention Schedule
                     </Typography>
                     {mainConventionDays.map(day => {
@@ -215,9 +217,10 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             alt="Post-convention schedule graphic"
                             width={200}
                             height={200}
+                            unoptimized
                         />
                     </Box>
-                    <Typography variant="h5" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
                         Post-Convention Schedule
                     </Typography>
                     {postConventionDays.map(day => {

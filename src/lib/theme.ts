@@ -12,6 +12,7 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: [
+      'var(--font-inter)',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
@@ -23,6 +24,11 @@ const theme = createTheme({
       '"Segoe UI Emoji"',
       '"Segoe UI Symbol"',
     ].join(','),
+    h1: {
+      fontFamily: 'var(--font-montserrat)',
+      fontWeight: 800,
+      fontSize: '3rem',
+    },
   },
 });
 

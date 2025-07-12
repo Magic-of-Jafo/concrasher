@@ -281,7 +281,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    key: currentImageUrl.replace('/uploads/', ''),
+                    key: currentImageUrl, // Send the full URL
                 }),
             });
 

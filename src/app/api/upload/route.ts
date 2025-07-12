@@ -1,149 +1,98 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { writeFile, mkdir, unlink } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { v4 as uuidv4 } from 'uuid';
+
+// Configure S3 Client
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
+const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
 
 // WordPress-style filename sanitization
 function sanitizeFilename(filename: string): string {
-  // Split filename and extension
   const lastDotIndex = filename.lastIndexOf('.');
   const name = lastDotIndex > 0 ? filename.substring(0, lastDotIndex) : filename;
   const extension = lastDotIndex > 0 ? filename.substring(lastDotIndex) : '';
 
-  // Sanitize the name part
   let sanitized = name
     .toLowerCase()
-    .replace(/\s+/g, '-')  // Replace spaces with hyphens
-    .replace(/[^a-z0-9\-_]/g, '')  // Remove special characters (keep alphanumeric, hyphens, underscores)
-    .replace(/-+/g, '-')  // Replace multiple hyphens with single hyphen
-    .replace(/^-+|-+$/g, '');  // Trim hyphens from start/end
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-_]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
-  // Fallback if name becomes empty
   if (!sanitized) {
     sanitized = 'image';
   }
 
+  // Preserve original extension but make it lowercase
   return sanitized + extension.toLowerCase();
 }
 
-// Generate unique filename if conflict exists
-async function getUniqueFilename(directory: string, filename: string): Promise<string> {
-  const sanitizedFilename = sanitizeFilename(filename);
-  let finalFilename = sanitizedFilename;
-  let counter = 1;
-
-  // Check if file exists and increment counter until we find a unique name
-  while (existsSync(join(directory, finalFilename))) {
-    const lastDotIndex = sanitizedFilename.lastIndexOf('.');
-    const name = lastDotIndex > 0 ? sanitizedFilename.substring(0, lastDotIndex) : sanitizedFilename;
-    const extension = lastDotIndex > 0 ? sanitizedFilename.substring(lastDotIndex) : '';
-
-    counter++;
-    finalFilename = `${name}-${counter}${extension}`;
-  }
-
-  return finalFilename;
-}
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File size must be less than 5MB' },
-        { status: 400 }
-      );
+    // Validate file size and type
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
     }
-
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!validTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, GIF, WebP, and AVIF are allowed' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid file type.' }, { status: 400 });
+    }
+
+    const conventionId = formData.get('conventionId') as string;
+    const mediaType = formData.get('mediaType') as string; // 'cover', 'profile', 'promotional'
+
+    if (!conventionId || !mediaType) {
+      return NextResponse.json({ error: 'conventionId and mediaType are required' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Get new path parameters
-    const conventionId = formData.get('conventionId') as string;
-    const mediaType = formData.get('mediaType') as string; // 'cover', 'profile', 'promotional'
+    // Sanitize filename and create a unique key for S3
+    const originalFilename = sanitizeFilename(file.name) || `upload-${uuidv4()}`;
+    const key = `uploads/${conventionId}/${mediaType}/${originalFilename}`;
 
-    // Validate required parameters
-    if (!conventionId || !mediaType) {
-      return NextResponse.json(
-        { error: 'conventionId and mediaType are required' },
-        { status: 400 }
-      );
-    }
+    // Upload to S3
+    const putCommand = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+    });
 
-    // Validate mediaType
-    const validMediaTypes = ['cover', 'profile', 'promotional'];
-    if (!validMediaTypes.includes(mediaType)) {
-      return NextResponse.json(
-        { error: 'Invalid mediaType. Must be: cover, profile, or promotional' },
-        { status: 400 }
-      );
-    }
+    await s3Client.send(putCommand);
 
-    // Create new directory structure: /uploads/{conventionId}/{mediaType}/
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    const conventionDir = join(uploadsDir, conventionId);
-    const mediaDir = join(conventionDir, mediaType);
+    // Return the full S3 URL
+    const url = `https://${BUCKET_NAME}.s3.amazonaws.com/${key}`;
 
-    // Ensure directories exist
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-    if (!existsSync(conventionDir)) {
-      await mkdir(conventionDir, { recursive: true });
-    }
-    if (!existsSync(mediaDir)) {
-      await mkdir(mediaDir, { recursive: true });
-    }
+    console.log(`[Upload] Saved file to S3: ${url}`);
+    return NextResponse.json({ url });
 
-    // Get unique filename with WordPress-style sanitization
-    const filename = await getUniqueFilename(mediaDir, file.name);
-
-    // Save file
-    const filepath = join(mediaDir, filename);
-    await writeFile(filepath, buffer);
-
-    // Return the URL path
-    const url = `/uploads/${conventionId}/${mediaType}/${filename}`;
-
-    console.log(`[Upload] Saved file: ${filename} to ${url}`);
-
-    return NextResponse.json({ url, filename });
   } catch (error) {
-    console.error('Error uploading file:', error);
-    return NextResponse.json(
-      { error: 'Failed to upload file' },
-      { status: 500 }
-    );
+    console.error('Error uploading file to S3:', error);
+    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
   }
 }
 
@@ -154,33 +103,34 @@ export async function DELETE(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    let key = '';
-    // Try to get key from JSON body
-    try {
-      const body = await request.json();
-      key = body.key || '';
-    } catch (e) {
-      // fallback: try to get from query param
-      const url = new URL(request.url);
-      key = url.searchParams.get('key') || '';
-    }
+    const { key } = await request.json();
 
     if (!key) {
       return NextResponse.json({ message: 'No file key provided' }, { status: 400 });
     }
 
-    // Handle both old and new path structures
-    const filePath = join(process.cwd(), 'public', 'uploads', key);
-    if (!existsSync(filePath)) {
-      return NextResponse.json({ message: 'File not found' }, { status: 404 });
+    // The key should be the path within the bucket, e.g., 'uploads/conventionId/...'
+    // The frontend should be updated to send the S3 key, not a partial path.
+    // Assuming the full URL is passed, we extract the key.
+    const url = new URL(key);
+    const s3Key = url.pathname.substring(1); // Remove leading '/'
+
+    if (!s3Key) {
+      return NextResponse.json({ message: 'Invalid S3 key provided' }, { status: 400 });
     }
 
-    await unlink(filePath);
-    console.log(`[Delete] Removed file: ${key}`);
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+    });
 
-    return NextResponse.json({ message: 'File deleted successfully', key });
+    await s3Client.send(deleteCommand);
+
+    console.log(`[Delete] Removed file from S3: ${s3Key}`);
+    return NextResponse.json({ message: 'File deleted successfully', key: s3Key });
+
   } catch (error) {
-    console.error('Error deleting file:', error);
+    console.error('Error deleting file from S3:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json({ message: 'Failed to delete file', details: errorMessage }, { status: 500 });
   }

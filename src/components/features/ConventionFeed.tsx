@@ -74,7 +74,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             mb: { xs: 4, md: 0 },
           }}
         >
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
+          <Typography variant="h1" sx={{ mb: 3 }}>
             Upcoming Conventions
           </Typography>
           <Box display="flex" flexDirection="column" gap={3}>

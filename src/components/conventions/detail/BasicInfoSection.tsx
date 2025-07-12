@@ -129,7 +129,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                     <Box sx={{ flex: 1 }}>
                         <Stack spacing={3}>
                             {/* Convention Name */}
-                            <Typography variant="h3" component="h1" gutterBottom>
+                            <Typography variant="h1" component="h1" gutterBottom>
                                 {convention.name}
                             </Typography>
 

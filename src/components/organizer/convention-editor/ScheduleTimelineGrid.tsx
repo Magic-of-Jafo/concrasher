@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import FlagIcon from '@mui/icons-material/Flag';
 import { useTheme, Theme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
+import Image from 'next/image';
 
 const EVENT_TYPES = [
   { value: 'Lecture', color: '#64b5f6' },     // Blue 300
@@ -69,7 +70,7 @@ function calculateLayout(visibleEvents: any[]): ProcessedEventData[] {
       return a.startTimeMinutes - b.startTimeMinutes;
     }
     if (a.durationMinutes !== b.durationMinutes) {
-      return b.durationMinutes - a.durationMinutes; 
+      return b.durationMinutes - a.durationMinutes;
     }
     return (a.id || a.tempId).localeCompare(b.id || b.tempId);
   });
@@ -81,7 +82,7 @@ function calculateLayout(visibleEvents: any[]): ProcessedEventData[] {
 
       const currentEventEnd = currentEvent.startTimeMinutes + currentEvent.durationMinutes;
       const otherEventEnd = otherEvent.startTimeMinutes + otherEvent.durationMinutes;
-      
+
       const startsOverlap = Math.max(currentEvent.startTimeMinutes, otherEvent.startTimeMinutes);
       const endsOverlap = Math.min(currentEventEnd, otherEventEnd);
 
@@ -92,7 +93,7 @@ function calculateLayout(visibleEvents: any[]): ProcessedEventData[] {
 
     const concurrentEventsGroup = [currentEvent, ...overlappingSiblings];
     concurrentEventsGroup.sort((a, b) => (a.id || a.tempId).localeCompare(b.id || b.tempId));
-    
+
     const numColsInGroup = concurrentEventsGroup.length;
     const colIndex = concurrentEventsGroup.findIndex(e => (e.id || e.tempId) === (currentEvent.id || currentEvent.tempId));
 
@@ -130,14 +131,14 @@ interface ResizingEventInfo {
   currentHeightPxOverride?: number; // For bottom edge resize
 }
 
-export default function ScheduleTimelineGrid({ 
-  dayOffset, 
+export default function ScheduleTimelineGrid({
+  dayOffset,
   allScheduleItems,
   onAssignExistingEvent,
   onUnscheduleEvent,
   onEventSelect
 }: {
-  dayOffset: number; 
+  dayOffset: number;
   allScheduleItems: any[];
   onAssignExistingEvent?: (eventId: string, dayOffset: number, timeMinutes: number, durationMinutes: number, title: string) => void;
   onUnscheduleEvent?: (eventId: string) => void;
@@ -158,13 +159,13 @@ export default function ScheduleTimelineGrid({
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const dayOffsetLastInitialized = useRef<number | null>(null);
   const isDefault8AMSetForEmptyDayRef = useRef(false);
-  const [draggedEventPlaceholder, setDraggedEventPlaceholder] = useState<{startTimeMinutes: number, durationMinutes: number, dayOffset: number } | null>(null);
+  const [draggedEventPlaceholder, setDraggedEventPlaceholder] = useState<{ startTimeMinutes: number, durationMinutes: number, dayOffset: number } | null>(null);
 
   const customSetViewStartHour = useCallback((newHourOrCallback: number | ((prev: number) => number)) => {
     setViewStartHour(prevHour => {
       const nextHour = typeof newHourOrCallback === 'function' ? newHourOrCallback(prevHour) : newHourOrCallback;
-      if (prevHour !== nextHour) { 
-          isDefault8AMSetForEmptyDayRef.current = false;
+      if (prevHour !== nextHour) {
+        isDefault8AMSetForEmptyDayRef.current = false;
       }
       return nextHour;
     });
@@ -182,7 +183,7 @@ export default function ScheduleTimelineGrid({
         customSetViewStartHour(Math.max(0, earliestHour));
       } else {
         customSetViewStartHour(8);
-        isDefault8AMSetForEmptyDayRef.current = true; 
+        isDefault8AMSetForEmptyDayRef.current = true;
       }
       dayOffsetLastInitialized.current = dayOffset;
     } else {
@@ -241,14 +242,14 @@ export default function ScheduleTimelineGrid({
       if (!prev) return null;
       const deltaY = e.clientY - prev.initialMouseY;
       if (prev.resizeEdge === 'top') {
-        return { 
-          ...prev, 
-          currentTopPxOverride: prev.originalTopPx + deltaY, 
+        return {
+          ...prev,
+          currentTopPxOverride: prev.originalTopPx + deltaY,
           currentHeightPxOverride: Math.max(MIN_EVENT_DURATION_MINUTES / INTERVAL_MINUTES * ROW_HEIGHT_PX, prev.originalHeightPx - deltaY)
         };
       } else { // Bottom edge
-        return { 
-          ...prev, 
+        return {
+          ...prev,
           currentHeightPxOverride: Math.max(MIN_EVENT_DURATION_MINUTES / INTERVAL_MINUTES * ROW_HEIGHT_PX, prev.originalHeightPx + deltaY)
         };
       }
@@ -267,11 +268,11 @@ export default function ScheduleTimelineGrid({
         const deltaPx = (prevInfo.currentTopPxOverride ?? prevInfo.originalTopPx) - prevInfo.originalTopPx;
         const deltaMinutesFromDrag = Math.round(deltaPx / ROW_HEIGHT_PX) * INTERVAL_MINUTES;
         let newStartTimeMinutes = snapToNearest15Minutes(prevInfo.originalStartTimeMinutes + deltaMinutesFromDrag);
-        
+
         const eventBeingDragged = allScheduleItems.find(item => (item.id || item.tempId) === prevInfo.id);
         const currentEventDuration = eventBeingDragged?.durationMinutes === 0 ? 0 : prevInfo.originalDurationMinutes;
 
-        newStartTimeMinutes = Math.max(0, Math.min(newStartTimeMinutes, (24 * 60) - (currentEventDuration || 0) ));
+        newStartTimeMinutes = Math.max(0, Math.min(newStartTimeMinutes, (24 * 60) - (currentEventDuration || 0)));
 
         const hasChanged = newStartTimeMinutes !== prevInfo.originalStartTimeMinutes || currentEventDuration !== prevInfo.originalDurationMinutes; // Duration doesn't change on drag, but check for completeness
 
@@ -311,17 +312,17 @@ export default function ScheduleTimelineGrid({
         }
         newStartTimeMinutes = Math.max(0, Math.min(newStartTimeMinutes, (24 * 60) - newDurationMinutes));
         newStartTimeMinutes = snapToNearest15Minutes(newStartTimeMinutes);
-        
+
         const originalEndTime = prevInfo.originalStartTimeMinutes + prevInfo.originalDurationMinutes;
         if (resizeEdge === 'top') {
-            newDurationMinutes = snapToNearest15Minutes(originalEndTime - newStartTimeMinutes);
-        } else { 
-            let calculatedNewEndTime = prevInfo.originalStartTimeMinutes + prevInfo.originalDurationMinutes + (Math.round(deltaY / ROW_HEIGHT_PX) * INTERVAL_MINUTES);
-            calculatedNewEndTime = snapToNearest15Minutes(calculatedNewEndTime);
-            newDurationMinutes = Math.max(MIN_EVENT_DURATION_MINUTES, calculatedNewEndTime - newStartTimeMinutes);
+          newDurationMinutes = snapToNearest15Minutes(originalEndTime - newStartTimeMinutes);
+        } else {
+          let calculatedNewEndTime = prevInfo.originalStartTimeMinutes + prevInfo.originalDurationMinutes + (Math.round(deltaY / ROW_HEIGHT_PX) * INTERVAL_MINUTES);
+          calculatedNewEndTime = snapToNearest15Minutes(calculatedNewEndTime);
+          newDurationMinutes = Math.max(MIN_EVENT_DURATION_MINUTES, calculatedNewEndTime - newStartTimeMinutes);
         }
 
-        if (newDurationMinutes < MIN_EVENT_DURATION_MINUTES) newDurationMinutes = MIN_EVENT_DURATION_MINUTES; 
+        if (newDurationMinutes < MIN_EVENT_DURATION_MINUTES) newDurationMinutes = MIN_EVENT_DURATION_MINUTES;
         if (newStartTimeMinutes + newDurationMinutes > 24 * 60) newDurationMinutes = (24 * 60) - newStartTimeMinutes;
         newDurationMinutes = snapToNearest15Minutes(newDurationMinutes);
 
@@ -332,7 +333,7 @@ export default function ScheduleTimelineGrid({
           onAssignExistingEvent(prevInfo.id, dayOffset, newStartTimeMinutes, newDurationMinutes, eventBeingResized?.title || 'Scheduled Event');
           dragOrResizeJustFinishedRef.current = true;
         } else {
-           // If no change, ensure the flag isn't set.
+          // If no change, ensure the flag isn't set.
         }
       }
       return null;
@@ -348,10 +349,10 @@ export default function ScheduleTimelineGrid({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const mouseYRelativeToEvent = e.clientY - rect.top;
     const eventHeight = rect.height;
-    
+
     const eventStartGlobalMinutes = eventItem.startTimeMinutes;
     const originalHeightPx = isMilestone ? ROW_HEIGHT_PX : (eventItem.durationMinutes / INTERVAL_MINUTES) * ROW_HEIGHT_PX; // Use ROW_HEIGHT_PX for milestone height
-    
+
     const originalTopPxInView = ((eventStartGlobalMinutes - viewStartMinutes) / INTERVAL_MINUTES) * ROW_HEIGHT_PX;
 
     const commonInfo = {
@@ -412,7 +413,7 @@ export default function ScheduleTimelineGrid({
   }, []);
 
   const startSmoothScroll = useCallback((direction: 'up' | 'down') => {
-    stopSmoothScroll(); 
+    stopSmoothScroll();
     const scroll = () => {
       customSetViewStartHour(prev => {
         let nextHour;
@@ -421,14 +422,14 @@ export default function ScheduleTimelineGrid({
         } else {
           nextHour = Math.min(24 - VISIBLE_WINDOW_HOURS, prev + 1);
         }
-        if (nextHour === prev) { 
+        if (nextHour === prev) {
           stopSmoothScroll();
         }
         return nextHour;
       });
     };
-    scroll(); 
-    scrollIntervalRef.current = setInterval(scroll, 100); 
+    scroll();
+    scrollIntervalRef.current = setInterval(scroll, 100);
   }, [stopSmoothScroll, customSetViewStartHour]);
 
   useEffect(() => {
@@ -437,8 +438,8 @@ export default function ScheduleTimelineGrid({
   }, [stopSmoothScroll]);
 
   const renderEventCards = () => {
-    const dayScheduleItems = allScheduleItems.filter(item => 
-      item.dayOffset === dayOffset && typeof item.startTimeMinutes === 'number' && 
+    const dayScheduleItems = allScheduleItems.filter(item =>
+      item.dayOffset === dayOffset && typeof item.startTimeMinutes === 'number' &&
       // Allow duration 0 for milestones, positive for others
       (item.durationMinutes === 0 || (typeof item.durationMinutes === 'number' && item.durationMinutes > 0))
     );
@@ -461,11 +462,11 @@ export default function ScheduleTimelineGrid({
       const eventStartMinutes = eventItem.startTimeMinutes;
       const isMilestone = eventItem.durationMinutes === 0;
       const eventTypeColor = EVENT_TYPES.find(t => t.value === eventItem.eventType)?.color || DEFAULT_EVENT_COLOR;
-      
+
       const isBeingDragged = draggingEventInfo && (eventItem.id || eventItem.tempId) === draggingEventInfo.id;
       // Milestones cannot be resized, so isBeingResized will effectively be false for them due to handleEventMouseDown logic
       const isBeingResized = !isMilestone && resizingEventInfo && (eventItem.id || eventItem.tempId) === resizingEventInfo.id;
-      
+
       let topPx, heightPx;
 
       if (isBeingDragged && draggingEventInfo.currentTopPxOverride !== null) {
@@ -475,7 +476,7 @@ export default function ScheduleTimelineGrid({
       } else {
         topPx = ((eventStartMinutes - viewStartMinutes) / INTERVAL_MINUTES) * ROW_HEIGHT_PX;
       }
-      
+
       if (isMilestone) {
         heightPx = ROW_HEIGHT_PX; // Fixed height for milestone row
       } else if (isBeingResized && resizingEventInfo.currentHeightPxOverride !== undefined) {
@@ -484,34 +485,34 @@ export default function ScheduleTimelineGrid({
         heightPx = (eventItem.durationMinutes / INTERVAL_MINUTES) * ROW_HEIGHT_PX;
       }
 
-      if ((isBeingDragged || isBeingResized) && heightPx <=0 ) {
+      if ((isBeingDragged || isBeingResized) && heightPx <= 0) {
         heightPx = ROW_HEIGHT_PX * (MIN_EVENT_DURATION_MINUTES / INTERVAL_MINUTES);
       }
-      if (isMilestone && heightPx <=0 && !(isBeingDragged || isBeingResized) ) heightPx = ROW_HEIGHT_PX;
+      if (isMilestone && heightPx <= 0 && !(isBeingDragged || isBeingResized)) heightPx = ROW_HEIGHT_PX;
 
 
       // If not a milestone, and duration is <=0 and not being manipulated, don't render. Milestones are handled above.
       if (!isMilestone && eventItem.durationMinutes <= 0 && !isBeingDragged && !isBeingResized) return null;
 
       const C_TIME_LABEL_AREA_WIDTH = `${TIME_LABEL_WIDTH_PX + 4}px`;
-      const C_TOTAL_HORIZONTAL_PADDING = `${TIME_LABEL_WIDTH_PX + 4 + 4}px`; 
+      const C_TOTAL_HORIZONTAL_PADDING = `${TIME_LABEL_WIDTH_PX + 4 + 4}px`;
       const singleColumnBaseWidthExpr = `( (100% - ${C_TOTAL_HORIZONTAL_PADDING}) / ${layout.numCols} )`;
       const gapAdjustForWidth = layout.numCols > 1 ? `( (${layout.numCols} - 1) * ${EVENT_HORIZONTAL_GAP_PX}px / ${layout.numCols} )` : '0px';
       const calculatedWidth = `calc(${singleColumnBaseWidthExpr} - ${gapAdjustForWidth})`;
       const spacePerColumnIncGap = `calc( (${singleColumnBaseWidthExpr}) )`;
       const calculatedLeft = `calc(${C_TIME_LABEL_AREA_WIDTH} + ${layout.col} * (${spacePerColumnIncGap}))`;
-      
+
       const commonSx = {
-        position: 'absolute', top: `${topPx}px`, left: calculatedLeft, width: calculatedWidth, 
+        position: 'absolute', top: `${topPx}px`, left: calculatedLeft, width: calculatedWidth,
         cursor: 'grab', boxSizing: 'border-box',
         transition: 'background-color 0.2s, box-shadow 0.2s, opacity 0.2s',
-        border: '1px solid transparent', opacity: (isBeingDragged || isBeingResized) ? 0.7 : 1, 
-        userSelect: 'none', 
+        border: '1px solid transparent', opacity: (isBeingDragged || isBeingResized) ? 0.7 : 1,
+        userSelect: 'none',
         zIndex: (isBeingDragged || isBeingResized) ? 20 : (layout.col + 1),
-         '&:hover': { 
-            filter: 'brightness(85%)', 
-            boxShadow: (isBeingDragged || isBeingResized) ? '0px 8px 16px rgba(0,0,0,0.3)' : '0px 4px 12px rgba(0,0,0,0.2)', 
-            zIndex: (isBeingDragged || isBeingResized) ? 20 : 15,
+        '&:hover': {
+          filter: 'brightness(85%)',
+          boxShadow: (isBeingDragged || isBeingResized) ? '0px 8px 16px rgba(0,0,0,0.3)' : '0px 4px 12px rgba(0,0,0,0.2)',
+          zIndex: (isBeingDragged || isBeingResized) ? 20 : 15,
         }
       };
 
@@ -536,7 +537,7 @@ export default function ScheduleTimelineGrid({
                 }
               }}
               // No resize cursor for milestones
-              onMouseMove={(e) => { if (!(draggingEventInfo || resizingEventInfo)) e.currentTarget.style.cursor = 'grab';}}
+              onMouseMove={(e) => { if (!(draggingEventInfo || resizingEventInfo)) e.currentTarget.style.cursor = 'grab'; }}
               onMouseLeave={(e) => { if (!(draggingEventInfo || resizingEventInfo)) e.currentTarget.style.cursor = 'grab'; }}
               sx={{
                 ...commonSx,
@@ -557,7 +558,7 @@ export default function ScheduleTimelineGrid({
               </Typography>
               {onUnscheduleEvent && (eventItem.id || eventItem.tempId) && (
                 <IconButton aria-label="Unschedule event" onClick={(e) => { e.stopPropagation(); onUnscheduleEvent(eventItem.id || eventItem.tempId); }}
-                  size="small" sx={{ position: 'absolute', top: 0, right: 0, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(0,0,0,0.2)', p: '2px', m: '2px', '&:hover': {color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)'} }}>
+                  size="small" sx={{ position: 'absolute', top: 0, right: 0, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(0,0,0,0.2)', p: '2px', m: '2px', '&:hover': { color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)' } }}>
                   <CloseIcon fontSize="inherit" />
                 </IconButton>
               )}
@@ -577,8 +578,8 @@ export default function ScheduleTimelineGrid({
             const wasDragOrResize = dragOrResizeJustFinishedRef.current; // Capture state
             console.log('[ScheduleTimelineGrid] Event Card Clicked. ID:', eventId, 'dragOrResizeJustFinishedRef was:', wasDragOrResize);
             if (wasDragOrResize) {
-                dragOrResizeJustFinishedRef.current = false; // Consume the flag
-                console.log('[ScheduleTimelineGrid] Action (Regular Event): Consumed drag/resize flag. onEventSelect NOT called. Ref now false.');
+              dragOrResizeJustFinishedRef.current = false; // Consume the flag
+              console.log('[ScheduleTimelineGrid] Action (Regular Event): Consumed drag/resize flag. onEventSelect NOT called. Ref now false.');
             } else if (onEventSelect && eventId) {
               console.log('[ScheduleTimelineGrid] Action (Regular Event): Genuine click. Calling onEventSelect. Ref was already false.');
               onEventSelect(eventId);
@@ -601,12 +602,12 @@ export default function ScheduleTimelineGrid({
             ...commonSx,
             height: `${heightPx}px`,
             backgroundColor: eventTypeColor, color: '#fff', p: 0.5, borderRadius: '4px', overflow: 'hidden',
-            fontSize: '0.75rem', 
+            fontSize: '0.75rem',
           }}
         >
           {onUnscheduleEvent && (eventItem.id || eventItem.tempId) && (
             <IconButton aria-label="Unschedule event" onClick={(e) => { e.stopPropagation(); onUnscheduleEvent(eventItem.id || eventItem.tempId); }}
-              size="small" sx={{ position: 'absolute', top: 0, right: 0, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(0,0,0,0.2)', p: '2px', m: '2px', '&:hover': {color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)'} }}>
+              size="small" sx={{ position: 'absolute', top: 0, right: 0, color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(0,0,0,0.2)', p: '2px', m: '2px', '&:hover': { color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)' } }}>
               <CloseIcon fontSize="inherit" />
             </IconButton>
           )}
@@ -616,6 +617,16 @@ export default function ScheduleTimelineGrid({
           <Typography variant="caption" component="div" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {formatTimeFromMinutes(eventStartMinutes)} - {formatTimeFromMinutes(eventStartMinutes + eventItem.durationMinutes)}
           </Typography>
+          {eventItem.imageUrl && (
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
+              <Image
+                src={eventItem.imageUrl}
+                alt={eventItem.title || 'Event image'}
+                layout="fill"
+                objectFit="cover"
+              />
+            </div>
+          )}
         </Paper>
       );
     });
@@ -638,7 +649,7 @@ export default function ScheduleTimelineGrid({
             position: 'relative',
             boxSizing: 'border-box',
             backgroundColor: i % 2 === 0 ? 'transparent' : alpha(theme.palette.grey[500], 0.03),
-            marginLeft: `${TIME_LABEL_WIDTH_PX}px`, 
+            marginLeft: `${TIME_LABEL_WIDTH_PX}px`,
             width: `calc(100% - ${TIME_LABEL_WIDTH_PX}px)`,
           }}
         />
@@ -660,20 +671,20 @@ export default function ScheduleTimelineGrid({
     <Box sx={{ width: '100%', minWidth: 180, background: '#f5faff', borderRadius: 1, overflow: 'hidden', border: '1px solid #e3f2fd', position: 'relative' }}>
       {viewStartHour > 0 && (
         <Button fullWidth onMouseDown={() => startSmoothScroll('up')} onMouseUp={stopSmoothScroll} onMouseLeave={stopSmoothScroll}
-          sx={{ justifyContent: 'center', py: 0.5, mb: 0.5, borderTopLeftRadius:0, borderTopRightRadius:0  }}>
+          sx={{ justifyContent: 'center', py: 0.5, mb: 0.5, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
           <KeyboardArrowUpIcon />
         </Button>
       )}
-      <Box 
+      <Box
         ref={rowsContainerRef}
         sx={{ cursor: 'crosshair', height: VISIBLE_WINDOW_ROWS * ROW_HEIGHT_PX, overflow: 'hidden', position: 'relative' }}
-        onMouseMove={handleGridMouseMove} 
-        onMouseLeave={handleMouseLeave} 
+        onMouseMove={handleGridMouseMove}
+        onMouseLeave={handleMouseLeave}
         onDragEnter={(e) => {
           e.preventDefault();
         }}
-        onDragOver={(e) => { 
-          e.preventDefault(); 
+        onDragOver={(e) => {
+          e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           const jsonData = e.dataTransfer.getData("application/json");
           let eventDurationMinutes = 30; // Default if not specified or milestone
@@ -694,13 +705,13 @@ export default function ScheduleTimelineGrid({
           const rowIndex = Math.floor(yInGrid / ROW_HEIGHT_PX);
           const minutesInView = (rowIndex * INTERVAL_MINUTES) + (isDroppedItemMilestone ? 0 : INTERVAL_MINUTES); // Snap to top of cell for milestone, middle/next for others
           let newStartTimeMinutes = snapToNearest15Minutes(viewStartMinutes + minutesInView);
-          newStartTimeMinutes = Math.max(0, Math.min(newStartTimeMinutes, (24*60) - eventDurationMinutes));
-          
+          newStartTimeMinutes = Math.max(0, Math.min(newStartTimeMinutes, (24 * 60) - eventDurationMinutes));
+
           // For milestones, placeholder duration will also be 0, handled by rendering logic.
           // For others, use the calculated/default eventDurationMinutes.
-          setDraggedEventPlaceholder({ 
-            startTimeMinutes: newStartTimeMinutes, 
-            durationMinutes: eventDurationMinutes, 
+          setDraggedEventPlaceholder({
+            startTimeMinutes: newStartTimeMinutes,
+            durationMinutes: eventDurationMinutes,
             dayOffset: dayOffset
           });
         }}
@@ -726,31 +737,31 @@ export default function ScheduleTimelineGrid({
             // For milestones, snap to the start of the cell. Others, allow snapping to midpoint/next cell.
             const minutesInView = (rowIndex * INTERVAL_MINUTES) + (finalDroppedDuration === 0 ? 0 : INTERVAL_MINUTES);
             let droppedStartTimeMinutes = snapToNearest15Minutes(viewStartMinutes + minutesInView);
-            
+
             // Ensure event doesn't go out of bounds
-            droppedStartTimeMinutes = Math.max(0, Math.min(droppedStartTimeMinutes, (24*60) - finalDroppedDuration)); 
-            
+            droppedStartTimeMinutes = Math.max(0, Math.min(droppedStartTimeMinutes, (24 * 60) - finalDroppedDuration));
+
             onAssignExistingEvent(eventId, dayOffset, droppedStartTimeMinutes, finalDroppedDuration, eventTitle);
           } catch (error) { console.error("Failed to handle drop:", error); }
         }}
       >
         {memoizedTimeLabels}
         {memoizedRows}
-        {renderEventCards()} 
+        {renderEventCards()}
         {draggedEventPlaceholder && draggedEventPlaceholder.dayOffset === dayOffset && (
-          <Paper 
-            elevation={1} 
+          <Paper
+            elevation={1}
             sx={{
               position: 'absolute',
               top: `${((Math.max(viewStartMinutes, draggedEventPlaceholder.startTimeMinutes) - viewStartMinutes) / INTERVAL_MINUTES) * ROW_HEIGHT_PX}px`,
-              left: `${TIME_LABEL_WIDTH_PX + 4 + EVENT_HORIZONTAL_GAP_PX}px`, 
-              width: `calc(100% - ${TIME_LABEL_WIDTH_PX + 4 + EVENT_HORIZONTAL_GAP_PX*2}px)`,
+              left: `${TIME_LABEL_WIDTH_PX + 4 + EVENT_HORIZONTAL_GAP_PX}px`,
+              width: `calc(100% - ${TIME_LABEL_WIDTH_PX + 4 + EVENT_HORIZONTAL_GAP_PX * 2}px)`,
               // For milestones (duration 0), use ROW_HEIGHT_PX for placeholder. Otherwise, calculate.
               height: `${draggedEventPlaceholder.durationMinutes === 0 ? ROW_HEIGHT_PX : (draggedEventPlaceholder.durationMinutes / INTERVAL_MINUTES) * ROW_HEIGHT_PX}px`,
-              backgroundColor: draggedEventPlaceholder.durationMinutes === 0 ? alpha(theme.palette.primary.light, 0.2) :'rgba(0, 0, 0, 0.1)',
+              backgroundColor: draggedEventPlaceholder.durationMinutes === 0 ? alpha(theme.palette.primary.light, 0.2) : 'rgba(0, 0, 0, 0.1)',
               border: `2px dashed ${draggedEventPlaceholder.durationMinutes === 0 ? theme.palette.primary.main : 'rgba(0,0,0,0.3)'}`,
               borderRadius: '4px',
-              zIndex: 5, 
+              zIndex: 5,
               pointerEvents: 'none',
               boxSizing: 'border-box',
               display: 'flex', // For milestone placeholder text/icon
@@ -765,27 +776,28 @@ export default function ScheduleTimelineGrid({
         )}
         {mouseYInGrid !== null && mouseViewportX !== null && mouseViewportY !== null && showTooltip && tooltipTime && rowsContainerRef.current && (
           <Tooltip open title={tooltipTime} placement="right" arrow PopperProps={{
-              anchorEl: {
-                getBoundingClientRect: () => ({
-                  top: mouseViewportY || 0,
-                  left: rowsContainerRef.current?.getBoundingClientRect().left || 0,
-                  right: (rowsContainerRef.current?.getBoundingClientRect().left || 0),
-                  bottom: mouseViewportY || 0,
-                  width: 0, height: 0,
-                  x: rowsContainerRef.current?.getBoundingClientRect().left || 0,
-                  y: mouseViewportY || 0, 
-                  toJSON: () => ({}), 
-                }),
-              },
-              style: { pointerEvents: 'none' } }}
-            componentsProps={{ tooltip: { sx: { bgcolor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', p: '4px 8px', transform: 'translate(10px, -50%)'} } }}>
+            anchorEl: {
+              getBoundingClientRect: () => ({
+                top: mouseViewportY || 0,
+                left: rowsContainerRef.current?.getBoundingClientRect().left || 0,
+                right: (rowsContainerRef.current?.getBoundingClientRect().left || 0),
+                bottom: mouseViewportY || 0,
+                width: 0, height: 0,
+                x: rowsContainerRef.current?.getBoundingClientRect().left || 0,
+                y: mouseViewportY || 0,
+                toJSON: () => ({}),
+              }),
+            },
+            style: { pointerEvents: 'none' }
+          }}
+            componentsProps={{ tooltip: { sx: { bgcolor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', p: '4px 8px', transform: 'translate(10px, -50%)' } } }}>
             <span />
           </Tooltip>
         )}
       </Box>
       {viewStartHour + VISIBLE_WINDOW_HOURS < 24 && (
         <Button fullWidth onMouseDown={() => startSmoothScroll('down')} onMouseUp={stopSmoothScroll} onMouseLeave={stopSmoothScroll}
-          sx={{ justifyContent: 'center', py: 0.5, mt: 0.5, borderBottomLeftRadius:0, borderBottomRightRadius:0 }}>
+          sx={{ justifyContent: 'center', py: 0.5, mt: 0.5, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
           <KeyboardArrowDownIcon />
         </Button>
       )}

@@ -88,20 +88,10 @@ export default function ProfilePage() {
     );
   }
 
-  const isAdmin = user.roles.includes(Role.ADMIN);
-  const isOrganizer = user.roles.includes(Role.ORGANIZER);
-  let profileTitle = "Your Profile";
-
-  if (isAdmin) {
-    profileTitle = "Your Admin Profile";
-  } else if (isOrganizer) {
-    profileTitle = "Your Organizer Profile";
-  }
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        {profileTitle}
+      <Typography variant="h1" component="h1" gutterBottom>
+        Profile
       </Typography>
 
       <Paper sx={{ p: { xs: 1, md: 2 } }}>
@@ -114,7 +104,7 @@ export default function ProfilePage() {
         />
       </Paper>
 
-      {isAdmin && (
+      {user.roles.includes(Role.ADMIN) && (
         <AdminGuard>
           <Paper sx={{ p: 4, mt: 4 }}>
             <Typography variant="h5" gutterBottom>Admin Actions</Typography>

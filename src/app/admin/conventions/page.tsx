@@ -10,7 +10,7 @@ export default function AdminConventionsPage() {
   return (
     <Box sx={{ p: 3 }}>
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+        <Typography variant="h1" component="h1" gutterBottom>
           Manage All Conventions
         </Typography>
         {error && (
