@@ -7,7 +7,8 @@ import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Link from 'next/link';
-import Image from 'next/image';
+// Remove the next/image import as it's no longer used for the logo
+// import Image from 'next/image'; 
 import Avatar from '@mui/material/Avatar';
 import eventBus from '@/lib/event-bus';
 import { getS3ImageUrl } from '@/lib/defaults';
@@ -46,12 +47,14 @@ export default function Header() {
       <Toolbar>
         <Box sx={{ flexGrow: 1, py: '10px' }}>
           <Link href="/">
-            <Image
+            {/* 
+              Replaced next/image with a standard img tag to bypass a stubborn 
+              configuration loading issue with the Next.js Image component. 
+            */}
+            <img
               src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
               alt="Convention Crasher Logo"
-              width={150}
-              height={38}
-              priority
+              style={{ width: '150px', height: 'auto', display: 'block' }}
             />
           </Link>
         </Box>

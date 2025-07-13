@@ -1,14 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'convention-crasher.s3.us-east-1.amazonaws.com',
-        port: '',
-        pathname: '/**',
-      },
-    ],
+    domains: ['convention-crasher.s3.us-east-1.amazonaws.com'],
   },
   experimental: {
     transpilePackages: ['@panva/hkdf', 'jose', 'next-auth', 'preact', 'preact-render-to-string', 'uuid'],
