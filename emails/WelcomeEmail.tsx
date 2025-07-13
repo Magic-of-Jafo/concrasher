@@ -58,14 +58,12 @@ const WelcomeEmail = ({
                 you’re in the right place.
             </Text>
 
-            <Text style={text}>
-                Here’s what you’ll get from showing up:
-            </Text>
+            <Text style={text}>Here’s what you’ll get from showing up:</Text>
 
             {features.map((feature) => (
                 <Section style={section} key={feature.number}>
                     <div style={itemWrapper}>
-                        <div style={badge}>{feature.number}</div>
+                        <span style={badge}>{feature.number}</span>
                         <div>
                             <Heading as="h2" style={itemTitle}>
                                 {feature.title}
@@ -76,18 +74,15 @@ const WelcomeEmail = ({
                 </Section>
             ))}
 
-            <Text style={text}>
-                Setting up your profile is the best way to get started.
-            </Text>
+            <Text style={text}>Setting up your profile is the best way to get started.</Text>
 
             <EmailButton href={dashboardUrl}>Go to Dashboard</EmailButton>
 
-
-
             <Text style={text}>
                 <br />
                 <br />
-                Welcome aboard!<br />
+                Welcome aboard!
+                <br />
                 The ConventionCrasher Team
             </Text>
         </EmailLayout>
@@ -114,25 +109,24 @@ const section = {
 };
 
 const itemWrapper = {
-    display: 'inline-flex',
-    alignItems: 'flex-start',
+    display: 'table', // Email-safe layout alternative to flex
     marginLeft: '12px',
     marginRight: '32px',
 };
 
 const badge = {
+    display: 'inline-block',
+    verticalAlign: 'top',
     marginRight: '18px',
-    display: 'flex',
     height: '24px',
     width: '24px',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderRadius: '9999px',
-    backgroundColor: '#983b30', // indigo-600
+    backgroundColor: '#983b30',
     color: 'white',
     fontWeight: 600,
     fontSize: '12px',
-    lineHeight: '1',
+    lineHeight: '24px', // Vertical centering
+    textAlign: 'center',
 };
 
 const itemTitle = {
@@ -140,14 +134,14 @@ const itemTitle = {
     marginBottom: '0px',
     fontSize: '18px',
     lineHeight: '28px',
-    color: '#111827', // gray-900
+    color: '#111827',
 };
 
 const itemText = {
     margin: 0,
     fontSize: '14px',
     lineHeight: '24px',
-    color: '#6b7280', // gray-500
+    color: '#6b7280',
 };
 
 export default WelcomeEmail;
