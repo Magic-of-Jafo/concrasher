@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react'; // <-- Import useSession
 import {
     Box,
     Typography,
@@ -30,6 +31,7 @@ interface UserProfilePictureUploaderProps {
 }
 
 const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({ currentImageUrl, onImageUpdate }) => {
+    const { data: session } = useSession(); // <-- Get session data
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -151,7 +153,7 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
     }, []);
 
     const handleCropConfirm = useCallback(async () => {
-        if (!imageSrc || !croppedAreaPixels) return;
+        if (!imageSrc || !croppedAreaPixels || !session?.user?.id) return; // <-- Add guard for session
 
         setIsProcessing(true);
         setError(null);
@@ -161,8 +163,11 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
 
             const formData = new FormData();
             formData.append('file', croppedBlob, 'profile-image.png');
+            formData.append('userId', session.user.id); // <-- Add userId
+            formData.append('mediaType', 'profile'); // <-- Add mediaType
 
-            const uploadResponse = await fetch('/api/upload/user-profile', {
+            // Use the generic upload route
+            const uploadResponse = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData,
             });
@@ -174,6 +179,7 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
 
             const { url } = await uploadResponse.json();
 
+            // Use the server action to update the user record
             const result = await updateUserProfileImage(url);
 
             if (result.success) {
@@ -188,7 +194,7 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
         } finally {
             setIsProcessing(false);
         }
-    }, [imageSrc, croppedAreaPixels, onImageUpdate, createCroppedImage]);
+    }, [imageSrc, croppedAreaPixels, onImageUpdate, createCroppedImage, session]); // <-- Add session to dependencies
 
     const handleRemove = async () => {
         if (!currentImageUrl) return;
@@ -196,7 +202,23 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
         setIsProcessing(true);
         setError(null);
         try {
+            // New logic: Call the DELETE endpoint
+            const response = await fetch('/api/upload', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ key: currentImageUrl }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'Failed to delete image from storage.');
+            }
+
+            // After successful S3 deletion, clear the image from the user profile
             const result = await clearUserProfileImage();
+
             if (result.success) {
                 onImageUpdate(null); // Notify parent component
             } else {

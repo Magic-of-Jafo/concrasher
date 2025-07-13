@@ -61,10 +61,11 @@ export async function POST(request: Request) {
     }
 
     const conventionId = formData.get('conventionId') as string;
+    const userId = formData.get('userId') as string;
     const mediaType = formData.get('mediaType') as string; // 'cover', 'profile', 'promotional'
 
-    if (!conventionId || !mediaType) {
-      return NextResponse.json({ error: 'conventionId and mediaType are required' }, { status: 400 });
+    if ((!conventionId && !userId) || !mediaType) {
+      return NextResponse.json({ error: 'conventionId or userId, and mediaType are required' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -72,7 +73,16 @@ export async function POST(request: Request) {
 
     // Sanitize filename and create a unique key for S3
     const originalFilename = sanitizeFilename(file.name) || `upload-${uuidv4()}`;
-    const key = `uploads/${conventionId}/${mediaType}/${originalFilename}`;
+    let key: string;
+
+    if (conventionId) {
+      key = `uploads/${conventionId}/${mediaType}/${originalFilename}`;
+    } else if (userId) {
+      key = `uploads/users/${userId}/${mediaType}/${originalFilename}`;
+    } else {
+      // This case should be prevented by the check above, but as a safeguard:
+      return NextResponse.json({ error: 'A valid identifier (conventionId or userId) is required.' }, { status: 400 });
+    }
 
     // Upload to S3
     const putCommand = new PutObjectCommand({
@@ -85,7 +95,7 @@ export async function POST(request: Request) {
     await s3Client.send(putCommand);
 
     // Return the full S3 URL
-    const url = `https://${BUCKET_NAME}.s3.amazonaws.com/${key}`;
+    const url = `https://${BUCKET_NAME}.s3.us-east-1.amazonaws.com/${key}`;
 
     console.log(`[Upload] Saved file to S3: ${url}`);
     return NextResponse.json({ url });
