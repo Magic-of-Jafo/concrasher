@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // Import useRouter
 import Link from 'next/link';
 
 export default function VerifyEmailPage() {
     const searchParams = useSearchParams();
+    const router = useRouter(); // Initialize useRouter
     const token = searchParams?.get('token');
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
@@ -24,7 +25,11 @@ export default function VerifyEmailPage() {
 
                 if (response.ok) {
                     setStatus('success');
-                    setMessage('Your email has been verified successfully!');
+                    setMessage('Your email has been verified successfully! Redirecting to your profile...');
+                    // Redirect to profile page after a short delay
+                    setTimeout(() => {
+                        router.push('/profile');
+                    }, 2000); // 2-second delay
                 } else {
                     setStatus('error');
                     setMessage(data.message || 'Verification failed');
@@ -65,12 +70,9 @@ export default function VerifyEmailPage() {
                             <h3 className="mt-4 text-lg font-medium text-gray-900">Verification Successful!</h3>
                             <p className="mt-2 text-gray-600">{message}</p>
                             <div className="mt-6">
-                                <Link
-                                    href="/auth/login"
-                                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    Sign In to Your Account
-                                </Link>
+                                <div className="animate-pulse text-center text-gray-600">
+                                    Redirecting...
+                                </div>
                             </div>
                         </div>
                     )}
