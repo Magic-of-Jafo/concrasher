@@ -18,7 +18,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   // Additional webpack config to ensure ESLint is bypassed
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     // Disable ESLint webpack plugin
     const eslintPlugin = config.plugins.find(
       (plugin) => plugin.constructor.name === 'ESLintWebpackPlugin'
@@ -28,6 +28,15 @@ const nextConfig = {
         (plugin) => plugin.constructor.name !== 'ESLintWebpackPlugin'
       );
     }
+
+    // Fix for HMR polling
+    if (dev && !isServer) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+
     return config;
   },
 };

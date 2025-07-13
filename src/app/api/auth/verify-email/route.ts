@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { sendWelcomeEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic'; // Ensures this route is always dynamic
 
@@ -46,6 +47,11 @@ export async function GET(request: NextRequest) {
             where: { id: user.id },
             data: { emailVerified: new Date() },
         });
+
+        // Send welcome email
+        if (user.email) {
+            await sendWelcomeEmail(user.firstName, user.email);
+        }
 
         // Clean up the verification token
         await prisma.verificationToken.delete({

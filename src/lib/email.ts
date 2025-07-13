@@ -3,6 +3,7 @@ import { render } from '@react-email/render';
 import nodemailer from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
 import React from 'react';
+import WelcomeEmail from '../../emails/WelcomeEmail';
 
 // Configure the SES client for AWS SDK v3
 const ses = new SESClient({
@@ -44,4 +45,18 @@ export const sendEmail = async ({
     console.error('[Email Lib] CRITICAL: Error sending email:', error);
     return { success: false, error: 'Failed to send email' };
   }
+};
+
+export const sendWelcomeEmail = async (name: string | null | undefined, email: string) => {
+  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/profile`;
+
+  return sendEmail({
+    to: email,
+    subject: 'Welcome to Convention Crasher!',
+    react: React.createElement(WelcomeEmail, {
+      name: name || undefined,
+      userEmail: email,
+      dashboardUrl,
+    }),
+  });
 }; 
