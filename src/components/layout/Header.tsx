@@ -47,7 +47,7 @@ export default function Header() {
         <Box sx={{ flexGrow: 1, py: '10px' }}>
           <Link href="/">
             <Image
-              src="/images/defaults/convention-crasher-logo.png"
+              src={getS3ImageUrl('defaults/convention-crasher-logo.png')}
               alt="Convention Crasher Logo"
               width={150}
               height={38}
