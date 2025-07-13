@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ConventionGrid from './ConventionGrid';
-import { Convention, ConventionStatus } from '@prisma/client';
+import { Convention, ConventionStatus } from '@prisma/client'
 import { useRouter } from 'next/navigation';
 
 // Mock next/navigation
@@ -52,6 +52,7 @@ describe('ConventionGrid', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
+      keywords: [],
     },
     {
       id: '2',
@@ -79,6 +80,7 @@ describe('ConventionGrid', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
+      keywords: [],
     },
   ];
 

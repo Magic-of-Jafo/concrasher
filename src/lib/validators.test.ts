@@ -55,10 +55,8 @@ describe('RegistrationSchema', () => {
     const result = RegistrationSchema.safeParse(data);
     expect(result.success).toBe(false);
     if (!result.success) {
-      // The error is attached to confirmPassword due to the .refine path
-      expect(result.error.flatten().fieldErrors.confirmPassword).toContain(
-        "Passwords don't match"
-      );
+      const fieldErrors = result.error.flatten().fieldErrors as Record<string, string[]>;
+      expect(fieldErrors.confirmPassword ?? []).toContain("Passwords don't match");
     }
   });
 
@@ -74,9 +72,8 @@ describe('RegistrationSchema', () => {
       expect(result.error.flatten().fieldErrors.password).toContain(
         'Password must be at least 8 characters long'
       );
-      expect(result.error.flatten().fieldErrors.confirmPassword).toContain(
-        'Password must be at least 8 characters long'
-      );
+      const fieldErrors = result.error.flatten().fieldErrors as Record<string, string[]>;
+      expect(fieldErrors.confirmPassword ?? []).toContain("Password must be at least 8 characters long");
       // No "Passwords don't match" error here because individual field validation fails first.
     }
   });

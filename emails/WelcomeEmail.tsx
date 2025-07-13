@@ -11,6 +11,7 @@ import {
 } from '@react-email/components';
 import EmailLayout from './shared/EmailLayout';
 import EmailButton from './shared/EmailButton';
+import { CSSProperties } from 'react';
 
 interface WelcomeEmailProps {
     name?: string;
@@ -114,7 +115,7 @@ const itemWrapper = {
     marginRight: '32px',
 };
 
-const badge = {
+const badge: CSSProperties = {
     display: 'inline-block',
     verticalAlign: 'top',
     marginRight: '18px',
@@ -125,7 +126,7 @@ const badge = {
     color: 'white',
     fontWeight: 600,
     fontSize: '12px',
-    lineHeight: '24px', // Vertical centering
+    lineHeight: '24px',
     textAlign: 'center',
 };
 

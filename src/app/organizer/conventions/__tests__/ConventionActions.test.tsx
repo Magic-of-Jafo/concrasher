@@ -66,6 +66,7 @@ const mockConvention: Convention = {
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
+    keywords: [],
 };
 
 

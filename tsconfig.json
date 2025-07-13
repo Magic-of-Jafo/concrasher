@@ -30,13 +30,20 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "types": [
+      "jest",
+      "@testing-library/jest-dom"
+    ]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "src",
+    "tests",
+    "src/types"
   ],
   "exclude": [
     "node_modules"
