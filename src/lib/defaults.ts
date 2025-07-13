@@ -3,7 +3,7 @@
  */
 
 // Default profile image path - now using S3 bucket
-export const DEFAULT_PROFILE_IMAGE_PATH = 'https://convention-crasher.s3.amazonaws.com/images/defaults/profile_default.png';
+export const DEFAULT_PROFILE_IMAGE_PATH = 'https://convention-crasher.s3.us-east-1.amazonaws.com/images/defaults/profile_default.png';
 
 /**
  * Get profile image URL with fallback to default
@@ -32,18 +32,18 @@ export function getS3ImageUrl(imageUrl: string | null | undefined): string {
     if (!imageUrl) return DEFAULT_PROFILE_IMAGE_PATH;
 
     // If it's already an S3 URL, return as is
-    if (imageUrl.startsWith('https://convention-crasher.s3.amazonaws.com/')) {
+    if (imageUrl.startsWith('https://convention-crasher.s3.us-east-1.amazonaws.com/')) {
         return imageUrl;
     }
 
     // If it's a local upload path, convert to S3 URL
     if (imageUrl.startsWith('/uploads/')) {
-        return `https://convention-crasher.s3.amazonaws.com${imageUrl}`;
+        return `https://convention-crasher.s3.us-east-1.amazonaws.com${imageUrl}`;
     }
 
     // If it's a relative path to static images, convert to S3 URL
     if (imageUrl.startsWith('/images/')) {
-        return `https://convention-crasher.s3.amazonaws.com${imageUrl}`;
+        return `https://convention-crasher.s3.us-east-1.amazonaws.com${imageUrl}`;
     }
 
     // Return as is for other URLs (like external URLs)

@@ -10,6 +10,7 @@ import {
     Hr,
     Img,
 } from '@react-email/components';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface EmailLayoutProps {
     children: React.ReactNode;
@@ -17,8 +18,7 @@ interface EmailLayoutProps {
 }
 
 const EmailLayout = ({ children, previewText }: EmailLayoutProps) => {
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const logoUrl = `${baseUrl}/images/defaults/convention-crasher-logo.png`;
+    const logoUrl = getS3ImageUrl('/images/defaults/convention-crasher-logo.png');
 
     return (
         <Html>
