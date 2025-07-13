@@ -25,6 +25,9 @@ export async function GET() {
 
     // Get all role applications with user details
     const applications = await prisma.roleApplication.findMany({
+      where: {
+        status: 'PENDING',
+      },
       include: {
         user: {
           select: {

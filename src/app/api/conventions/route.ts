@@ -184,12 +184,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // The 'view' parameter is now only used to scope 'PUBLISHED' conventions
-      if (params.view === 'current') {
-        mainQueryAnd.push({
-          OR: [{ endDate: { gte: new Date() } }, { endDate: null }],
-        });
-      }
     } else {
       // For public/non-admin view, only show PUBLISHED conventions
       mainQueryAnd.push({ status: 'PUBLISHED' });

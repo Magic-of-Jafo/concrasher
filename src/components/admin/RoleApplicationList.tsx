@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useTransition } from 'react';
+import React, { useTransition, useState } from 'react';
 import {
     List,
     ListItem,
@@ -14,6 +14,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { approveRoleApplication, rejectRoleApplication } from '@/lib/actions';
+import eventBus from '@/lib/event-bus';
 
 // This type should ideally be generated or shared from a common types file
 interface Application {
@@ -27,20 +28,28 @@ interface Application {
 
 interface RoleApplicationListProps {
     applications: Application[];
+    onApplicationProcessed: (applicationId: string) => void;
 }
 
-export default function RoleApplicationList({ applications }: RoleApplicationListProps) {
+export default function RoleApplicationList({ applications, onApplicationProcessed }: RoleApplicationListProps) {
     const [isPending, startTransition] = useTransition();
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const handleApprove = (id: string) => {
+        setProcessingId(id);
         startTransition(async () => {
             await approveRoleApplication(id);
+            eventBus.emit('applicationProcessed', id);
+            setProcessingId(null);
         });
     };
 
     const handleReject = (id: string) => {
+        setProcessingId(id);
         startTransition(async () => {
             await rejectRoleApplication(id);
+            eventBus.emit('applicationProcessed', id);
+            setProcessingId(null);
         });
     };
 
@@ -59,12 +68,12 @@ export default function RoleApplicationList({ applications }: RoleApplicationLis
                             secondary={`Role: ${app.requestedRole}`}
                         />
                         <ListItemSecondaryAction>
-                            {isPending ? <CircularProgress size={24} /> : (
+                            {processingId === app.id ? <CircularProgress size={24} /> : (
                                 <>
-                                    <IconButton edge="end" aria-label="approve" onClick={() => handleApprove(app.id)} color="success">
+                                    <IconButton edge="end" aria-label="approve" onClick={() => handleApprove(app.id)} color="success" disabled={isPending}>
                                         <CheckCircleIcon />
                                     </IconButton>
-                                    <IconButton edge="end" aria-label="reject" onClick={() => handleReject(app.id)} color="error">
+                                    <IconButton edge="end" aria-label="reject" onClick={() => handleReject(app.id)} color="error" disabled={isPending}>
                                         <CancelIcon />
                                     </IconButton>
                                 </>

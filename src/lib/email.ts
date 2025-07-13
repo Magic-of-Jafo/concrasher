@@ -1,35 +1,47 @@
+import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
+import { render } from '@react-email/render';
 import nodemailer from 'nodemailer';
+import Mail from 'nodemailer/lib/mailer';
+import React from 'react';
 
-interface EmailOptions {
-  to: string;
-  subject: string;
-  text: string;
-  html: string;
-}
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
+// Configure the SES client for AWS SDK v3
+const ses = new SESClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
 });
 
-export async function sendEmail({ to, subject, text, html }: EmailOptions) {
-  const mailOptions = {
-    from: process.env.SMTP_FROM,
+// Create a Nodemailer transporter that uses the SES client
+const transporter = nodemailer.createTransport({
+  SES: { ses, aws: { SendRawEmailCommand } }, // Pass the command class
+});
+
+export const sendEmail = async ({
+  to,
+  subject,
+  react,
+}: {
+  to: string;
+  subject: string;
+  react: React.ReactElement;
+}) => {
+  const html = await render(react);
+
+  const options: Mail.Options = {
+    from: '"Convention Crasher" <noreply@conventioncrasher.com>',
     to,
     subject,
-    text,
     html,
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    const result = await transporter.sendMail(options);
+    console.log(`[Email Lib] Email sent successfully to ${to}. Message ID:`, result.messageId);
+    return { success: true };
   } catch (error) {
-    console.error('Error sending email:', error);
-    throw new Error('Failed to send email');
+    console.error('[Email Lib] CRITICAL: Error sending email:', error);
+    return { success: false, error: 'Failed to send email' };
   }
-} 
+}; 

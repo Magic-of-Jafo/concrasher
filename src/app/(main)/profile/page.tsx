@@ -7,7 +7,6 @@ import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
-import AdminGuard from '@/components/auth/AdminGuard';
 import RoleApplicationList from '@/components/admin/RoleApplicationList';
 import ProfileTabs from "@/components/features/ProfileTabs";
 import { RoleApplication, Brand, User, Role } from "@prisma/client";
@@ -64,6 +63,26 @@ export default function ProfilePage() {
     }
   }, [status, session?.user?.id]); // Depend only on user ID
 
+  useEffect(() => {
+    const handleApplicationProcessed = (applicationId: string) => {
+      setPendingApplications((prev) =>
+        prev.filter((app) => app.id !== applicationId)
+      );
+    };
+
+    eventBus.on('applicationProcessed', handleApplicationProcessed);
+
+    return () => {
+      eventBus.off('applicationProcessed', handleApplicationProcessed);
+    };
+  }, []);
+
+  const handleApplicationProcessed = useCallback((applicationId: string) => {
+    setPendingApplications((prev) =>
+      prev.filter((app) => app.id !== applicationId)
+    );
+  }, []);
+
   const handleImageUpdate = useCallback(async (newUrl: string | null) => {
     // Optimistic UI update for the profile page itself
     setImageUrl(newUrl);
@@ -101,17 +120,11 @@ export default function ProfilePage() {
           ownedBrands={ownedBrands}
           currentImageUrl={imageUrl}
           onImageUpdate={handleImageUpdate}
+          pendingApplications={pendingApplications}
+          onApplicationProcessed={handleApplicationProcessed}
         />
       </Paper>
 
-      {user.roles.includes(Role.ADMIN) && (
-        <AdminGuard>
-          <Paper sx={{ p: 4, mt: 4 }}>
-            <Typography variant="h5" gutterBottom>Admin Actions</Typography>
-            <RoleApplicationList applications={pendingApplications} />
-          </Paper>
-        </AdminGuard>
-      )}
     </Container>
   );
 } 

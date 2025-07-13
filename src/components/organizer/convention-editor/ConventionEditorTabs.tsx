@@ -98,6 +98,7 @@ export interface ConventionDataForEditor extends BasicInfoFormData {
   coverImageUrl?: string;
   profileImageUrl?: string;
   settings?: ConventionSettingData;
+  keywords?: string[];
 }
 
 interface ConventionEditorTabsProps {
@@ -185,6 +186,10 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     timezone: initialConventionData?.settings?.timezone || '',
   }));
 
+  const [keywords, setKeywords] = useState<string[]>(() =>
+    initialConventionData?.keywords || []
+  );
+
   const currencySymbol = useMemo(() => {
     if (!currencies || !settingsData.currency) {
       return ''; // Return empty string instead of '$' when no currency is set
@@ -207,6 +212,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       venueHotel,
       media,
       settings,
+      keywords,
       ...basicDataFromInitial
     } = initialConventionData || {};
 
@@ -220,6 +226,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       currency: settings?.currency || '',
       timezone: settings?.timezone || '',
     });
+    setKeywords(keywords || []);
     setVenueHotelData(venueHotel || defaultVenueHotelData);
 
   }, [initialConventionData, defaultVenueHotelData]);
@@ -293,6 +300,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         guestsStayAtPrimaryVenue: venueHotelData.guestsStayAtPrimaryVenue,
         media: mediaData,
         settings: settingsData,
+        keywords: keywords,
       };
 
       console.log('[ConventionEditorTabs] Sending data to API:', JSON.stringify(fullDataToSave, null, 2));
@@ -397,11 +405,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
       <TabPanel value={activeTab} index={6}>
         <SettingsTab
-          conventionId={conventionId as string}
-          conventionName={conventionName}
           value={settingsData}
           onFormChange={handleSettingsChange}
           isEditing={isEditing}
+          conventionId={conventionId || ''}
+          conventionName={conventionName}
+          keywords={keywords}
+          onKeywordsChange={setKeywords}
         />
       </TabPanel>
 

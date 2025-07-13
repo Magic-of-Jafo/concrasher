@@ -152,6 +152,7 @@ export async function PUT(
   try {
     const body = await request.json();
     console.log(`[API PUT /organizer/conventions/${conventionId}] Received body:`, JSON.stringify(body, null, 2));
+    console.log(`[API PUT /organizer/conventions/${conventionId}] Keywords in body:`, body.keywords);
     const {
       venues: incomingVenues,
       hotels: incomingHotels,
@@ -174,7 +175,8 @@ export async function PUT(
       priceTiers,
       priceDiscounts,
       coverImageUrl,
-      profileImageUrl
+      profileImageUrl,
+      keywords
     } = body;
 
     // Check if this is an image-only update
@@ -215,13 +217,16 @@ export async function PUT(
 
     // --- Main Transaction ---
     const updatedConvention = await prisma.$transaction(async (tx) => {
-      const conventionUpdatePayload: Prisma.ConventionUpdateInput = {
+      const conventionUpdatePayload: any = {
         name, slug, city, stateAbbreviation, stateName, country, status,
         descriptionShort, descriptionMain, isOneDayEvent, isTBD,
         websiteUrl, registrationUrl,
         guestsStayAtPrimaryVenue,
+        keywords,
         updatedAt: new Date(),
       };
+
+      console.log(`[API PUT /organizer/conventions/${conventionId}] Update payload keywords:`, conventionUpdatePayload.keywords);
 
       if (seriesId) {
         conventionUpdatePayload.series = { connect: { id: seriesId } };

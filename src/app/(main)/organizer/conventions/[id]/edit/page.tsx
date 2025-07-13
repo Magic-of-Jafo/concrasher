@@ -42,6 +42,7 @@ interface PageConventionData extends BasicInfoFormData {
   coverImageUrl?: string; // Add cover image URL
   profileImageUrl?: string; // Add profile image URL
   settings?: { currency: string; timezone: string; }; // Add settings field
+  keywords?: string[]; // Add keywords field
   // Add other top-level fields if the API for fetching a single convention returns more
 }
 
@@ -382,6 +383,7 @@ function ConventionEditPage() { // Remove params from props
             coverImageUrl: loadedApiConvention.coverImageUrl,
             profileImageUrl: loadedApiConvention.profileImageUrl,
             settings: conventionSettings || { currency: 'USD', timezone: '' },
+            keywords: loadedApiConvention.keywords || [], // Add keywords mapping
           });
 
           if (loadedApiConvention.seriesId || loadedApiConvention.conventionSeriesId) {

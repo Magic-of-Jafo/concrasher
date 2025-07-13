@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText, Button, Divider } from '@mui/material';
+import { Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem, FormHelperText, Button, Divider, TextField, Chip } from '@mui/material';
 import { Grid } from '@mui/material';
 import { ConventionSettingData } from '@/lib/validators';
 import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { deleteConvention } from '@/lib/actions';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
 import { useSnackbar } from 'notistack';
+import { useSession } from 'next-auth/react';
 
 // Define the type here to match the data fetched from the API
 interface Currency {
@@ -42,6 +43,8 @@ interface SettingsTabProps {
     isEditing: boolean;
     conventionId: string; // Made required for delete functionality
     conventionName: string; // For the confirmation dialog
+    keywords: string[];
+    onKeywordsChange: (keywords: string[]) => void;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -51,18 +54,47 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     isEditing,
     conventionId,
     conventionName,
+    keywords,
+    onKeywordsChange,
 }) => {
     const [localValue, setLocalValue] = useState<ConventionSettingData>(value);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [keywordInput, setKeywordInput] = useState('');
     const router = useRouter();
     const { enqueueSnackbar } = useSnackbar();
     const queryClient = useQueryClient();
+    const { data: session } = useSession();
 
     const { data: currencies, isLoading: isLoadingCurrencies } = useQuery<Currency[]>({
         queryKey: ['currencies'],
         queryFn: fetchCurrencies,
         staleTime: Infinity, // This is static data
+    });
+
+    const initializeKeywordsMutation = useMutation({
+        mutationFn: async () => {
+            // Use admin endpoint if user is admin, otherwise use organizer endpoint
+            const endpoint = session?.user?.roles?.includes('ADMIN')
+                ? `/api/admin/conventions/${conventionId}/initialize-keywords`
+                : `/api/organizer/conventions/${conventionId}/initialize-keywords`;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to initialize keywords.');
+            }
+            return response.json();
+        },
+        onSuccess: (data) => {
+            onKeywordsChange(data.keywords);
+            enqueueSnackbar('Keywords initialized from default settings.', { variant: 'success' });
+        },
+        onError: (error: Error) => {
+            enqueueSnackbar(error.message, { variant: 'error' });
+        },
     });
 
     const sortedAndFormattedCurrencies = useMemo(() => {
@@ -128,6 +160,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             setDeleteModalOpen(false);
         },
     });
+
+    const handleAddKeyword = () => {
+        if (keywordInput && !keywords.includes(keywordInput)) {
+            onKeywordsChange([...keywords, keywordInput]);
+            setKeywordInput('');
+        }
+    };
+
+    const handleDeleteKeyword = (keywordToDelete: string) => {
+        onKeywordsChange(keywords.filter(keyword => keyword !== keywordToDelete));
+    };
 
     const handleChange = (field: keyof ConventionSettingData) => async (event: any) => {
         const newValue = event.target.value;
@@ -262,38 +305,117 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         />
                     </Box>
                 </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-                    <strong>Currency:</strong> This will be the default currency used for all pricing throughout your convention listing.
-                    <br />
-                    <strong>Timezone:</strong> This will be used for displaying schedule times and handling time-sensitive operations.
-                </Typography>
             </Paper>
 
-            {/* Danger Zone */}
-            <Box sx={{ mt: 4 }}>
-                <Typography variant="h6" color="error" gutterBottom>
-                    Danger Zone
+            <Divider sx={{ my: 4 }} />
+
+            <Typography variant="h6" gutterBottom>
+                SEO Settings
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+                Add keywords to improve your convention's discoverability on search engines. You can initialize this list from the site-wide defaults.
+            </Typography>
+            <Paper elevation={1} sx={{ p: 3, mt: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                    Convention Keywords
                 </Typography>
-                <Paper elevation={1} sx={{ p: 3, mt: 2, border: '1px solid', borderColor: 'error.main' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                            <Typography variant="subtitle1" fontWeight="bold">Delete this convention</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Once you delete a convention, there is no going back. Please be certain.
-                            </Typography>
+
+                {/* Keyword Tips Guide */}
+                <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontSize: '1rem', fontWeight: 600 }}>
+                        Quick Keyword Tips for Your Listing
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" paragraph sx={{ mb: 2 }}>
+                        Help the right people find your event with a few good keywords.
+                    </Typography>
+                    <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                            <strong>Start with Defaults.</strong> Click the "Initialize Keywords from Defaults" button for a good start. It will add a list of general-purpose keywords that will likely do a decent job. It's good to remove any that don't apply.
+                        </Typography>
+                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                            <strong>Add Your Location.</strong> Add your state (<Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>Michigan</Box>) or main city (<Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>Detroit</Box>) to attract local attendees.
+                            <br />
+                            <Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>magic conventions in Texas</Box> or <Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>Orlando magician lectures</Box> for example.
+                        </Typography>
+                        <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                            <strong>Add Related Topics.</strong> Think about other styles your attendees like, such as <Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>close-up magic convention</Box> or <Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>card magic lecture</Box>.
+                        </Typography>
+                        <Typography component="li" variant="body2" sx={{ mb: 0 }}>
+                            <strong>Add Your Guests.</strong> Use your guest performers' names in the keywords. People search for them! (e.g., <Box component="span" sx={{ bgcolor: 'grey.700', color: 'white', px: 0.5, py: 0.25, borderRadius: 0.5, fontFamily: 'monospace', fontSize: '0.875em' }}>[Guest Performer's Name] lecture</Box>).
+                        </Typography>
+                    </Box>
+                </Box>
+
+                {keywords && keywords.length > 0 ? (
+                    <>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                            <TextField
+                                label="New Keyword"
+                                value={keywordInput}
+                                onChange={(e) => setKeywordInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddKeyword();
+                                    }
+                                }}
+                                disabled={!isEditing}
+                                fullWidth
+                            />
+                            <Button onClick={handleAddKeyword} variant="outlined" disabled={!isEditing}>
+                                Add
+                            </Button>
                         </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {keywords.map((keyword) => (
+                                <Chip
+                                    key={keyword}
+                                    label={keyword}
+                                    onDelete={() => handleDeleteKeyword(keyword)}
+                                    disabled={!isEditing}
+                                />
+                            ))}
+                        </Box>
+                    </>
+                ) : (
+                    <Box>
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                            No keywords have been set for this convention.
+                        </Typography>
                         <Button
                             variant="contained"
-                            color="error"
-                            onClick={() => setDeleteModalOpen(true)}
-                            disabled={!isEditing || isDeleting}
+                            onClick={() => initializeKeywordsMutation.mutate()}
+                            disabled={initializeKeywordsMutation.isPending || !isEditing}
                         >
-                            {isDeleting ? 'Deleting...' : 'Delete Convention'}
+                            {initializeKeywordsMutation.isPending ? 'Initializing...' : 'Initialize Keywords from Defaults'}
                         </Button>
                     </Box>
-                </Paper>
-            </Box>
+                )}
+            </Paper>
+
+            <Divider sx={{ my: 4 }} />
+
+            <Typography variant="h6" gutterBottom color="error">
+                Danger Zone
+            </Typography>
+            <Paper elevation={1} sx={{ p: 3, mt: 2, border: '1px solid', borderColor: 'error.main' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">Delete this convention</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Once you delete a convention, there is no going back. Please be certain.
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={() => setDeleteModalOpen(true)}
+                        disabled={!isEditing || isDeleting}
+                    >
+                        {isDeleting ? 'Deleting...' : 'Delete Convention'}
+                    </Button>
+                </Box>
+            </Paper>
 
             <ConfirmationModal
                 isOpen={isDeleteModalOpen}

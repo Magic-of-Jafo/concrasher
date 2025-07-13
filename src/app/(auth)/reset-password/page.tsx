@@ -1,116 +1,99 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Box, Button, Container, TextField, Typography, Alert, Link } from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+import React, { Suspense, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Container, Box, Typography, TextField, Button, Alert, Paper } from '@mui/material';
+import { AutofillTextField } from '@/components/ui/AutofillTextField';
 
-export default function ResetPasswordRequest() {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [resetToken, setResetToken] = useState<string | null>(null);
-  const router = useRouter();
+const ResetPasswordSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+type ResetPasswordInputs = z.infer<typeof ResetPasswordSchema>;
 
-    try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+function ResetPasswordForm() {
+  const { control, handleSubmit, formState: { errors }, reset } = useForm<ResetPasswordInputs>({
+    resolver: zodResolver(ResetPasswordSchema),
+    defaultValues: {
+      email: '',
+    },
+  });
 
-      const data = await response.json();
+  const [message, setMessage] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send reset email');
-      }
-
-      setSuccess(true);
-      // For testing: Show the reset token
-      if (data.resetToken) {
-        setResetToken(data.resetToken);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const storedEmail = sessionStorage.getItem('reset-password-email');
+    if (storedEmail) {
+      reset({ email: storedEmail });
+      sessionStorage.removeItem('reset-password-email');
     }
+  }, [reset]);
+
+  const onSubmit = async (data: ResetPasswordInputs) => {
+    setIsSubmitting(true);
+    setMessage('');
+    // Placeholder for actual API call
+    console.log('Password reset requested for:', data.email);
+    // Simulate network request
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setMessage(`If an account exists for ${data.email}, a password reset link has been sent.`);
+    setIsSubmitting(false);
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Typography component="h1" variant="h5">
+    <Container component="main" maxWidth="xs" sx={{ mt: 8 }}>
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Typography component="h1" variant="h5" align="center">
           Reset Password
         </Typography>
-        {success ? (
-          <Box sx={{ mt: 2, width: '100%' }}>
-            <Alert severity="success" sx={{ mb: 2 }}>
-              If an account exists with that email, you will receive password reset instructions.
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1, mb: 2 }}>
+          Enter your email address and we will send you a link to reset your password.
+        </Typography>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+          {message && (
+            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
+              {message}
             </Alert>
-            {resetToken && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  For testing purposes, use this reset link:
-                </Typography>
-                <Link href={`/reset-password/${resetToken}`}>
-                  Click here to reset your password
-                </Link>
-              </Alert>
+          )}
+          <Controller
+            name="email"
+            control={control}
+            render={({ field }) => (
+              <AutofillTextField
+                {...field}
+                margin="normal"
+                required
+                fullWidth
+                label="Email Address"
+                autoComplete="email"
+                autoFocus
+                error={!!errors.email}
+                helperText={errors.email?.message}
+              />
             )}
-          </Box>
-        ) : (
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <LoadingButton
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              loading={loading}
-            >
-              Send Reset Link
-            </LoadingButton>
-            <Button
-              fullWidth
-              variant="text"
-              onClick={() => router.push('/login')}
-              sx={{ mt: 1 }}
-            >
-              Back to Login
-            </Button>
-          </Box>
-        )}
-      </Box>
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Sending...' : 'Send Reset Link'}
+          </Button>
+        </Box>
+      </Paper>
     </Container>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 } 

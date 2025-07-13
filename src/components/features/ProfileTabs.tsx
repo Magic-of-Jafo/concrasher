@@ -8,6 +8,7 @@ import SettingsTab from './profile/SettingsTab';
 import { User, Role, RoleApplication, Brand } from '@prisma/client';
 import UserProfilePictureUploader from '@/components/features/profile/UserProfilePictureUploader';
 import BasicInfoDisplay from './profile/BasicInfoDisplay';
+import AdminSettingsTab from './profile/AdminSettingsTab';
 
 interface ProfileTabsProps {
     user: any; // Using 'any' for now to match fetched data structure
@@ -15,6 +16,8 @@ interface ProfileTabsProps {
     ownedBrands: any[];
     currentImageUrl?: string | null;
     onImageUpdate: (url: string | null) => void;
+    pendingApplications: any[];
+    onApplicationProcessed: (applicationId: string) => void;
 }
 
 interface TabPanelProps {
@@ -50,7 +53,7 @@ function a11yProps(index: number) {
     };
 }
 
-export default function ProfileTabs({ user, roleApplications, ownedBrands, currentImageUrl, onImageUpdate }: ProfileTabsProps) {
+export default function ProfileTabs({ user, roleApplications, ownedBrands, currentImageUrl, onImageUpdate, pendingApplications, onApplicationProcessed }: ProfileTabsProps) {
     const [value, setValue] = useState(0);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -58,6 +61,11 @@ export default function ProfileTabs({ user, roleApplications, ownedBrands, curre
     };
 
     const isTalent = user?.roles?.includes('TALENT');
+    const isAdmin = user?.roles?.includes('ADMIN');
+    let adminTabIndex = 2; // Default index if no other roles are present
+    if (user?.roles?.includes('ORGANIZER')) adminTabIndex++;
+    if (isTalent) adminTabIndex++;
+
 
     return (
         <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)' }}>
@@ -82,6 +90,7 @@ export default function ProfileTabs({ user, roleApplications, ownedBrands, curre
                 <Tab label="Account Settings" {...a11yProps(1)} />
                 {user?.roles?.includes('ORGANIZER') && <Tab label="My Brands" {...a11yProps(2)} />}
                 {isTalent && <Tab label="Talent Profile" {...a11yProps(3)} />}
+                {isAdmin && <Tab label="Admin Settings" {...a11yProps(adminTabIndex)} />}
             </Tabs>
 
             <Box sx={{ flexGrow: 1 }}>
@@ -112,6 +121,14 @@ export default function ProfileTabs({ user, roleApplications, ownedBrands, curre
                 {isTalent && (
                     <CustomTabPanel value={value} index={3}>
                         Talent Profile Editor goes here.
+                    </CustomTabPanel>
+                )}
+                {isAdmin && (
+                    <CustomTabPanel value={value} index={adminTabIndex}>
+                        <AdminSettingsTab
+                            applications={pendingApplications}
+                            onApplicationProcessed={onApplicationProcessed}
+                        />
                     </CustomTabPanel>
                 )}
             </Box>

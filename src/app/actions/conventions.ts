@@ -26,6 +26,12 @@ export async function createConvention(formData: z.infer<typeof BasicInfoFormSch
     // Validate the form data
     const validatedData = BasicInfoFormSchema.parse(formData);
 
+    // Fetch default SEO keywords
+    const seoSettings = await prisma.sEOSetting.findUnique({
+      where: { id: 'singleton' },
+      select: { defaultKeywords: true },
+    });
+
     // Create the convention
     const convention = await prisma.convention.create({
       data: {
@@ -42,6 +48,7 @@ export async function createConvention(formData: z.infer<typeof BasicInfoFormSch
         descriptionShort: validatedData.descriptionShort || undefined,
         descriptionMain: validatedData.descriptionMain || undefined,
         status: 'DRAFT', // New conventions start as drafts
+        keywords: seoSettings?.defaultKeywords || [],
       },
     });
 

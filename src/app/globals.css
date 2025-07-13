@@ -39,3 +39,41 @@ body {
 .skip-link:focus {
   top: 0;
 }
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 
+  This is a workaround for detecting browser autofill.
+  Browsers that support autofill will trigger an animation on the input.
+  We can listen for this animation event in our components to react to autofill.
+*/
+@keyframes on-autofill-start {
+  from {}
+
+  to {}
+}
+
+@keyframes on-autofill-cancel {
+  from {}
+
+  to {}
+}
+
+input:-webkit-autofill {
+  animation-name: on-autofill-start;
+  animation-fill-mode: both;
+}
+
+input:not(:-webkit-autofill) {
+  animation-name: on-autofill-cancel;
+  animation-fill-mode: both;
+}
