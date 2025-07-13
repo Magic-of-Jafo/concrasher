@@ -63,9 +63,8 @@ export async function POST(request: NextRequest) {
         to: email,
         subject: 'Verify your email address - Convention Crasher',
         react: EmailVerificationEmail({
-          userEmail: email,
-          verificationUrl,
           userName: email.split('@')[0], // Use email prefix as name fallback
+          verificationUrl,
         }),
       });
 
