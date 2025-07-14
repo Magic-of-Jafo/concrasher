@@ -171,23 +171,24 @@ export async function GET(request: NextRequest) {
     const mainQueryWhere = { ...baseSearchQuery };
     const mainQueryAnd: Prisma.ConventionWhereInput[] = (mainQueryWhere.AND as Prisma.ConventionWhereInput[]) || [];
 
-    // Handle status and visibility based on admin role
+    const requestedStatuses = params.status
+      .split(',')
+      .filter(s => !!s && Object.values(ConventionStatus).includes(s as any)) as ConventionStatus[];
+
+    // Handle status and visibility based on role and request
     if (isAdmin) {
-      // Status filter is now mandatory for this admin view, but we check for safety.
-      if (params.status) {
-        const statuses = params.status
-          .split(',')
-          .filter(s => !!s && Object.values(ConventionStatus).includes(s as any)) as ConventionStatus[];
-
-        if (statuses.length > 0) {
-          mainQueryAnd.push({ status: { in: statuses } });
-        }
+      // Admins can see any status they request
+      if (requestedStatuses.length > 0) {
+        mainQueryAnd.push({ status: { in: requestedStatuses } });
       }
-
     } else {
-      // For public/non-admin view, only show PUBLISHED conventions
-      mainQueryAnd.push({ status: 'PUBLISHED' });
-      // Always filter out soft-deleted conventions for public view
+      // Public users can see PUBLISHED or PAST conventions
+      if (requestedStatuses.includes('PAST')) {
+        mainQueryAnd.push({ status: 'PAST' });
+      } else {
+        // Default to PUBLISHED for any other case
+        mainQueryAnd.push({ status: 'PUBLISHED' });
+      }
       mainQueryAnd.push({ deletedAt: null });
     }
 

@@ -15,95 +15,55 @@ interface ConventionsPageProps {
   searchParams: { [key: string]: string | string[] | undefined };
 }
 
+// We move the state management out of the URL and into the component state.
+// This will keep the URL clean.
 export default function ConventionsPage({ searchParams }: ConventionsPageProps) {
   const router = useRouter();
-  const currentSearchParams = useSearchParams()!;
   const [conventions, setConventions] = useState<any[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [status, setStatus] = useState<ConventionStatus>(
-    (currentSearchParams.get('status') as ConventionStatus) || 'PUBLISHED'
-  );
+
+  // Initialize state from URL search params for deep linking, but manage it internally afterward.
+  const [filters, setFilters] = useState<ConventionSearchParams>(() => {
+    const limitFromURL = searchParams.limit;
+    const parsedLimit = Number(limitFromURL);
+    return {
+      limit: parsedLimit || 200,
+      query: (searchParams.query as string) || '',
+      city: (searchParams.city as string) || '',
+      state: (searchParams.state as string) || '',
+      country: (searchParams.country as string) || '',
+      startDate: (searchParams.startDate as string) || undefined,
+      endDate: (searchParams.endDate as string) || undefined,
+      status: [(searchParams.status as ConventionStatus) || 'PUBLISHED'],
+    };
+  });
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // Convert search params to ConventionSearchParams using useMemo to prevent unnecessary recalculations
-  const params = useMemo(() => {
-    const limitFromURL = currentSearchParams.get('limit');
-    const parsedLimit = Number(limitFromURL);
-    return {
-      limit: parsedLimit || 200, 
-      query: currentSearchParams.get('query') || '',
-      city: currentSearchParams.get('city') || '',
-      state: currentSearchParams.get('state') || '',
-      country: currentSearchParams.get('country') || '',
-      startDate: currentSearchParams.get('startDate') || undefined,
-      endDate: currentSearchParams.get('endDate') || undefined,
-      status: [status],
-    };
-  }, [currentSearchParams, status]);
-
-  const handleFilterChange = useCallback((newFilters: ConventionSearchParams) => {
-    const params = new URLSearchParams(currentSearchParams.toString());
-    // Only add non-empty values to the URL
-    Object.entries(newFilters).forEach(([key, value]) => {
-      if (value && value !== '') {
-        params.set(key, value.toString());
-      } else {
-        params.delete(key);
-      }
-    });
-    // Always include status
-    params.set('status', status);
-    // Update URL
-    router.push(`/conventions?${params.toString()}`);
-    if (isMobile) setDrawerOpen(false); // Close drawer on mobile after applying filters
-  }, [router, isMobile, status, currentSearchParams]);
+  const handleFilterChange = useCallback((newFilters: Partial<ConventionSearchParams>) => {
+    setFilters(prevFilters => ({ ...prevFilters, ...newFilters }));
+    if (isMobile) setDrawerOpen(false);
+  }, [isMobile]);
 
   // Handle toggle change
   const handleStatusChange = (_event: React.MouseEvent<HTMLElement>, newStatus: ConventionStatus | null) => {
     if (newStatus) {
-      setStatus(newStatus);
-      // Update URL with new status
-      const params = new URLSearchParams(currentSearchParams.toString());
-      if (newStatus === 'PAST') {
-        params.set('status', newStatus);
-      } else {
-        params.delete('status');
-      }
-      router.push(`/conventions?${params.toString()}`);
+      setFilters(prevFilters => ({ ...prevFilters, status: [newStatus] }));
     }
   };
 
-  // Fetch conventions when params change
+  // Fetch conventions when filters change
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
     const fetchConventions = async () => {
       try {
-        const response = await getConventions(params);
+        // Use the state 'filters' object for the API call
+        const response = await getConventions(filters);
         if (isMounted) {
-          let fetchedItems = response.items;
-
-          if (params.status && params.status.includes(ConventionStatus.PUBLISHED)) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); 
-
-            fetchedItems = fetchedItems.filter(conv => {
-              if (!conv.endDate) return true; 
-              const endDate = new Date(conv.endDate);
-              endDate.setHours(0,0,0,0);
-              return endDate >= today;
-            });
-
-            fetchedItems.sort((a, b) => {
-              if (!a.startDate) return 1; 
-              if (!b.startDate) return -1;
-              return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-            });
-          }
-          
-          setConventions(fetchedItems);
+          setConventions(response.items);
           setIsInitialLoading(false);
         }
       } catch (error) {
@@ -120,22 +80,20 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [params]);
+  }, [filters]); // Depend on the internal filters state
+
+  const status = filters.status?.[0] || 'PUBLISHED';
 
   return (
-    <Container maxWidth="xl" sx={{
+    <Container maxWidth="lg" sx={{
       backgroundColor: status === 'PAST' ? '#eaf6fb' : 'inherit',
       minHeight: '100vh',
       transition: 'background-color 0.3s',
-      width: '100vw',
-      marginLeft: 'calc(-50vw + 50%)',
-      paddingLeft: 0,
-      paddingRight: 0,
     }}>
       <Box sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Conventions
+          <Typography variant="h1" component="h1" gutterBottom>
+            Advanced Search
           </Typography>
           <ToggleButtonGroup
             value={status}
@@ -170,7 +128,7 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
               <Box sx={{ p: 2, width: '100%' }}>
                 <ConventionFilterPanel
                   onFilterChange={handleFilterChange}
-                  initialFilters={params}
+                  initialFilters={filters}
                 />
               </Box>
             </Drawer>
@@ -179,7 +137,7 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
           <Box sx={{ mb: 2 }}>
             <ConventionFilterPanel
               onFilterChange={handleFilterChange}
-              initialFilters={params}
+              initialFilters={filters}
             />
           </Box>
         )}

@@ -18,6 +18,7 @@ interface ProfileTabsProps {
     onImageUpdate: (url: string | null) => void;
     pendingApplications: any[];
     onApplicationProcessed: (applicationId: string) => void;
+    initialTab?: string;
 }
 
 interface TabPanelProps {
@@ -53,8 +54,25 @@ function a11yProps(index: number) {
     };
 }
 
-export default function ProfileTabs({ user, roleApplications, ownedBrands, currentImageUrl, onImageUpdate, pendingApplications, onApplicationProcessed }: ProfileTabsProps) {
-    const [value, setValue] = useState(0);
+const TAB_MAP: { [key: string]: number } = {
+    profile: 0,
+    settings: 1,
+    brands: 2,
+    talent: 3,
+    admin: 4, // This may need to be dynamic if other tabs can appear before it
+};
+
+export default function ProfileTabs({
+    user,
+    roleApplications,
+    ownedBrands,
+    currentImageUrl,
+    onImageUpdate,
+    pendingApplications,
+    onApplicationProcessed,
+    initialTab = 'profile'
+}: ProfileTabsProps) {
+    const [value, setValue] = useState(TAB_MAP[initialTab] || 0);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);

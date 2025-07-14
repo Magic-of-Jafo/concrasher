@@ -2,25 +2,38 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
+import {
+  AppBar,
+  Toolbar,
+  Button,
+  Box,
+  Container,
+  Avatar,
+  Menu,
+  MenuItem,
+  IconButton,
+  ListItemIcon,
+  ListItemText
+} from '@mui/material';
 import Link from 'next/link';
-import { Container } from '@mui/material';
-// Remove the next/image import as it's no longer used for the logo
-// import Image from 'next/image'; 
-import Avatar from '@mui/material/Avatar';
 import eventBus from '@/lib/event-bus';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { Role } from '@prisma/client';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import AccountCircle from '@mui/icons-material/AccountCircle';
 
 export default function Header() {
   const { data: session, status } = useSession();
   const [imageUrl, setImageUrl] = useState<string | null | undefined>();
+  const [manageMenuAnchor, setManageMenuAnchor] = useState<null | HTMLElement>(null);
+  const [myStuffMenuAnchor, setMyStuffMenuAnchor] = useState<null | HTMLElement>(null);
+
   const isAuthenticated = status === 'authenticated';
+  const isOrganizer = isAuthenticated && session?.user?.roles?.includes(Role.ORGANIZER);
+  const isBrandCreator = isAuthenticated && session?.user?.isBrandCreator;
+  const hasTalentProfile = isAuthenticated && session?.user?.hasTalentProfile;
 
   useEffect(() => {
-    // When the session initially loads, set the image url
     if (session?.user?.image !== undefined) {
       setImageUrl(session.user.image);
     }
@@ -30,18 +43,25 @@ export default function Header() {
     const handleImageUpdate = (newUrl: string | null) => {
       setImageUrl(newUrl);
     };
-
     eventBus.on('profileImageChanged', handleImageUpdate);
-
     return () => {
       eventBus.off('profileImageChanged', handleImageUpdate);
     };
-  }, []); // Empty dependency array ensures this runs only on mount and unmount
+  }, []);
 
+  const handleMenuOpen = (setter: React.Dispatch<React.SetStateAction<HTMLElement | null>>) => (event: React.MouseEvent<HTMLElement>) => {
+    setter(event.currentTarget);
+  };
+
+  const handleMenuClose = (setter: React.Dispatch<React.SetStateAction<HTMLElement | null>>) => () => {
+    setter(null);
+  };
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/' });
   };
+
+  const showManageMenu = isOrganizer || isBrandCreator || hasTalentProfile;
 
   return (
     <AppBar position="static" sx={{ backgroundColor: '#01264b' }}>
@@ -49,10 +69,6 @@ export default function Header() {
         <Box component={Toolbar} disableGutters>
           <Box sx={{ flexGrow: 1, py: '10px' }}>
             <Link href="/">
-              {/* 
-              Replaced next/image with a standard img tag to bypass a stubborn 
-              configuration loading issue with the Next.js Image component. 
-            */}
               <img
                 src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
                 alt="Convention Crasher Logo"
@@ -61,29 +77,82 @@ export default function Header() {
             </Link>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {isAuthenticated && session?.user?.roles?.includes('ADMIN') && (
-              <Button color="inherit" component={Link} href="/admin/conventions" sx={{ mr: 1 }}>
-                Manage Conventions
-              </Button>
+            <Button color="inherit" component={Link} href="/conventions" sx={{ mr: 1 }}>
+              Advanced Search
+            </Button>
+
+            {/* Manage Menu */}
+            {showManageMenu && (
+              <>
+                <Button
+                  color="inherit"
+                  onClick={handleMenuOpen(setManageMenuAnchor)}
+                  endIcon={<ArrowDropDownIcon />}
+                >
+                  Manage
+                </Button>
+                <Menu
+                  anchorEl={manageMenuAnchor}
+                  open={Boolean(manageMenuAnchor)}
+                  onClose={handleMenuClose(setManageMenuAnchor)}
+                >
+                  {isOrganizer && (
+                    <MenuItem component={Link} href="/organizer/conventions" onClick={handleMenuClose(setManageMenuAnchor)}>
+                      Conventions
+                    </MenuItem>
+                  )}
+                  {isBrandCreator && (
+                    <MenuItem component={Link} href="/brands/new" onClick={handleMenuClose(setManageMenuAnchor)}>
+                      Brand
+                    </MenuItem>
+                  )}
+                  {hasTalentProfile && (
+                    <MenuItem component={Link} href="/profile?tab=talent" onClick={handleMenuClose(setManageMenuAnchor)}>
+                      Talent Profile
+                    </MenuItem>
+                  )}
+                </Menu>
+              </>
             )}
-            {isAuthenticated && session?.user?.roles?.includes('ORGANIZER') && (
-              <Button color="inherit" component={Link} href="/organizer/conventions" sx={{ mr: 1 }}>
-                Dashboard
-              </Button>
-            )}
+
+            {/* My Stuff & Auth Actions */}
             {isAuthenticated ? (
               <>
+                <Button
+                  color="inherit"
+                  onClick={handleMenuOpen(setMyStuffMenuAnchor)}
+                  endIcon={<ArrowDropDownIcon />}
+                >
+                  My Stuff
+                </Button>
+                <Menu
+                  anchorEl={myStuffMenuAnchor}
+                  open={Boolean(myStuffMenuAnchor)}
+                  onClose={handleMenuClose(setMyStuffMenuAnchor)}
+                >
+                  <MenuItem component={Link} href="/profile" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
+                    My Profile
+                  </MenuItem>
+                  <MenuItem component={Link} href="/profile?tab=settings" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
+                    Settings
+                  </MenuItem>
+                </Menu>
+
                 <Button color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
-                  Logout
+                  Sign Out
                 </Button>
-                <Button color="inherit" component={Link} href="/profile" sx={{ p: 0, minWidth: 0 }}>
+
+                <IconButton component={Link} href="/profile" sx={{ p: 0, ml: 1 }}>
                   <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
-                </Button>
+                </IconButton>
               </>
             ) : (
-              <Button color="inherit" component={Link} href="/login">
-                Sign in/Sign Up
-              </Button>
+              <>
+                <Button color="inherit" component={Link} href="/login" sx={{ mr: 1 }}>
+                  Sign in/Sign Up
+                </Button>
+                <AccountCircle sx={{ color: 'white' }} />
+              </>
             )}
           </Box>
         </Box>

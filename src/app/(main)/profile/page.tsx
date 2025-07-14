@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useSearchParams } from "next/navigation";
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
@@ -21,6 +21,9 @@ interface RoleApplicationWithUser extends RoleApplication {
 
 export default function ProfilePage() {
   const { data: session, status, update: updateSession } = useSession();
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams && searchParams.get('tab')) || 'profile';
+
   const [user, setUser] = useState<User | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined);
   const [roleApplications, setRoleApplications] = useState<RoleApplication[]>([]);
@@ -122,6 +125,7 @@ export default function ProfilePage() {
           onImageUpdate={handleImageUpdate}
           pendingApplications={pendingApplications}
           onApplicationProcessed={handleApplicationProcessed}
+          initialTab={initialTab}
         />
       </Paper>
 

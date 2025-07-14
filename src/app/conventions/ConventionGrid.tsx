@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Card, CardContent, useTheme, useMediaQuery, Skeleton } from "@mui/material";
+import { Box, Typography, Card, CardContent, useTheme, useMediaQuery, Skeleton, Avatar } from "@mui/material";
 import { Convention } from "@prisma/client";
 import { useRouter } from "next/navigation";
 
@@ -28,8 +28,8 @@ const formatDateToDDMonYY_UTC = (date: Date | string | null): string => {
   return `${day} ${month} ${year}`;
 };
 
-export default function ConventionGrid({ 
-  conventions = [], 
+export default function ConventionGrid({
+  conventions = [],
   loading = false,
   totalPages = 1,
   currentPage = 1,
@@ -49,7 +49,7 @@ export default function ConventionGrid({
     start.setHours(0, 0, 0, 0);
 
     const end = endDate ? new Date(endDate) : new Date(startDate); // Assume single day if no end date
-    end.setHours(0,0,0,0);
+    end.setHours(0, 0, 0, 0);
 
 
     if (today >= start && today <= end) {
@@ -61,7 +61,7 @@ export default function ConventionGrid({
 
     if (diffDays < 0) {
       // This case should ideally be filtered out, but as a fallback:
-      return "Event Over"; 
+      return "Event Over";
     } else if (diffDays === 0) {
       // This means startDate is today, but it's not "Happening Now!" yet (e.g. event starts later today)
       // Or if an event is single-day and already happened today but not marked as "Happening Now"
@@ -113,9 +113,9 @@ export default function ConventionGrid({
             : `${city}, ${country}`;
 
           return (
-            <Card 
+            <Card
               key={convention.id}
-              sx={{ 
+              sx={{
                 cursor: 'pointer',
                 '&:hover': {
                   backgroundColor: 'action.hover'
@@ -124,13 +124,13 @@ export default function ConventionGrid({
               onClick={() => router.push(`/conventions/${convention.slug}`)}
             >
               <CardContent>
-                <Box sx={{ 
-                  display: 'flex', 
+                <Box sx={{
+                  display: 'flex',
                   flexDirection: isMobile ? 'column' : 'row',
                   gap: 2,
                   alignItems: isMobile ? 'flex-start' : 'center'
                 }}>
-                  <Box sx={{ 
+                  <Box sx={{
                     width: isMobile ? '100%' : '16.66%',
                     minWidth: isMobile ? 'auto' : '100px'
                   }}>
@@ -138,15 +138,21 @@ export default function ConventionGrid({
                       {daysText}
                     </Typography>
                   </Box>
-                  <Box sx={{ 
+                  <Box sx={{
                     width: isMobile ? '100%' : '33.33%',
-                    minWidth: isMobile ? 'auto' : '200px'
+                    minWidth: isMobile ? 'auto' : '200px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
                   }}>
+                    <Avatar src={convention.profileImageUrl ?? undefined}>
+                      {!convention.profileImageUrl && convention.name.charAt(0)}
+                    </Avatar>
                     <Typography variant="h6" component="div">
                       {convention.name}
                     </Typography>
                   </Box>
-                  <Box sx={{ 
+                  <Box sx={{
                     width: isMobile ? '100%' : '25%',
                     minWidth: isMobile ? 'auto' : '130px'
                   }}>
@@ -154,7 +160,7 @@ export default function ConventionGrid({
                       {formatDateToDDMonYY_UTC(convention.startDate)}
                     </Typography>
                   </Box>
-                  <Box sx={{ 
+                  <Box sx={{
                     width: isMobile ? '100%' : '25%',
                     minWidth: isMobile ? 'auto' : '200px'
                   }}>

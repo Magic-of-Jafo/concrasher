@@ -7,6 +7,8 @@ declare module 'next-auth' {
     user: {
       id: string;
       roles: Role[];
+      isBrandCreator?: boolean;
+      hasTalentProfile?: boolean;
     } & DefaultSession['user'];
   }
 
@@ -18,5 +20,7 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT extends DefaultJWT {
     roles: Role[];
+    isBrandCreator?: boolean;
+    hasTalentProfile?: boolean;
   }
 } 
