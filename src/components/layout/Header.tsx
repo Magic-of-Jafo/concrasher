@@ -7,6 +7,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Link from 'next/link';
+import { Container } from '@mui/material';
 // Remove the next/image import as it's no longer used for the logo
 // import Image from 'next/image'; 
 import Avatar from '@mui/material/Avatar';
@@ -44,47 +45,49 @@ export default function Header() {
 
   return (
     <AppBar position="static" sx={{ backgroundColor: '#01264b' }}>
-      <Toolbar>
-        <Box sx={{ flexGrow: 1, py: '10px' }}>
-          <Link href="/">
-            {/* 
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 4 } }}>
+        <Box component={Toolbar} disableGutters>
+          <Box sx={{ flexGrow: 1, py: '10px' }}>
+            <Link href="/">
+              {/* 
               Replaced next/image with a standard img tag to bypass a stubborn 
               configuration loading issue with the Next.js Image component. 
             */}
-            <img
-              src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
-              alt="Convention Crasher Logo"
-              style={{ width: '150px', height: 'auto', display: 'block' }}
-            />
-          </Link>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          {isAuthenticated && session?.user?.roles?.includes('ADMIN') && (
-            <Button color="inherit" component={Link} href="/admin/conventions" sx={{ mr: 1 }}>
-              Manage Conventions
-            </Button>
-          )}
-          {isAuthenticated && session?.user?.roles?.includes('ORGANIZER') && (
-            <Button color="inherit" component={Link} href="/organizer/conventions" sx={{ mr: 1 }}>
-              Dashboard
-            </Button>
-          )}
-          {isAuthenticated ? (
-            <>
-              <Button color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
-                Logout
+              <img
+                src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
+                alt="Convention Crasher Logo"
+                style={{ width: '150px', height: 'auto', display: 'block' }}
+              />
+            </Link>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {isAuthenticated && session?.user?.roles?.includes('ADMIN') && (
+              <Button color="inherit" component={Link} href="/admin/conventions" sx={{ mr: 1 }}>
+                Manage Conventions
               </Button>
-              <Button color="inherit" component={Link} href="/profile" sx={{ p: 0, minWidth: 0 }}>
-                <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
+            )}
+            {isAuthenticated && session?.user?.roles?.includes('ORGANIZER') && (
+              <Button color="inherit" component={Link} href="/organizer/conventions" sx={{ mr: 1 }}>
+                Dashboard
               </Button>
-            </>
-          ) : (
-            <Button color="inherit" component={Link} href="/login">
-              Login
-            </Button>
-          )}
+            )}
+            {isAuthenticated ? (
+              <>
+                <Button color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
+                  Logout
+                </Button>
+                <Button color="inherit" component={Link} href="/profile" sx={{ p: 0, minWidth: 0 }}>
+                  <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
+                </Button>
+              </>
+            ) : (
+              <Button color="inherit" component={Link} href="/login">
+                Sign in/Sign Up
+              </Button>
+            )}
+          </Box>
         </Box>
-      </Toolbar>
+      </Container>
     </AppBar>
   );
 } 

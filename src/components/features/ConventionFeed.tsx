@@ -59,51 +59,14 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
     <Box sx={{ flexGrow: 1, px: { xs: 1, sm: 2, md: 4 }, py: 4, maxWidth: 1400, mx: "auto" }}>
       <Grid
         columns={12}
-        columnSpacing={4}
-        rowSpacing={4}
         alignItems="flex-start"
-        sx={{ display: "flex", flexWrap: "wrap" }}
+        sx={{ display: "flex", flexWrap: "wrap", gap: 4 }}
       >
-        {/* Main Convention Feed */}
-        <Box
-          sx={{
-            flex: { xs: "1 1 100%", md: "1 1 66%" },
-            minWidth: 0,
-            maxWidth: { md: "66%" },
-            pr: { md: 4 },
-            mb: { xs: 4, md: 0 },
-          }}
-        >
-          <Typography variant="h1" sx={{ mb: 3 }}>
-            Upcoming Conventions
-          </Typography>
-          <Box display="flex" flexDirection="column" gap={3}>
-            {filteredSorted.length === 0 ? (
-              <Typography color="text.secondary">No conventions found.</Typography>
-            ) : (
-              filteredSorted.map((con: any) => {
-                const statusText = getConventionStatusText(con.startDate, con.endDate);
-                if (!statusText) return null; // Hide past events
-                return (
-                  <Box key={con.id}>
-                    <Box sx={{ mb: 1 }}>
-                      <Typography variant="subtitle2" color={statusText === 'Happening Now!' ? 'success.main' : 'primary'} fontWeight={600}>
-                        {statusText}
-                      </Typography>
-                    </Box>
-                    <ConventionCard convention={con} />
-                  </Box>
-                );
-              })
-            )}
-          </Box>
-        </Box>
         {/* Sidebar */}
         <Box
           sx={{
-            flex: { xs: "1 1 100%", md: "1 1 33%" },
+            flex: { xs: "1 1 100%", md: "1 1 0" },
             minWidth: 0,
-            maxWidth: { md: "33%" },
             position: { md: "sticky" },
             top: { md: 32 },
             zIndex: 1,
@@ -136,6 +99,38 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             </Typography>
             <Typography color="text.secondary">Coming soon...</Typography>
           </SidebarWidget>
+        </Box>
+        {/* Main Convention Feed */}
+        <Box
+          sx={{
+            flex: { xs: "1 1 100%", md: "1 1 0" },
+            minWidth: 0,
+            mb: { xs: 4, md: 0 },
+          }}
+        >
+          <Typography variant="h1" sx={{ mb: 3 }}>
+            Upcoming Conventions
+          </Typography>
+          <Box display="flex" flexDirection="column" gap={3}>
+            {filteredSorted.length === 0 ? (
+              <Typography color="text.secondary">No conventions found.</Typography>
+            ) : (
+              filteredSorted.map((con: any) => {
+                const statusText = getConventionStatusText(con.startDate, con.endDate);
+                if (!statusText) return null; // Hide past events
+                return (
+                  <Box key={con.id}>
+                    <Box sx={{ mb: 1 }}>
+                      <Typography variant="subtitle2" color={statusText === 'Happening Now!' ? 'success.main' : 'primary'} fontWeight={600}>
+                        {statusText}
+                      </Typography>
+                    </Box>
+                    <ConventionCard convention={con} />
+                  </Box>
+                );
+              })
+            )}
+          </Box>
         </Box>
       </Grid>
     </Box>
