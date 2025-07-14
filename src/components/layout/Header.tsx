@@ -43,7 +43,7 @@ export default function Header() {
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="static" sx={{ backgroundColor: '#01264b' }}>
       <Toolbar>
         <Box sx={{ flexGrow: 1, py: '10px' }}>
           <Link href="/">

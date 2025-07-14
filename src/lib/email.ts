@@ -48,7 +48,8 @@ export const sendEmail = async ({
 };
 
 export const sendWelcomeEmail = async (name: string | null | undefined, email: string) => {
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/profile`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+  const dashboardUrl = `${appUrl}/profile`;
 
   return sendEmail({
     to: email,
