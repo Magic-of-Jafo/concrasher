@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { Container, Box, Typography, Paper, Tabs, Tab } from '@mui/material';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Container, Box, Typography, Paper, Tabs, Tab, Snackbar, Alert } from '@mui/material';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 
@@ -39,7 +39,15 @@ interface AuthFormProps {
 export default function AuthForm({ initialTab = 'login' }: AuthFormProps) {
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [value, setValue] = useState(initialTab === 'login' ? 0 : 1);
+    const [notification, setNotification] = useState<{ open: boolean, message: string, severity: 'success' | 'error' } | null>(null);
+
+    useEffect(() => {
+        if (searchParams?.get('verified') === 'true') {
+            setNotification({ open: true, message: 'Email verified successfully! Please log in.', severity: 'success' });
+        }
+    }, [searchParams]);
 
     // This effect syncs the tab state with the URL
     useEffect(() => {
@@ -59,8 +67,21 @@ export default function AuthForm({ initialTab = 'login' }: AuthFormProps) {
         }
     };
 
+    const handleCloseNotification = () => {
+        if (notification) {
+            setNotification({ ...notification, open: false });
+        }
+    };
+
     return (
         <Container component="main" maxWidth="xs" sx={{ mt: 8 }}>
+            {notification && (
+                <Snackbar open={notification.open} autoHideDuration={6000} onClose={handleCloseNotification} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                    <Alert onClose={handleCloseNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                        {notification.message}
+                    </Alert>
+                </Snackbar>
+            )}
             <Paper elevation={3}>
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs value={value} onChange={handleChange} variant="fullWidth" aria-label="login and sign up tabs">

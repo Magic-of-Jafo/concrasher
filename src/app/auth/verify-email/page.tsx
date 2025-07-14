@@ -25,10 +25,10 @@ export default function VerifyEmailPage() {
 
                 if (response.ok) {
                     setStatus('success');
-                    setMessage('Your email has been verified successfully! Redirecting to your profile...');
-                    // Redirect to profile page after a short delay
+                    setMessage('Your email has been verified successfully! Redirecting to login...');
+                    // Redirect to login page after a short delay
                     setTimeout(() => {
-                        router.push('/profile');
+                        router.push('/login?verified=true');
                     }, 2000); // 2-second delay
                 } else {
                     setStatus('error');
