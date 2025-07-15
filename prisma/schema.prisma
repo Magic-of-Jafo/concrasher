@@ -173,6 +173,7 @@ model Convention {
   priceTiers               PriceTier[]
   scheduleDays             ScheduleDay[]
   venues                   Venue[]
+  tags                     Tag[]                    @relation("ConventionTags")
 }
 
 model SiteSetting {
@@ -456,6 +457,12 @@ model ConventionTalent {
   @@unique([conventionId, talentProfileId])
   @@index([conventionId])
   @@index([talentProfileId])
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  conventions Convention[] @relation("ConventionTags")
 }
 
 model TalentProfileMedia {

@@ -20,8 +20,8 @@ export const PromotionalImageItem: React.FC<PromotionalImageItemProps> = ({
 }) => {
     const [caption, setCaption] = useState(media.caption || '');
     const [showSaved, setShowSaved] = useState(false);
-    const debounceRef = useRef<NodeJS.Timeout>();
-    const savedTimeoutRef = useRef<NodeJS.Timeout>();
+    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+    const savedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleCaptionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const newCaption = event.target.value;
@@ -194,4 +194,4 @@ export const PromotionalImageItem: React.FC<PromotionalImageItemProps> = ({
             )}
         </Draggable>
     );
-}; 
+};

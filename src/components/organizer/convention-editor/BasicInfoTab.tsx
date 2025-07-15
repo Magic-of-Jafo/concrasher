@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, TextField, Typography, Switch, FormControlLabel, Paper, Autocomplete } from '@mui/material';
-import Grid from '@mui/material/Grid';
+import { Box, TextField, Typography, Switch, FormControlLabel, Paper, Autocomplete, Button, Chip, Grid } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -9,8 +8,8 @@ import { BasicInfoFormSchema, type BasicInfoFormData } from '@/lib/validators';
 import { ZodError } from 'zod';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import { FuzzyStateInput } from '@/components/ui/FuzzyStateInput';
+import TagEditor from './TagEditor';
 
-// Define the country list with common countries at the top based on magic conventions
 const COUNTRIES = [
   { label: 'United States', code: 'US' },
   { label: 'England', code: 'GB' },
@@ -54,6 +53,7 @@ const COUNTRIES = [
   { label: 'Burundi', code: 'BI' },
   { label: 'Cambodia', code: 'KH' },
   { label: 'Cameroon', code: 'CM' },
+  { label: 'Canada', code: 'CA' },
   { label: 'Cape Verde', code: 'CV' },
   { label: 'Central African Republic', code: 'CF' },
   { label: 'Chad', code: 'TD' },
@@ -79,9 +79,11 @@ const COUNTRIES = [
   { label: 'Ethiopia', code: 'ET' },
   { label: 'Fiji', code: 'FJ' },
   { label: 'Finland', code: 'FI' },
+  { label: 'France', code: 'FR' },
   { label: 'Gabon', code: 'GA' },
   { label: 'Gambia', code: 'GM' },
   { label: 'Georgia', code: 'GE' },
+  { label: 'Germany', code: 'DE' },
   { label: 'Ghana', code: 'GH' },
   { label: 'Greece', code: 'GR' },
   { label: 'Grenada', code: 'GD' },
@@ -93,12 +95,15 @@ const COUNTRIES = [
   { label: 'Honduras', code: 'HN' },
   { label: 'Hungary', code: 'HU' },
   { label: 'Iceland', code: 'IS' },
+  { label: 'India', code: 'IN' },
   { label: 'Indonesia', code: 'ID' },
   { label: 'Iran', code: 'IR' },
   { label: 'Iraq', code: 'IQ' },
   { label: 'Ireland', code: 'IE' },
   { label: 'Israel', code: 'IL' },
+  { label: 'Italy', code: 'IT' },
   { label: 'Jamaica', code: 'JM' },
+  { label: 'Japan', code: 'JP' },
   { label: 'Jordan', code: 'JO' },
   { label: 'Kazakhstan', code: 'KZ' },
   { label: 'Kenya', code: 'KE' },
@@ -123,6 +128,7 @@ const COUNTRIES = [
   { label: 'Marshall Islands', code: 'MH' },
   { label: 'Mauritania', code: 'MR' },
   { label: 'Mauritius', code: 'MU' },
+  { label: 'Mexico', code: 'MX' },
   { label: 'Micronesia', code: 'FM' },
   { label: 'Moldova', code: 'MD' },
   { label: 'Monaco', code: 'MC' },
@@ -176,10 +182,12 @@ const COUNTRIES = [
   { label: 'South Africa', code: 'ZA' },
   { label: 'South Korea', code: 'KR' },
   { label: 'South Sudan', code: 'SS' },
+  { label: 'Spain', code: 'ES' },
   { label: 'Sri Lanka', code: 'LK' },
   { label: 'Sudan', code: 'SD' },
   { label: 'Suriname', code: 'SR' },
   { label: 'Sweden', code: 'SE' },
+  { label: 'Switzerland', code: 'CH' },
   { label: 'Syria', code: 'SY' },
   { label: 'Taiwan', code: 'TW' },
   { label: 'Tajikistan', code: 'TJ' },
@@ -196,6 +204,7 @@ const COUNTRIES = [
   { label: 'Uganda', code: 'UG' },
   { label: 'Ukraine', code: 'UA' },
   { label: 'United Arab Emirates', code: 'AE' },
+  { label: 'United States', code: 'US' },
   { label: 'Uruguay', code: 'UY' },
   { label: 'Uzbekistan', code: 'UZ' },
   { label: 'Vanuatu', code: 'VU' },
@@ -221,8 +230,13 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   isEditing
 }) => {
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [keywords, setKeywords] = useState<string[]>(value.keywords || []);
+  const [keywordInput, setKeywordInput] = useState('');
 
-  // Memoize Date objects to stabilize references for DatePicker
+  useEffect(() => {
+    setKeywords(value.keywords || []);
+  }, [value.keywords]);
+
   const startDateValue = useMemo(() => {
     return value.startDate ? new Date(value.startDate) : null;
   }, [value.startDate]);
@@ -250,248 +264,140 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
     if (field === 'isOneDayEvent' && checked && value.startDate) {
       onFormChange('endDate', value.startDate);
     }
+    if (field === 'isTBD' && checked) {
+      onFormChange('startDate', null);
+      onFormChange('endDate', null);
+    }
   };
 
   const handleEditorChange = (field: 'descriptionShort' | 'descriptionMain') => (content: string) => {
     onFormChange(field, content);
   };
 
+  const handleCountryChange = (event: any, newValue: { label: string; code: string } | null) => {
+    let countryString = '';
+    if (typeof newValue === 'string') {
+      countryString = newValue;
+    } else if (newValue && newValue.label) {
+      countryString = newValue.label;
+    }
+    onFormChange('country', countryString);
+    if (countryString !== 'United States') {
+      onFormChange('stateName', '');
+      onFormChange('stateAbbreviation', '');
+    }
+  };
+
+  const handleStateChange = (newValue: string) => {
+    onFormChange('stateName', newValue);
+  };
+
+  const handleAddKeyword = () => {
+    if (keywordInput && !keywords.includes(keywordInput)) {
+      const newKeywords = [...keywords, keywordInput];
+      setKeywords(newKeywords);
+      onFormChange('keywords', newKeywords);
+      setKeywordInput('');
+    }
+  };
+
+  const handleDeleteKeyword = (keywordToDelete: string) => {
+    const newKeywords = keywords.filter((keyword) => keyword !== keywordToDelete);
+    setKeywords(newKeywords);
+    onFormChange('keywords', newKeywords);
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Paper elevation={0} sx={{ p: 0 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Section: Core Details */}
-          <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
-            <Typography variant="h6" gutterBottom>Core Details</Typography>
-            <TextField
-              required
-              fullWidth
-              name="name"
-              label="Convention Name"
-              value={value.name || ''}
-              onChange={handleTextChange}
-              error={!!errors.name}
-              helperText={errors.name}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              disabled
-              name="slug"
-              label="Slug"
-              value={value.slug || ''}
-              variant="filled"
-              size="small"
-              error={!!errors.slug}
-              helperText={errors.slug}
-              sx={{ mb: 2 }}
-            />
-          </Paper>
-
-          {/* Dates Section */}
-          <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
-            <Typography variant="subtitle1" gutterBottom sx={{ mb: 1, fontWeight: 'medium' }}>
-              Dates
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={!!value.isTBD}
-                  onChange={handleSwitchChange('isTBD')}
-                  name="isTBD"
-                />
-              }
-              label="Dates To Be Determined"
-              sx={{ mb: 1, display: 'block' }}
-            />
-            <Box
-              sx={{
-                minHeight: '130px',
-                mt: 1,
-              }}
-            >
-              {!value.isTBD && (
-                <>
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    <Box sx={{ width: 250 }}>
-                      <DatePicker
-                        label="Start Date"
-                        value={startDateValue}
-                        onChange={handleDateChange('startDate')}
-                        disabled={!!value.isTBD}
-                      />
-                    </Box>
-                    {!value.isOneDayEvent && (
-                      <Box sx={{ width: 250 }}>
-                        <DatePicker
-                          label="End Date"
-                          value={endDateValue}
-                          onChange={handleDateChange('endDate')}
-                          disabled={!!value.isTBD}
-                          minDate={value.isOneDayEvent && startDateValue ? startDateValue : undefined}
-                        />
-                      </Box>
-                    )}
-                  </Box>
-                  <Box sx={{ mt: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={!!value.isOneDayEvent}
-                          onChange={handleSwitchChange('isOneDayEvent')}
-                          name="isOneDayEvent"
-                          disabled={!!value.isTBD}
-                        />
-                      }
-                      label="One-Day Event"
-                    />
-                  </Box>
-                </>
-              )}
-            </Box>
-          </Paper>
-
-          {/* Section: Location */}
-          <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
+            <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
+              <TextField fullWidth label="Convention Name" name="name" value={value.name} onChange={handleTextChange} error={!!errors?.name} helperText={errors?.name} required sx={{ mb: 2 }} />
+              <TextField fullWidth label="URL Slug" name="slug" value={value.slug} onChange={(e) => { setSlugManuallyEdited(true); handleTextChange(e); }} error={!!errors?.slug} helperText={errors?.slug || "URL-friendly version of the name."} required />
+            </Paper>
+          </Box>
+          <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
+            <Paper elevation={1} sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', mb: 2 }}>
+                <FormControlLabel control={<Switch checked={value.isTBD} onChange={handleSwitchChange('isTBD')} />} label="Dates TBD" />
+                <FormControlLabel control={<Switch checked={value.isOneDayEvent} onChange={handleSwitchChange('isOneDayEvent')} />} label="One-Day Event" />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <DatePicker label="Start Date" value={startDateValue} onChange={handleDateChange('startDate')} disabled={value.isTBD} sx={{ flexGrow: 1 }} />
+                <DatePicker label="End Date" value={endDateValue} onChange={handleDateChange('endDate')} disabled={value.isTBD || value.isOneDayEvent} sx={{ flexGrow: 1 }} />
+              </Box>
+            </Paper>
+          </Box>
+          <Paper elevation={1} sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Location</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
               <Autocomplete
                 options={COUNTRIES}
                 getOptionLabel={(option: any) => option.label || (typeof option === 'string' ? option : '')}
                 value={COUNTRIES.find(opt => opt.label === value.country) || value.country || null}
-                onChange={(_, newValue: any) => {
-                  let countryString = '';
-                  if (typeof newValue === 'string') {
-                    countryString = newValue;
-                  } else if (newValue && newValue.label) {
-                    countryString = newValue.label;
-                  }
-                  const newFormDataState = { ...value, country: countryString };
-                  if (countryString !== 'United States') {
-                    newFormDataState.stateName = '';
-                    newFormDataState.stateAbbreviation = '';
-                  }
-                  onFormChange('country', countryString);
-                  if (countryString !== 'United States') {
-                    onFormChange('stateName', '');
-                    onFormChange('stateAbbreviation', '');
-                  }
-                }}
-                onInputChange={(_, newInputValue, reason) => {
-                  if (reason === 'input') {
-                    const updatedFormData = { ...value, country: newInputValue };
-                    if (newInputValue !== 'United States') {
-                      updatedFormData.stateName = '';
-                      updatedFormData.stateAbbreviation = '';
-                    }
-                    onFormChange('country', newInputValue);
-                    if (newInputValue !== 'United States') {
-                      onFormChange('stateName', '');
-                      onFormChange('stateAbbreviation', '');
-                    }
-                  }
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Country"
-                    error={!!errors.country}
-                    helperText={errors.country}
-                    required
-                    sx={{ mb: 1 }}
-                  />
-                )}
+                onChange={handleCountryChange}
+                onInputChange={(_, newInputValue, reason) => { if (reason === 'input') { onFormChange('country', newInputValue); } }}
                 freeSolo
-                sx={{ maxWidth: '250px' }}
-              />
-              <TextField
-                name="city"
-                label="City"
-                value={value.city || ''}
-                onChange={handleTextChange}
-                error={!!errors.city}
-                helperText={errors.city}
-                required
-                sx={{ maxWidth: '250px' }}
+                sx={{ width: 250 }}
+                renderInput={(params) => <TextField {...params} label="Country" name="country" error={!!errors?.country} helperText={errors?.country} />}
               />
               {value.country === 'United States' && (
-                <FuzzyStateInput
-                  value={value.stateName || ''}
-                  onChange={(stateName, stateAbbreviation) => {
-                    onFormChange('stateName', stateName);
-                    onFormChange('stateAbbreviation', stateAbbreviation);
+                <FuzzyStateInput value={value.stateName || ''} onChange={handleStateChange} error={!!errors?.stateName} />
+              )}
+              <TextField label="City" name="city" value={value.city || ''} onChange={handleTextChange} error={!!errors?.city} helperText={errors?.city} sx={{ flexGrow: 1 }} />
+            </Box>
+          </Paper>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Descriptions & More</Typography>
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>Short Description</Typography>
+              <ProseMirrorEditor value={value.descriptionShort || ''} onChange={handleEditorChange('descriptionShort')} />
+            </Box>
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>Main Description</Typography>
+              <ProseMirrorEditor value={value.descriptionMain || ''} onChange={handleEditorChange('descriptionMain')} />
+            </Box>
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>Keywords (for SEO)</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <TextField
+                  label="New Keyword"
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddKeyword();
+                    }
                   }}
-                  error={!!errors.stateName}
-                  helperText={errors.stateName}
-                  required
-                  sx={{ maxWidth: '250px' }}
+                  size="small"
                 />
-              )}
+                <Button onClick={handleAddKeyword} variant="outlined">Add</Button>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {keywords.map((keyword) => (
+                  <Chip
+                    key={keyword}
+                    label={keyword}
+                    onDelete={() => handleDeleteKeyword(keyword)}
+                  />
+                ))}
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Internal keywords for search engine optimization.
+              </Typography>
             </Box>
-          </Paper>
 
-          {/* Section: Website */}
-          <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
-            <Typography variant="h6" gutterBottom>Website & Registration</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                name="websiteUrl"
-                label="Convention Website"
-                type="url"
-                value={value.websiteUrl || ''}
-                onChange={handleTextChange}
-                error={!!errors.websiteUrl}
-                helperText={errors.websiteUrl || 'Official convention website (optional)'}
-                placeholder="https://example.com"
-                sx={{ maxWidth: '400px' }}
-              />
-              <TextField
-                name="registrationUrl"
-                label="Registration URL"
-                type="url"
-                value={value.registrationUrl || ''}
-                onChange={handleTextChange}
-                error={!!errors.registrationUrl}
-                helperText={errors.registrationUrl || 'Direct link to registration page (optional)'}
-                placeholder="https://registration.example.com"
-                sx={{ maxWidth: '400px' }}
-              />
-            </Box>
-          </Paper>
-
-          {/* Section: Descriptions */}
-          <Box sx={{ width: '100%', mt: 2 }}>
-            <Typography variant="h6" gutterBottom>Descriptions</Typography>
-            <TextField
-              name="descriptionShort"
-              label="Short Description"
-              multiline
-              rows={3}
-              value={value.descriptionShort ?? ''}
-              onChange={handleTextChange}
-              error={!!errors.descriptionShort}
-              helperText={errors.descriptionShort || 'A brief description that will appear in listings and previews'}
-              fullWidth
-              sx={{ mb: 2 }}
+            <TagEditor
+              value={value.tags || []}
+              onChange={(tags) => onFormChange('tags', tags)}
             />
-            <Box>
-              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>Main Description</Typography>
-              <ProseMirrorEditor
-                value={value.descriptionMain ?? ''}
-                onChange={handleEditorChange('descriptionMain')}
-                disabled={!isEditing}
-              />
-              {errors.descriptionMain && (
-                <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
-                  {errors.descriptionMain}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+          </Paper>
         </Box>
-      </Paper>
+      </Box>
     </LocalizationProvider>
   );
 };
 
-export default BasicInfoTab; 
+export default BasicInfoTab;

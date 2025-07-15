@@ -860,7 +860,7 @@ export async function reviewOrganizerApplication(
               // fetch roles, add new role, make unique, then set.
               // For simple enum addition, push should work if the DB/Prisma handles uniqueness
               // or if we manually ensure it. Prisma's `set` is safer for replacing the array.
-              set: [...new Set([...application.user.roles, Role.ORGANIZER])],
+              set: Array.from(new Set([...application.user.roles, Role.ORGANIZER])),
             },
           },
         });
@@ -1642,7 +1642,8 @@ export async function updateConventionMedia(
 
     // Validate media data
     const validatedMediaData: ConventionMediaData[] = [];
-    for (const [idx, media] of mediaDataWithOrder.entries()) {
+    for (let idx = 0; idx < mediaDataWithOrder.length; idx++) {
+      const media = mediaDataWithOrder[idx];
       const validationResult = ConventionMediaSchema.safeParse(media);
       if (!validationResult.success) {
         console.error(`[updateConventionMedia] Validation failed for media item ${idx}:`, validationResult.error);

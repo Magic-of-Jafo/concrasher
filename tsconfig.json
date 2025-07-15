@@ -4,7 +4,7 @@
     "experimentalSpecifierResolution": "node"
   },
   "compilerOptions": {
-    "target": "ES2017",
+    /* Basic Options */
     "lib": [
       "dom",
       "dom.iterable",
@@ -15,12 +15,14 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "incremental": true,
+    /* Key Fixes */
     "module": "esnext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
+    "jsx": "preserve",
+    /* Project Setup */
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
     "plugins": [
       {
         "name": "next"
@@ -30,20 +32,13 @@
       "@/*": [
         "./src/*"
       ]
-    },
-    "types": [
-      "jest",
-      "@testing-library/jest-dom"
-    ]
+    }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "src",
-    "tests",
-    "src/types"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

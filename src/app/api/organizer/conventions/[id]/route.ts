@@ -111,6 +111,7 @@ export async function GET(
         venues: true, // Include venues
         hotels: true, // Include hotels
         media: true, // Include media
+        tags: true, // Include tags
       }
     });
 
@@ -176,7 +177,8 @@ export async function PUT(
       priceDiscounts,
       coverImageUrl,
       profileImageUrl,
-      keywords
+      keywords,
+      tags: incomingTags,
     } = body;
 
     // Check if this is an image-only update
@@ -217,12 +219,32 @@ export async function PUT(
 
     // --- Main Transaction ---
     const updatedConvention = await prisma.$transaction(async (tx) => {
+
+      // Step 1: Handle Tags - Upsert new tags and get IDs for all tags
+      const tagIds = [];
+      if (incomingTags && Array.isArray(incomingTags)) {
+        for (const tag of incomingTags) {
+          if (tag.id) {
+            tagIds.push({ id: tag.id });
+          } else {
+            // This is a new tag, needs to be created
+            const newTag = await tx.tag.upsert({
+              where: { name: tag.name },
+              create: { name: tag.name },
+              update: {},
+            });
+            tagIds.push({ id: newTag.id });
+          }
+        }
+      }
+
       const conventionUpdatePayload: any = {
         name, slug, city, stateAbbreviation, stateName, country, status,
         descriptionShort, descriptionMain, isOneDayEvent, isTBD,
         websiteUrl, registrationUrl,
         guestsStayAtPrimaryVenue,
         keywords,
+        tags: { set: tagIds }, // Use the collected IDs to set the relationship
         updatedAt: new Date(),
       };
 

@@ -146,6 +146,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     return {
       ...initialBasicFormData,
       ...basicDataFromInitial,
+      tags: initialConventionData?.tags || [],
     };
   });
 
