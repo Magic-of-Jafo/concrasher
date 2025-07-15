@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { randomBytes } from 'crypto';
+import { sendPasswordResetEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
@@ -41,16 +42,29 @@ export async function POST(request: Request) {
       throw updateError;
     }
 
-    // For testing: Log the reset URL instead of sending email
-    const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password/${resetToken}`;
-    console.log('TESTING: Password reset URL:', resetUrl);
-    console.log('TESTING: Reset token:', resetToken);
+    // Create reset URL
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+    const resetUrl = `${appUrl}/reset-password/${resetToken}`;
 
-    return NextResponse.json({
-      message: 'If an account exists, you will receive a password reset email.',
-      // Include the token in the response for testing
-      resetToken
-    });
+    // Send password reset email
+    console.log('Sending password reset email...');
+    const emailResult = await sendPasswordResetEmail(
+      user.email,
+      resetUrl,
+      user.stageName || user.firstName || undefined
+    );
+
+    if (!emailResult.success) {
+      console.error('Failed to send password reset email:', emailResult.error);
+      // Don't fail the request, but log the error
+      return NextResponse.json({
+        message: 'If an account exists, you will receive a password reset email.',
+        warning: 'Email delivery may be delayed'
+      });
+    }
+
+    console.log('Password reset email sent successfully');
+    return NextResponse.json({ message: 'If an account exists, you will receive a password reset email.' });
   } catch (error) {
     console.error('Password reset error details:', {
       name: error instanceof Error ? error.name : 'Unknown',

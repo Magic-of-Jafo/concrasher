@@ -4,6 +4,9 @@ import nodemailer from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
 import React from 'react';
 import WelcomeEmail from '../../emails/WelcomeEmail';
+import PasswordResetEmail from '../../emails/PasswordResetEmail';
+import PasswordChangedEmail from '../../emails/PasswordChangedEmail';
+import OrganizerApplicationApproved from '../../emails/OrganizerApplicationApproved';
 
 // Configure the SES client for AWS SDK v3
 const ses = new SESClient({
@@ -58,6 +61,47 @@ export const sendWelcomeEmail = async (name: string | null | undefined, email: s
       name: name || undefined,
       userEmail: email,
       dashboardUrl,
+    }),
+  });
+};
+
+export const sendPasswordResetEmail = async (email: string, resetUrl: string, userName?: string) => {
+  return sendEmail({
+    to: email,
+    subject: 'Reset Your Convention Crasher Password',
+    react: React.createElement(PasswordResetEmail, {
+      userEmail: email,
+      resetUrl,
+      userName: userName || 'there',
+    }),
+  });
+};
+
+export const sendPasswordChangedEmail = async (email: string, userName?: string) => {
+  const supportUrl = 'https://conventioncrasher.com/support';
+
+  return sendEmail({
+    to: email,
+    subject: 'Your Convention Crasher Password Has Been Changed',
+    react: React.createElement(PasswordChangedEmail, {
+      userEmail: email,
+      userName: userName || 'there',
+      supportUrl,
+    }),
+  });
+};
+
+export const sendOrganizerApplicationApprovedEmail = async (email: string, userName?: string) => {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+  const organizerDashboardUrl = `${appUrl}/organizer/conventions`;
+
+  return sendEmail({
+    to: email,
+    subject: 'Your Organizer Application Has Been Approved!',
+    react: React.createElement(OrganizerApplicationApproved, {
+      userEmail: email,
+      userName: userName || 'there',
+      organizerDashboardUrl,
     }),
   });
 }; 

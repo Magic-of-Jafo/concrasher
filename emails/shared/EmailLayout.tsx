@@ -10,7 +10,6 @@ import {
     Hr,
     Img,
 } from '@react-email/components';
-import { getS3ImageUrl } from '@/lib/defaults';
 
 interface EmailLayoutProps {
     children: React.ReactNode;
@@ -18,7 +17,8 @@ interface EmailLayoutProps {
 }
 
 const EmailLayout = ({ children, previewText }: EmailLayoutProps) => {
-    const logoUrl = getS3ImageUrl('/images/defaults/convention-crasher-logo.png');
+    // Use direct S3 URL for emails to ensure it works in preview server
+    const logoUrl = 'https://convention-crasher.s3.us-east-1.amazonaws.com/images/defaults/convention-crasher-logo.png';
 
     return (
         <Html>

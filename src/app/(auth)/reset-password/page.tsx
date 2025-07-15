@@ -22,6 +22,7 @@ function ResetPasswordForm() {
   });
 
   const [message, setMessage] = React.useState('');
+  const [messageType, setMessageType] = React.useState<'success' | 'error' | 'warning'>('success');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   useEffect(() => {
@@ -35,12 +36,37 @@ function ResetPasswordForm() {
   const onSubmit = async (data: ResetPasswordInputs) => {
     setIsSubmitting(true);
     setMessage('');
-    // Placeholder for actual API call
-    console.log('Password reset requested for:', data.email);
-    // Simulate network request
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setMessage(`If an account exists for ${data.email}, a password reset link has been sent.`);
-    setIsSubmitting(false);
+    setMessageType('success');
+
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage(result.message);
+        setMessageType('success');
+        if (result.warning) {
+          setMessage(`${result.message} ${result.warning}`);
+          setMessageType('warning');
+        }
+      } else {
+        setMessage(result.message || 'An error occurred. Please try again.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setMessage('An error occurred while processing your request. Please try again.');
+      setMessageType('error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -54,7 +80,7 @@ function ResetPasswordForm() {
         </Typography>
         <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {message && (
-            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
+            <Alert severity={messageType} sx={{ width: '100%', mb: 2 }}>
               {message}
             </Alert>
           )}

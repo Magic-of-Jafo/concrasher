@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { sendPasswordChangedEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
@@ -35,6 +36,21 @@ export async function POST(request: Request) {
         resetTokenExpiry: null,
       },
     });
+
+    // Send password changed notification email
+    console.log('Sending password changed notification email...');
+    const emailResult = await sendPasswordChangedEmail(
+      user.email,
+      user.stageName || user.firstName || undefined
+    );
+
+    if (!emailResult.success) {
+      console.error('Failed to send password changed email:', emailResult.error);
+      // Don't fail the password reset, but log the error
+      console.warn('Password reset successful but notification email failed to send');
+    } else {
+      console.log('Password changed notification email sent successfully');
+    }
 
     return NextResponse.json({ message: 'Password has been reset successfully.' });
   } catch (error) {

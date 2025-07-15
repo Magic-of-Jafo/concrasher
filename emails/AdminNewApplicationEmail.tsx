@@ -4,40 +4,37 @@ import EmailLayout from './shared/EmailLayout';
 import EmailButton from './shared/EmailButton';
 
 interface AdminNewApplicationEmailProps {
-    applicantName: string;
-    applicantEmail: string;
-    applicationId: string;
-    applicationDate: string;
-    reviewUrl: string;
-    adminDashboardUrl: string;
+    applicantName?: string;
+    applicantEmail?: string;
+    requestedRoles?: string[];
+    reviewUrl?: string;
 }
 
 const AdminNewApplicationEmail = ({
-    applicantName,
-    applicantEmail,
-    applicationId,
-    applicationDate,
-    reviewUrl,
-    adminDashboardUrl,
+    applicantName = 'John Doe',
+    applicantEmail = 'john.doe@example.com',
+    requestedRoles = ['Convention Organizer'],
+    reviewUrl = 'https://conventioncrasher.com/profile/admin',
 }: AdminNewApplicationEmailProps) => {
+    const rolesText = requestedRoles.join(' and ');
+
     return (
-        <EmailLayout previewText="New organizer application pending review">
-            <Heading style={heading}>New Organizer Application</Heading>
+        <EmailLayout previewText="New role application pending review">
+            <Heading style={heading}>New Role Application</Heading>
 
             <Text style={text}>
                 Hi Admin,
             </Text>
 
             <Text style={text}>
-                A new organizer application has been submitted and is pending your review.
+                A new role application has been submitted and is pending your review.
             </Text>
 
             <Text style={infoBox}>
                 <strong>Application Details:</strong><br />
                 <strong>Applicant:</strong> {applicantName}<br />
                 <strong>Email:</strong> {applicantEmail}<br />
-                <strong>Application ID:</strong> {applicationId}<br />
-                <strong>Submitted:</strong> {applicationDate}
+                <strong>Requested Role{requestedRoles.length > 1 ? 's' : ''}:</strong> {rolesText}
             </Text>
 
             <Text style={text}>
@@ -53,14 +50,10 @@ const AdminNewApplicationEmail = ({
                 <strong>Review checklist:</strong>
             </Text>
 
-            <Text style={listItem}>• Verify applicant's event organizing experience</Text>
+            <Text style={listItem}>• Verify applicant's experience and qualifications</Text>
             <Text style={listItem}>• Check provided references and portfolio</Text>
             <Text style={listItem}>• Assess alignment with platform standards</Text>
             <Text style={listItem}>• Ensure complete application information</Text>
-
-            <EmailButton href={adminDashboardUrl} variant="secondary">
-                Admin Dashboard
-            </EmailButton>
 
             <Text style={text}>
                 This is an automated notification. Please do not reply to this email.

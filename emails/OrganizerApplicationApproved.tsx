@@ -4,17 +4,15 @@ import EmailLayout from './shared/EmailLayout';
 import EmailButton from './shared/EmailButton';
 
 interface OrganizerApplicationApprovedProps {
-    userName: string;
-    userEmail: string;
-    organizerDashboardUrl: string;
-    gettingStartedUrl: string;
+    userName?: string;
+    userEmail?: string;
+    organizerDashboardUrl?: string;
 }
 
 const OrganizerApplicationApproved = ({
-    userName,
-    userEmail,
-    organizerDashboardUrl,
-    gettingStartedUrl,
+    userName = 'there',
+    userEmail = 'organizer@example.com',
+    organizerDashboardUrl = 'https://conventioncrasher.com/organizer/conventions',
 }: OrganizerApplicationApprovedProps) => {
     return (
         <EmailLayout previewText="Welcome to Convention Crasher - You're approved!">
@@ -29,25 +27,8 @@ const OrganizerApplicationApproved = ({
                 You can now start creating and managing conventions on Convention Crasher.
             </Text>
 
-            <Text style={text}>
-                <strong>What you can do now:</strong>
-            </Text>
-
-            <Text style={listItem}>• Create and publish conventions</Text>
-            <Text style={listItem}>• Manage convention details and pricing</Text>
-            <Text style={listItem}>• Track registrations and attendees</Text>
-            <Text style={listItem}>• Access organizer analytics</Text>
-
             <EmailButton href={organizerDashboardUrl}>
                 Access Organizer Dashboard
-            </EmailButton>
-
-            <Text style={text}>
-                New to organizing conventions? Check out our getting started guide.
-            </Text>
-
-            <EmailButton href={gettingStartedUrl} variant="secondary">
-                Getting Started Guide
             </EmailButton>
 
             <Text style={text}>
@@ -70,14 +51,6 @@ const text = {
     lineHeight: '24px',
     color: '#374151',
     margin: '0 0 16px',
-};
-
-const listItem = {
-    fontSize: '16px',
-    lineHeight: '24px',
-    color: '#374151',
-    margin: '0 0 8px',
-    paddingLeft: '20px',
 };
 
 export default OrganizerApplicationApproved; 

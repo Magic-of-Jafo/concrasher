@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { Role } from '@prisma/client';
+import { sendOrganizerApplicationApprovedEmail } from '@/lib/email';
 
 export async function PUT(
   request: Request,
@@ -96,6 +97,23 @@ export async function PUT(
         });
       } else {
         console.log('User already has the requested role');
+      }
+
+      // Send approval email for organizer applications
+      if (application.requestedRole === 'ORGANIZER') {
+        console.log('Sending organizer approval email...');
+        const emailResult = await sendOrganizerApplicationApprovedEmail(
+          application.user.email,
+          application.user.stageName || application.user.firstName || undefined
+        );
+
+        if (!emailResult.success) {
+          console.error('Failed to send organizer approval email:', emailResult.error);
+          // Don't fail the approval, but log the error
+          console.warn('Application approved but notification email failed to send');
+        } else {
+          console.log('Organizer approval email sent successfully');
+        }
       }
     }
 

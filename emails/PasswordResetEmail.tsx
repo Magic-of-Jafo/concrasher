@@ -15,7 +15,7 @@ const PasswordResetEmail = ({
     userName = 'there',
 }: PasswordResetEmailProps) => {
     return (
-        <EmailLayout previewText="Reset your password">
+        <EmailLayout previewText="Reset your Convention Crasher password">
             <Heading style={heading}>Reset Your Password</Heading>
 
             <Text style={text}>
@@ -31,13 +31,25 @@ const PasswordResetEmail = ({
                 Reset Password
             </EmailButton>
 
-            <Text style={text}>
-                If you didn't request a password reset, you can safely ignore this email.
-                Your password will remain unchanged.
+            <Text style={warningBox}>
+                <strong>⚠️ Security Notice:</strong><br />
+                • This link will expire in 24 hours<br />
+                • Only click this link if you requested a password reset<br />
+                • Never share this link with anyone<br />
+                • If you didn't request this, your account may be compromised
             </Text>
 
+            <Text style={text}>
+                If you didn't request a password reset, please contact our support team immediately.
+            </Text>
+
+            <EmailButton href="https://conventioncrasher.com/support" variant="secondary">
+                Contact Support
+            </EmailButton>
+
             <Text style={smallText}>
-                This password reset link will expire in 1 hour for security reasons.
+                This password reset link will expire in 24 hours for security reasons.
+                If you need a new link, please request another password reset.
             </Text>
         </EmailLayout>
     );
@@ -56,6 +68,17 @@ const text = {
     lineHeight: '24px',
     color: '#374151',
     margin: '0 0 16px',
+};
+
+const warningBox = {
+    fontSize: '16px',
+    lineHeight: '24px',
+    color: '#1e40af',
+    backgroundColor: '#eff6ff',
+    padding: '16px',
+    borderRadius: '8px',
+    border: '1px solid #93c5fd',
+    margin: '16px 0',
 };
 
 const smallText = {
