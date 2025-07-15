@@ -23,9 +23,10 @@ export async function getConventions(params: ConventionSearchParams): Promise<Pa
         searchParams.set('status', params.status[0]);
     }
 
-    // Use absolute URL for server component
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/conventions?${searchParams.toString()}`);
+    // Use a relative path for the API call. This works universally for both
+    // client-side and server-side rendering, as the browser or server
+    // will resolve it against the current host.
+    const response = await fetch(`/api/conventions?${searchParams.toString()}`);
     if (!response.ok) {
         throw new Error('Failed to fetch conventions');
     }
