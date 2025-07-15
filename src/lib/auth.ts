@@ -75,8 +75,6 @@ export const authOptions: AuthOptions = {
         session.user.id = token.id as string;
         session.user.roles = token.roles as Role[];
         session.user.image = token.picture as string | null | undefined;
-        session.user.isBrandCreator = token.isBrandCreator as boolean | undefined;
-        session.user.hasTalentProfile = token.hasTalentProfile as boolean | undefined;
       }
       return session;
     },
@@ -103,29 +101,23 @@ export const authOptions: AuthOptions = {
       // or on initial sign-in, we need to refetch from the DB to get the latest data.
       const dbUser = await db.user.findUnique({
         where: { id: token.id as string },
-        select: {
-          image: true,
-          roles: true,
-          firstName: true,
-          lastName: true,
-          stageName: true,
-          brandMemberships: { select: { userId: true } },
-          talentProfile: { select: { userId: true } },
-        },
+        select: { image: true, roles: true, firstName: true, lastName: true, stageName: true }
       });
       console.log('[JWT] DB user fetched:', dbUser);
 
-      if (dbUser) {
-        const name = dbUser.stageName || `${dbUser.firstName || ''} ${dbUser.lastName || ''}`.trim();
-        token.name = name;
-        token.picture = dbUser.image;
-        token.roles = dbUser.roles;
-        token.isBrandCreator = dbUser.brandMemberships.length > 0;
-        token.hasTalentProfile = !!dbUser.talentProfile;
-      } else {
+
+      if (!dbUser) {
         // User has been deleted from DB, invalidate the token
-        return {}; // Return an empty object to invalidate
+        token.id = undefined;
+        console.log('[JWT] DB user not found. Invalidating token.');
+        console.log('--- [JWT Callback] End ---');
+        return token;
       }
+
+      const name = dbUser.stageName || `${dbUser.firstName || ''} ${dbUser.lastName || ''}`.trim();
+      token.name = name;
+      token.picture = dbUser.image;
+      token.roles = dbUser.roles;
 
       console.log('[JWT] Final token before returning:', token);
       console.log('--- [JWT Callback] End ---');

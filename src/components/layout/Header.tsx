@@ -24,14 +24,17 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 
 export default function Header() {
   const { data: session, status } = useSession();
+
   const [imageUrl, setImageUrl] = useState<string | null | undefined>();
   const [manageMenuAnchor, setManageMenuAnchor] = useState<null | HTMLElement>(null);
   const [myStuffMenuAnchor, setMyStuffMenuAnchor] = useState<null | HTMLElement>(null);
 
   const isAuthenticated = status === 'authenticated';
-  const isOrganizer = isAuthenticated && session?.user?.roles?.includes(Role.ORGANIZER);
-  const isBrandCreator = isAuthenticated && session?.user?.isBrandCreator;
-  const hasTalentProfile = isAuthenticated && session?.user?.hasTalentProfile;
+  const userRoles = session?.user?.roles || [];
+
+  const isOrganizer = isAuthenticated && userRoles.includes(Role.ORGANIZER);
+  const isBrandCreator = isAuthenticated && userRoles.includes(Role.BRAND_CREATOR);
+  const hasTalentProfile = isAuthenticated && userRoles.includes(Role.TALENT);
 
   useEffect(() => {
     if (session?.user?.image !== undefined) {
