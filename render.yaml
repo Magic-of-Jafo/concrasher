@@ -10,17 +10,11 @@ services:
         fromDatabase:
           name: convention_crasher_db
           property: connectionString
-      - key: NEXT_PUBLIC_APP_URL
-        fromService:
-          type: web
-          name: convention-crasher
-          property: url
       - key: NEXTAUTH_SECRET
         generateValue: true
+      - key: NEXT_PUBLIC_APP_URL
+        value: $RENDER_EXTERNAL_URL
       - key: NEXTAUTH_URL
-        fromService:
-          type: web
-          name: convention-crasher
-          property: url
+        value: $RENDER_EXTERNAL_URL
     autoDeploy: true
     branch: master 

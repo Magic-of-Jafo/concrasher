@@ -192,6 +192,7 @@ model SEOSetting {
   organizationUrl   String?
   organizationLogo  String?
   socialProfiles    String[] @default([])
+  trackingScripts   String?
   updatedAt         DateTime @updatedAt
 }
 

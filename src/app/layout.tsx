@@ -9,6 +9,30 @@ import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
 import { db } from "@/lib/db";
+import Script from 'next/script';
+
+// A simple parser to extract attributes from a script tag string
+const parseScriptTag = (scriptTag: string): { src?: string; id?: string;[key: string]: any } => {
+  const srcMatch = scriptTag.match(/src="([^"]+)"/);
+  const idMatch = scriptTag.match(/id="([^"]+)"/);
+  const asyncMatch = scriptTag.includes('async');
+  const deferMatch = scriptTag.includes('defer');
+
+  const props: { src?: string; id?: string;[key: string]: any } = {};
+  if (srcMatch) props.src = srcMatch[1];
+  if (idMatch) props.id = idMatch[1];
+  if (asyncMatch) props.async = true;
+  if (deferMatch) props.defer = true;
+
+  // Find inner content if it's not just a src tag
+  const contentMatch = scriptTag.match(/>([^<]+)</);
+  if (contentMatch && contentMatch[1].trim()) {
+    props.dangerouslySetInnerHTML = { __html: contentMatch[1].trim() };
+  }
+
+  return props;
+};
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -74,6 +98,9 @@ export default async function RootLayout({
     },
   };
 
+  const trackingScriptTags = seoSettings?.trackingScripts
+    ? seoSettings.trackingScripts.split(/(?=<\s*script)/).filter((s: string) => s.trim())
+    : [];
 
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
@@ -96,6 +123,14 @@ export default async function RootLayout({
             dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema, null, 2) }}
           />
         )}
+
+        {/* Injected Tracking Scripts */}
+        {trackingScriptTags.map((tag: string, index: number) => {
+          const scriptProps = parseScriptTag(tag);
+          // Ensure we have something to render before creating a Script tag
+          if (!scriptProps.src && !scriptProps.dangerouslySetInnerHTML) return null;
+          return <Script key={index} {...scriptProps} />;
+        })}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>

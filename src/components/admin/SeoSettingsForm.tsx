@@ -24,6 +24,7 @@ const seoSettingsSchema = z.object({
     organizationUrl: z.string().url().or(z.literal('')).optional(),
     organizationLogo: z.string().url().or(z.literal('')).optional(),
     socialProfiles: z.array(z.string().url()).optional(),
+    trackingScripts: z.string().optional(),
 });
 
 type SEOSettingsFormData = z.infer<typeof seoSettingsSchema>;
@@ -52,6 +53,7 @@ export default function SeoSettingsForm() {
             organizationUrl: '',
             organizationLogo: '',
             socialProfiles: [],
+            trackingScripts: '',
         },
     });
 
@@ -70,6 +72,7 @@ export default function SeoSettingsForm() {
                     organizationName: data.organizationName ?? '',
                     organizationUrl: data.organizationUrl ?? '',
                     organizationLogo: data.organizationLogo ?? '',
+                    trackingScripts: data.trackingScripts ?? '',
                 });
                 setKeywords(data.defaultKeywords ?? []);
                 setSocialProfiles(data.socialProfiles ?? []);
@@ -292,14 +295,37 @@ export default function SeoSettingsForm() {
                 </Box>
             </Box>
 
+            <Divider sx={{ my: 4 }} />
 
-            <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={isSaving}
-            >
-                {isSaving ? <CircularProgress size={24} /> : 'Save Settings'}
+            <Typography variant="h5" gutterBottom>
+                Tracking & Analytics
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Add script tags for analytics services like Google Analytics, Facebook Pixel, Microsoft Clarity, etc. These will be injected into the site's head.
+            </Typography>
+
+            <Box sx={{ mb: 2 }}>
+                <Controller
+                    name="trackingScripts"
+                    control={control}
+                    render={({ field }) => (
+                        <TextField
+                            {...field}
+                            label="Header Scripts"
+                            fullWidth
+                            multiline
+                            rows={8}
+                            helperText={errors.trackingScripts?.message || "Paste the full script tags here."}
+                            error={!!errors.trackingScripts}
+                            variant="outlined"
+                            sx={{ fontFamily: 'monospace' }}
+                        />
+                    )}
+                />
+            </Box>
+
+            <Button type="submit" variant="contained" color="primary" disabled={isSaving}>
+                {isSaving ? <CircularProgress size={24} /> : 'Save All Settings'}
             </Button>
         </form>
     );

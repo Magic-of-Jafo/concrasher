@@ -15,6 +15,7 @@ import {
   Button,
   Snackbar,
   Alert,
+  Container,
 } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 
@@ -137,9 +138,9 @@ export default function OrganizerConventionsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <Typography>Redirecting to login...</Typography>
       </Box>
-    ); 
+    );
   }
-  
+
   const userRoles = (session?.user as { roles?: Role[] })?.roles || [];
   const isActualAdmin = userRoles.includes(Role.ADMIN);
   const isOrganizer = userRoles.includes(Role.ORGANIZER);
@@ -192,15 +193,15 @@ export default function OrganizerConventionsPage() {
       </Box>
     );
   }
-  
+
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" sx={{ mb: 0 }}>
-          Manage Conventions ({viewMode === "deleted" ? "Deleted" : "Active"})
+        <Typography variant="h1" component="h1" sx={{ mb: 0 }}>
+          Manage Conventions
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button 
+          <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => router.push('/organizer/conventions/new')}
@@ -228,13 +229,13 @@ export default function OrganizerConventionsPage() {
           {fetchConventionsError.message}
         </MuiAlert>
       )}
-      
+
       {sessionStatus === "authenticated" && !isLoadingConventions && (
         <Suspense fallback={<Typography>Loading conventions list...</Typography>}>
-          <ConventionList 
-            conventions={displayedConventions} 
-            isAdmin={isActualAdmin} 
-            viewMode={viewMode} 
+          <ConventionList
+            conventions={displayedConventions}
+            isAdmin={isActualAdmin}
+            viewMode={viewMode}
             onActionComplete={refetchConventions}
           />
         </Suspense>
@@ -250,6 +251,6 @@ export default function OrganizerConventionsPage() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 } 

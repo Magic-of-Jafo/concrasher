@@ -3,6 +3,7 @@
 import { Box, Typography, Button, Paper, Divider } from '@mui/material';
 import RoleApplicationList from '@/components/admin/RoleApplicationList';
 import SeoSettingsForm from '@/components/admin/SeoSettingsForm';
+import Link from 'next/link';
 
 interface AdminSettingsTabProps {
     applications: any[];
@@ -12,6 +13,18 @@ interface AdminSettingsTabProps {
 export default function AdminSettingsTab({ applications, onApplicationProcessed }: AdminSettingsTabProps) {
     return (
         <Box>
+            <Paper sx={{ p: 3, mb: 4 }}>
+                <Typography variant="h6" gutterBottom>
+                    Convention Management
+                </Typography>
+                <Button
+                    variant="contained"
+                    component={Link}
+                    href="/admin/conventions"
+                >
+                    Manage All Conventions
+                </Button>
+            </Paper>
             <Paper sx={{ p: 3, mb: 4 }}>
                 <Typography variant="h6" gutterBottom>
                     Role Applications
