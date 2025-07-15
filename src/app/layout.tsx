@@ -127,9 +127,21 @@ export default async function RootLayout({
         {/* Injected Tracking Scripts */}
         {trackingScriptTags.map((tag: string, index: number) => {
           const scriptProps = parseScriptTag(tag);
-          // Ensure we have something to render before creating a Script tag
-          if (!scriptProps.src && !scriptProps.dangerouslySetInnerHTML) return null;
-          return <Script key={index} strategy="beforeInteractive" {...scriptProps} />;
+          // For inline scripts, use regular script tag to avoid Next.js bootstrapping
+          if (scriptProps.dangerouslySetInnerHTML) {
+            return (
+              <script
+                key={index}
+                type="text/javascript"
+                dangerouslySetInnerHTML={scriptProps.dangerouslySetInnerHTML}
+              />
+            );
+          }
+          // For external scripts, use Next.js Script component
+          if (scriptProps.src) {
+            return <Script key={index} strategy="beforeInteractive" {...scriptProps} />;
+          }
+          return null;
         })}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
