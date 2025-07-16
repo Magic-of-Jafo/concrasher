@@ -6,6 +6,8 @@ import { Box, Grid, Paper, Typography, Theme, Button } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import Link from "next/link";
 import { getS3ImageUrl } from "@/lib/defaults";
+import Script from "next/script";
+
 
 const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
   padding: theme.spacing(2),
@@ -108,7 +110,11 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
               }}
             >
               <link href="https://widget.groovevideo.com/widget/app.css" rel="stylesheet" />
-              <script src="https://widget.groovevideo.com/widget/app.js" />
+              <Script
+                src="https://widget.groovevideo.com/widget/app.js"
+                strategy="lazyOnload"
+              />
+
               <div dangerouslySetInnerHTML={{
                 __html: '<groovevideo-widget id="288599" permalink="uU0ZawgZlpNaCgBRHCdc"></groovevideo-widget>'
               }} />
