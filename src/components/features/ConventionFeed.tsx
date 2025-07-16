@@ -7,6 +7,7 @@ import { styled } from "@mui/material/styles";
 import Link from "next/link";
 import { getS3ImageUrl } from "@/lib/defaults";
 import Script from "next/script";
+import FacebookIcon from '@mui/icons-material/Facebook';
 
 
 const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
@@ -253,10 +254,11 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             {filteredSorted.length === 0 ? (
               <Typography color="text.secondary">No conventions found.</Typography>
             ) : (
-              filteredSorted.map((con: any) => {
+              filteredSorted.map((con: any, index: number) => {
                 const statusText = getConventionStatusText(con.startDate, con.endDate);
                 if (!statusText) return null; // Hide past events
-                return (
+
+                const elements = [
                   <Box key={con.id}>
                     <Box sx={{ mb: 1 }}>
                       <Typography variant="subtitle2" color={statusText === 'Happening Now!' ? 'success.main' : 'primary'} fontWeight={600}>
@@ -265,8 +267,40 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                     </Box>
                     <ConventionCard convention={con} />
                   </Box>
-                );
-              })
+                ];
+
+                // Insert Facebook link after the second card
+                if (index === 1) {
+                  elements.push(
+                    <Box key="facebook-link" sx={{ textAlign: 'center' }}>
+                      <Typography
+                        component="a"
+                        href="https://www.facebook.com/conventioncrasher"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          color: 'primary.main',
+                          textDecoration: 'underline',
+                          fontFamily: 'Open Sans',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 1,
+                          '&:hover': {
+                            textDecoration: 'underline',
+                          },
+                        }}
+                      >
+                        <FacebookIcon sx={{ fontSize: '1.2rem' }} />
+                        Follow our Facebook page for feature updates.
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                return elements;
+              }).flat()
             )}
           </Box>
         </Box>
