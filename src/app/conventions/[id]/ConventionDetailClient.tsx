@@ -49,15 +49,13 @@ const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary'
 
 type ViewType = 'basic' | 'schedule' | 'pricing' | 'venue' | 'hotel' | 'dealers' | 'media';
 
-const navigationItems = [
-    { id: 'basic' as ViewType, label: 'Details', icon: InfoIcon },
-    { id: 'schedule' as ViewType, label: 'Schedule', icon: ScheduleIcon },
-    { id: 'pricing' as ViewType, label: 'Pricing', icon: AttachMoneyIcon },
-    { id: 'venue' as ViewType, label: 'Venue', icon: LocationOnIcon },
-    { id: 'hotel' as ViewType, label: 'Hotel', icon: HotelIcon },
-    { id: 'dealers' as ViewType, label: 'Dealers', icon: StorefrontIcon },
-    { id: 'media' as ViewType, label: 'Media', icon: PhotoLibraryIcon },
-];
+interface NavigationItem {
+    id: ViewType;
+    label: string;
+    icon: any;
+}
+
+// Navigation items will be dynamically generated based on available data
 
 interface ConventionDetailClientProps {
     convention: any;
@@ -470,7 +468,31 @@ function PlaceholderView({ title }: { title: string }) {
 }
 
 export default function ConventionDetailClient({ convention }: ConventionDetailClientProps) {
-    const [currentView, setCurrentView] = useState<ViewType>('basic');
+    // Generate navigation items dynamically based on available data
+    const navigationItems: NavigationItem[] = [
+        { id: 'basic', label: 'Details', icon: InfoIcon },
+        { id: 'schedule', label: 'Schedule', icon: ScheduleIcon },
+        { id: 'pricing', label: 'Pricing', icon: AttachMoneyIcon },
+        { id: 'venue', label: 'Venue', icon: LocationOnIcon },
+    ];
+
+    // Only add Hotel tab if there are hotels
+    if (convention.hotels && convention.hotels.length > 0) {
+        navigationItems.push({ id: 'hotel', label: 'Hotel', icon: HotelIcon });
+    }
+
+    // Only add Dealers tab if there are dealer links
+    if (convention.dealerLinks && convention.dealerLinks.length > 0) {
+        navigationItems.push({ id: 'dealers', label: 'Dealers', icon: StorefrontIcon });
+    }
+
+    // Only add Media tab if there are media items
+    if (convention.media && convention.media.length > 0) {
+        navigationItems.push({ id: 'media', label: 'Media', icon: PhotoLibraryIcon });
+    }
+
+    // Initialize current view to the first available tab
+    const [currentView, setCurrentView] = useState<ViewType>(navigationItems[0].id);
 
     const renderCurrentView = () => {
         switch (currentView) {
@@ -507,7 +529,7 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
                     }}
                 >
                     <List sx={{ p: 0 }}>
-                        {navigationItems.map((item) => {
+                        {navigationItems.map((item: NavigationItem) => {
                             const IconComponent = item.icon;
                             return (
                                 <ListItem key={item.id} disablePadding>

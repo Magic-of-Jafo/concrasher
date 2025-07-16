@@ -157,16 +157,15 @@ export async function POST(request: Request) {
         );
       }
 
+      // For one-day events, ensure end date matches start date
+      if (isOneDayEvent && finalStartDate) {
+        finalEndDate = finalStartDate;
+      }
+
       // Perform date sequence validation only if not TBD
       if (finalStartDate >= finalEndDate && !isOneDayEvent) {
         return NextResponse.json(
           { error: 'Start date must be before end date for multi-day events.' },
-          { status: 400 }
-        );
-      }
-      if (isOneDayEvent && finalStartDate.getTime() !== finalEndDate.getTime()) {
-        return NextResponse.json(
-          { error: 'For one-day events, start and end dates must be the same.' },
           { status: 400 }
         );
       }

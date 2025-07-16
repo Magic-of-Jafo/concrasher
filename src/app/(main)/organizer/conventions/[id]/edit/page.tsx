@@ -405,6 +405,42 @@ function ConventionEditPage() { // Remove params from props
     }
   }, [conventionId, isEditing, sessionStatus]);
 
+  // Check if user has permission to edit this convention
+  useEffect(() => {
+    if (sessionStatus === 'authenticated' && conventionPageData && session?.user) {
+      const isAdmin = session.user.roles?.includes('ADMIN');
+      const isOrganizer = session.user.roles?.includes('ORGANIZER');
+
+      if (!isAdmin && !isOrganizer) {
+        router.push('/unauthorized');
+        return;
+      }
+
+      // If user is Organizer, check if they own the series that this convention belongs to
+      if (isOrganizer && !isAdmin && conventionPageData.seriesId) {
+        // Check if the organizer owns the series
+        const checkSeriesOwnership = async () => {
+          try {
+            const response = await fetch(`/api/organizer/series/${conventionPageData.seriesId}/check-ownership`);
+            if (!response.ok) {
+              router.push('/unauthorized');
+              return;
+            }
+            const { isOwner } = await response.json();
+            if (!isOwner) {
+              router.push('/unauthorized');
+            }
+          } catch (error) {
+            console.error('Error checking series ownership:', error);
+            router.push('/unauthorized');
+          }
+        };
+
+        checkSeriesOwnership();
+      }
+    }
+  }, [sessionStatus, session, conventionPageData, router]);
+
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
       router.push('/login');
@@ -598,9 +634,5 @@ function ConventionEditPage() { // Remove params from props
 }
 
 export default function GuardedConventionEditPage() {
-  return (
-    <AdminGuard redirectUrl="/admin/conventions">
-      <ConventionEditPage />
-    </AdminGuard>
-  );
+  return <ConventionEditPage />;
 } 

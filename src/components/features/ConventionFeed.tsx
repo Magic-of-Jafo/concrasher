@@ -2,8 +2,10 @@
 
 import React from "react";
 import ConventionCard from "@/components/features/ConventionCard";
-import { Box, Grid, Paper, Typography, Theme } from "@mui/material";
+import { Box, Grid, Paper, Typography, Theme, Button } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import Link from "next/link";
+import { getS3ImageUrl } from "@/lib/defaults";
 
 const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
   padding: theme.spacing(2),
@@ -75,12 +77,119 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             gap: 2,
           }}
         >
-          <SidebarWidget>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              ✨ Featured Convention
-            </Typography>
-            <Typography color="text.secondary">Coming soon...</Typography>
-          </SidebarWidget>
+          {/* Mini Hero Section */}
+          <Paper
+            sx={{
+              p: 3,
+              mb: 2,
+              borderRadius: 2,
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '300px',
+            }}
+          >
+            {/* GrooveVideo Player as "background" */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 0,
+                '& groovevideo-widget': {
+                  width: '100% !important',
+                  height: '100% !important',
+                  objectFit: 'cover',
+                },
+              }}
+            >
+              <link href="https://widget.groovevideo.com/widget/app.css" rel="stylesheet" />
+              <script src="https://widget.groovevideo.com/widget/app.js" />
+              <div dangerouslySetInnerHTML={{
+                __html: '<groovevideo-widget id="288599" permalink="uU0ZawgZlpNaCgBRHCdc"></groovevideo-widget>'
+              }} />
+            </Box>
+
+            {/* Dark overlay */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(26, 54, 93, 0.7)',
+                zIndex: 1,
+              }}
+            />
+
+            {/* Text at top */}
+            <Box sx={{ mb: 2, position: 'relative', zIndex: 2 }}>
+              <Typography
+                sx={{
+                  fontSize: '2.5rem',
+                  fontFamily: 'Montserrat',
+                  fontWeight: 900,
+                  lineHeight: 1.1,
+                }}
+              >
+                The Best Guide to Magic Conventions
+              </Typography>
+            </Box>
+
+            {/* Centered button */}
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flex: 1,
+              position: 'relative',
+              zIndex: 2,
+            }}>
+              <Button
+                variant="contained"
+                size="large"
+                sx={{
+                  bgcolor: '#ffd700',
+                  color: '#1a365d',
+                  fontWeight: 600,
+                  px: 4,
+                  py: 1.5,
+                  '&:hover': {
+                    bgcolor: '#ffed4e',
+                  },
+                }}
+                component={Link}
+                href="/register"
+              >
+                Click to Sign Up!
+              </Button>
+            </Box>
+
+            {/* Logo in lower right corner */}
+            <Box sx={{
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              zIndex: 2,
+            }}>
+              <img
+                src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
+                alt="Convention Crasher Logo"
+                style={{
+                  width: '150px',
+                  height: 'auto',
+                }}
+              />
+            </Box>
+          </Paper>
+
+
+
           <SidebarWidget>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               🧵 Community Posts

@@ -86,9 +86,7 @@ export default function ConventionsPage({ searchParams }: ConventionsPageProps) 
 
   return (
     <Container maxWidth="lg" sx={{
-      backgroundColor: status === 'PAST' ? '#eaf6fb' : 'inherit',
       minHeight: '100vh',
-      transition: 'background-color 0.3s',
     }}>
       <Box sx={{ py: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>

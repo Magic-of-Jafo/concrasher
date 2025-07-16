@@ -229,13 +229,9 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   errors = {},
   isEditing
 }) => {
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [keywords, setKeywords] = useState<string[]>(value.keywords || []);
   const [keywordInput, setKeywordInput] = useState('');
 
-  useEffect(() => {
-    setKeywords(value.keywords || []);
-  }, [value.keywords]);
+
 
   const startDateValue = useMemo(() => {
     return value.startDate ? new Date(value.startDate) : null;
@@ -248,7 +244,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   const handleTextChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value: fieldValue } = event.target;
     onFormChange(name as keyof BasicInfoFormData, fieldValue);
-    if (name === 'name' && !slugManuallyEdited) {
+    if (name === 'name') {
       const newSlug = slugify(fieldValue, { lower: true, strict: true });
       onFormChange('slug', newSlug);
     }
@@ -256,12 +252,18 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
   const handleDateChange = (field: 'startDate' | 'endDate') => (date: Date | null) => {
     onFormChange(field, date ? date.toISOString() : null);
+
+    // If this is a start date change and one-day event is enabled, update end date to match
+    if (field === 'startDate' && value.isOneDayEvent && date) {
+      onFormChange('endDate', date.toISOString());
+    }
   };
 
   const handleSwitchChange = (field: 'isOneDayEvent' | 'isTBD') => (event: React.ChangeEvent<HTMLInputElement>) => {
     const { checked } = event.target;
     onFormChange(field, checked);
     if (field === 'isOneDayEvent' && checked && value.startDate) {
+      // Set end date to same as start date for one-day events
       onFormChange('endDate', value.startDate);
     }
     if (field === 'isTBD' && checked) {
@@ -293,17 +295,15 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   };
 
   const handleAddKeyword = () => {
-    if (keywordInput && !keywords.includes(keywordInput)) {
-      const newKeywords = [...keywords, keywordInput];
-      setKeywords(newKeywords);
+    if (keywordInput && !value.keywords?.includes(keywordInput)) {
+      const newKeywords = [...(value.keywords || []), keywordInput];
       onFormChange('keywords', newKeywords);
       setKeywordInput('');
     }
   };
 
   const handleDeleteKeyword = (keywordToDelete: string) => {
-    const newKeywords = keywords.filter((keyword) => keyword !== keywordToDelete);
-    setKeywords(newKeywords);
+    const newKeywords = (value.keywords || []).filter((keyword: string) => keyword !== keywordToDelete);
     onFormChange('keywords', newKeywords);
   };
 
@@ -314,7 +314,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
             <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
               <TextField fullWidth label="Convention Name" name="name" value={value.name} onChange={handleTextChange} error={!!errors?.name} helperText={errors?.name} required sx={{ mb: 2 }} />
-              <TextField fullWidth label="URL Slug" name="slug" value={value.slug} onChange={(e) => { setSlugManuallyEdited(true); handleTextChange(e); }} error={!!errors?.slug} helperText={errors?.slug || "URL-friendly version of the name."} required />
+              <TextField fullWidth label="URL Slug" name="slug" value={value.slug} disabled error={!!errors?.slug} helperText={errors?.slug || "Auto-generated from convention name."} required />
             </Paper>
           </Box>
           <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
@@ -325,7 +325,9 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <DatePicker label="Start Date" value={startDateValue} onChange={handleDateChange('startDate')} disabled={value.isTBD} sx={{ flexGrow: 1 }} />
-                <DatePicker label="End Date" value={endDateValue} onChange={handleDateChange('endDate')} disabled={value.isTBD || value.isOneDayEvent} sx={{ flexGrow: 1 }} />
+                {!value.isOneDayEvent && (
+                  <DatePicker label="End Date" value={endDateValue} onChange={handleDateChange('endDate')} disabled={value.isTBD} sx={{ flexGrow: 1 }} />
+                )}
               </Box>
             </Paper>
           </Box>
@@ -346,6 +348,29 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                 <FuzzyStateInput value={value.stateName || ''} onChange={handleStateChange} error={!!errors?.stateName} />
               )}
               <TextField label="City" name="city" value={value.city || ''} onChange={handleTextChange} error={!!errors?.city} helperText={errors?.city} sx={{ flexGrow: 1 }} />
+            </Box>
+          </Paper>
+          <Paper elevation={1} sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Website & Registration</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                fullWidth
+                label="Website URL"
+                name="websiteUrl"
+                value={value.websiteUrl || ''}
+                onChange={handleTextChange}
+                error={!!errors?.websiteUrl}
+                helperText={errors?.websiteUrl || "Official convention website"}
+              />
+              <TextField
+                fullWidth
+                label="Registration URL"
+                name="registrationUrl"
+                value={value.registrationUrl || ''}
+                onChange={handleTextChange}
+                error={!!errors?.registrationUrl}
+                helperText={errors?.registrationUrl || "Link to registration page"}
+              />
             </Box>
           </Paper>
           <Paper sx={{ p: 2 }}>
@@ -376,7 +401,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
                 <Button onClick={handleAddKeyword} variant="outlined">Add</Button>
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {keywords.map((keyword) => (
+                {(value.keywords || []).map((keyword: string) => (
                   <Chip
                     key={keyword}
                     label={keyword}

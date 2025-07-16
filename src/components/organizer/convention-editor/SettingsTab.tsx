@@ -57,7 +57,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     keywords,
     onKeywordsChange,
 }) => {
-    const [localValue, setLocalValue] = useState<ConventionSettingData>(value);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const [keywordInput, setKeywordInput] = useState('');
@@ -133,9 +132,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }, [currencies]);
 
 
-    useEffect(() => {
-        setLocalValue(value);
-    }, [value]);
+
 
     const { mutate: performDelete, isPending: isDeleting } = useMutation({
         mutationFn: async () => {
@@ -174,7 +171,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     const handleChange = (field: keyof ConventionSettingData) => async (event: any) => {
         const newValue = event.target.value;
-        setLocalValue(prev => ({ ...prev, [field]: newValue }));
         onFormChange(field, newValue);
 
         // Auto-save immediately when currency or timezone changes
@@ -185,7 +181,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 // Ensure we are sending both currency and timezone
                 const payload = {
                     currency: newValue,
-                    timezone: localValue.timezone,
+                    timezone: value.timezone,
                 };
 
                 const settingsResponse = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
@@ -228,7 +224,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             <InputLabel id="currency-label" shrink>Default Currency</InputLabel>
                             <Select
                                 labelId="currency-label"
-                                value={localValue.currency || ''}
+                                value={value.currency || ''}
                                 onChange={handleChange('currency')}
                                 label="Default Currency"
                                 disabled={!isEditing || isLoadingCurrencies}
@@ -255,12 +251,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
                     <Box sx={{ flex: 1 }}>
                         <TimezoneSelector
-                            value={localValue.timezone || undefined}
+                            value={value.timezone || undefined}
                             onChange={async (timezoneId, timezone) => {
                                 console.log('[SettingsTab] TimezoneSelector onChange:', { timezoneId, timezone });
 
-                                // Update local state
-                                setLocalValue(prev => ({ ...prev, timezone: timezoneId || '' }));
                                 onFormChange('timezone', timezoneId || '');
 
                                 // Auto-save immediately when timezone changes
@@ -272,7 +266,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                             method: 'PUT',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({
-                                                currency: localValue.currency || '',
+                                                currency: value.currency || '',
                                                 timezone: timezoneId
                                             }),
                                         });

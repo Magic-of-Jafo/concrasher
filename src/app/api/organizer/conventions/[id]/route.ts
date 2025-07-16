@@ -248,6 +248,19 @@ export async function PUT(
         updatedAt: new Date(),
       };
 
+      // Handle date fields
+      if (rawStartDate !== undefined) {
+        conventionUpdatePayload.startDate = rawStartDate ? new Date(rawStartDate) : null;
+      }
+      if (rawEndDate !== undefined) {
+        conventionUpdatePayload.endDate = rawEndDate ? new Date(rawEndDate) : null;
+      }
+
+      // For one-day events, ensure end date matches start date
+      if (isOneDayEvent && conventionUpdatePayload.startDate) {
+        conventionUpdatePayload.endDate = conventionUpdatePayload.startDate;
+      }
+
       console.log(`[API PUT /organizer/conventions/${conventionId}] Update payload keywords:`, conventionUpdatePayload.keywords);
 
       if (seriesId) {
