@@ -116,7 +116,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
               />
 
               <div dangerouslySetInnerHTML={{
-                __html: '<groovevideo-widget id="288599" permalink="uU0ZawgZlpNaCgBRHCdc"></groovevideo-widget>'
+                __html: '<groovevideo-widget id="288647" permalink="UjAdn2s5J45xXy4uBUas"></groovevideo-widget>'
               }} />
             </Box>
 
@@ -134,7 +134,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             />
 
             {/* Text at top */}
-            <Box sx={{ mb: 2, position: 'relative', zIndex: 2 }}>
+            <Box sx={{ mb: 2, position: 'relative', zIndex: 2, pr: 20 }}>
               <Typography
                 sx={{
                   fontSize: '2.5rem',
@@ -147,13 +147,29 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
               </Typography>
             </Box>
 
-            {/* Centered button */}
+            {/* Logo in upper right corner */}
             <Box sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flex: 1,
-              position: 'relative',
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              zIndex: 2,
+            }}>
+              <img
+                src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
+                alt="Convention Crasher Logo"
+                style={{
+                  width: '150px',
+                  height: 'auto',
+                }}
+              />
+            </Box>
+
+            {/* Button centered along bottom */}
+            <Box sx={{
+              position: 'absolute',
+              bottom: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
               zIndex: 2,
             }}>
               <Button
@@ -172,48 +188,35 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                 component={Link}
                 href="/register"
               >
-                Click to Sign Up!
+                Make Your Free Account
               </Button>
-            </Box>
-
-            {/* Logo in lower right corner */}
-            <Box sx={{
-              position: 'absolute',
-              bottom: 16,
-              right: 16,
-              zIndex: 2,
-            }}>
-              <img
-                src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
-                alt="Convention Crasher Logo"
-                style={{
-                  width: '150px',
-                  height: 'auto',
-                }}
-              />
             </Box>
           </Paper>
 
-
-
-          <SidebarWidget>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              🧵 Community Posts
+          {/* New content section */}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="h2" sx={{ mb: 2, fontWeight: 600, fontSize: '2rem', fontFamily: 'Montserrat' }}>
+              Never been to a magic convention?
             </Typography>
-            <Typography color="text.secondary">Coming soon...</Typography>
-          </SidebarWidget>
-          <SidebarWidget>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              📣 Upcoming Deadlines
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+              You're in the right place.
             </Typography>
-            <Typography color="text.secondary">Coming soon...</Typography>
-          </SidebarWidget>
-          <SidebarWidget>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              🔗 Submit a Convention
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+              Magic conventions aren't just for pros - they're for anyone who loves the art and wants to see it up close. See shows, lectures, new effects, and jam into the early hours with new friends. Whether you're a casual fan, a curious hobbyist, or just looking for your first taste of the live magic scene, this is where it starts.
             </Typography>
-            <Typography color="text.secondary">Coming soon...</Typography>
-          </SidebarWidget>
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+              Convention Crasher makes it easy to discover what's happening, when, and where. You can find a lot of great information. And we have a ton of new site features rolling out over the rest of the year.
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+              And if you're an organizer or performer, Convention Crasher helps you connect with exactly the kind of audience you're trying to reach. From full-featured tools to manage your event, to talent profiles and brand pages that help you get noticed.
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.6 }}>
+              Our industry has seen more growth than ever before. Which means there are a ton of people who have never been to a magic convention. It all starts here!
+            </Typography>
+            <Typography variant="body1" sx={{ fontStyle: 'italic', lineHeight: 1.6 }}>
+              The Convention Crasher Team
+            </Typography>
+          </Box>
         </Box>
         {/* Main Convention Feed */}
         <Box
@@ -223,9 +226,29 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             mb: { xs: 4, md: 0 },
           }}
         >
-          <Typography variant="h1" sx={{ mb: 3 }}>
-            Upcoming Conventions
+          <Typography variant="h1" sx={{ mb: 3, fontSize: '2rem', textAlign: 'center' }}>
+            Find a Convention Near You
           </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+            <Button
+              variant="contained"
+              size="medium"
+              component={Link}
+              href="/conventions"
+              sx={{
+                px: 4,
+                py: 0.5,
+                fontWeight: 600,
+                bgcolor: '#424242',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: '#616161',
+                },
+              }}
+            >
+              Browse Complete List
+            </Button>
+          </Box>
           <Box display="flex" flexDirection="column" gap={3}>
             {filteredSorted.length === 0 ? (
               <Typography color="text.secondary">No conventions found.</Typography>
