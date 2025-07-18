@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { RegistrationSchema } from '../../../../lib/validators'; // Adjusted path
 import { sendEmail } from '../../../../lib/email';
 import EmailVerificationEmail from '../../../../../emails/EmailVerificationEmail';
+import { sendCapiEvent } from '../../../../lib/meta-events';
 
 const prisma = new PrismaClient();
 
@@ -40,6 +41,25 @@ export async function POST(request: NextRequest) {
         roles: [Role.USER], // Assuming Role.USER is correctly defined in your Prisma schema
       },
     });
+
+    // Fire CompleteRegistration event using Meta Conversions API
+    try {
+      await sendCapiEvent(
+        'CompleteRegistration',
+        {
+          email: newUser.email,
+          ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+        },
+        {
+          registration_method: 'Email',
+          user_id: newUser.id,
+        }
+      );
+    } catch (capiError) {
+      console.error('[API Register] Failed to send CompleteRegistration CAPI event:', capiError);
+      // Don't fail the registration if CAPI event fails
+    }
 
     // Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
