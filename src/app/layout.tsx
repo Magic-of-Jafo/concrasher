@@ -10,6 +10,7 @@ import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
 import { db } from "@/lib/db";
 import Script from 'next/script';
+import TrackingScripts from '@/components/TrackingScripts';
 
 // A simple parser to extract attributes from a script tag string
 const parseScriptTag = (scriptTag: string): { src?: string; id?: string;[key: string]: any } => {
@@ -124,20 +125,10 @@ export default async function RootLayout({
           />
         )}
 
-        {/* Injected Tracking Scripts */}
+        {/* External Tracking Scripts */}
         {trackingScriptTags.map((tag: string, index: number) => {
           const scriptProps = parseScriptTag(tag);
-          // For inline scripts, use regular script tag to avoid Next.js bootstrapping
-          if (scriptProps.dangerouslySetInnerHTML) {
-            return (
-              <script
-                key={index}
-                type="text/javascript"
-                dangerouslySetInnerHTML={scriptProps.dangerouslySetInnerHTML}
-              />
-            );
-          }
-          // For external scripts, use Next.js Script component
+          // Only render external scripts in head
           if (scriptProps.src) {
             return <Script key={index} strategy="beforeInteractive" {...scriptProps} />;
           }
@@ -163,6 +154,21 @@ export default async function RootLayout({
                 <Suspense fallback={<div>Loading...</div>}>
                   {children}
                 </Suspense>
+
+                {/* Inline Tracking Scripts */}
+                {trackingScriptTags.map((tag: string, index: number) => {
+                  const scriptProps = parseScriptTag(tag);
+                  // Only render inline scripts in body
+                  if (scriptProps.dangerouslySetInnerHTML) {
+                    return (
+                      <TrackingScripts
+                        key={`inline-${index}`}
+                        scripts={tag}
+                      />
+                    );
+                  }
+                  return null;
+                })}
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>
