@@ -12,6 +12,23 @@ import { db } from "@/lib/db";
 import Script from 'next/script';
 import { TrackingScripts } from '@/components/TrackingScripts';
 
+const parseScriptTag = (scriptString: string) => {
+  const attributes: { [key: string]: string | boolean } = {};
+  const attributeRegex = /([\w-]+)=(['"])(.*?)\2/g;
+  let match;
+  while ((match = attributeRegex.exec(scriptString)) !== null) {
+    attributes[match[1]] = match[3];
+  }
+  if (scriptString.includes(' defer')) attributes.defer = true;
+  if (scriptString.includes(' async')) attributes.async = true;
+
+  const contentRegex = /<script[^>]*>([\s\S]*?)<\/script>/;
+  const contentMatch = scriptString.match(contentRegex);
+  const innerContent = contentMatch ? contentMatch[1].trim() : '';
+
+  return { attributes, innerContent };
+};
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -56,6 +73,10 @@ export default async function RootLayout({
     where: { id: 'singleton' },
   });
 
+  const dbTrackingScripts = seoSettings?.trackingScripts
+    ? seoSettings.trackingScripts.split(/(?=<\s*script)/).filter((s: string) => s.trim())
+    : [];
+
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -93,13 +114,33 @@ export default async function RootLayout({
           />
         )}
 
-        {/* ✅ Scripts Injected from Database (for Clarity) MOVED HERE */}
-        {seoSettings?.trackingScripts && (
-          <script
-            id="db-tracking-scripts"
-            dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
-          />
-        )}
+        {/* Database-Injected Scripts (Clarity, Plerdy, etc.) */}
+        {dbTrackingScripts.map((scriptString: string, index: number) => {
+          const { attributes, innerContent } = parseScriptTag(scriptString);
+          return (
+            <Script key={`db-script-${index}`} {...attributes}>
+              {innerContent}
+            </Script>
+          );
+        })}
+
+        {/* ✅ CORRECTED: Meta Pixel Implementation MOVED to the <head> */}
+        <TrackingScripts />
+        <Script id="meta-pixel-base" strategy="afterInteractive">
+          {`
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            
+            fbq('init', '282675836122405');
+            fbq('set', 'autoConfig', 'false', '282675836122405');
+          `}
+        </Script>
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>
@@ -116,25 +157,6 @@ export default async function RootLayout({
                 <Suspense fallback={<div>Loading...</div>}>
                   {children}
                 </Suspense>
-
-                {/* Correct Meta Pixel Implementation */}
-                <TrackingScripts />
-                <Script id="meta-pixel-base" strategy="afterInteractive">
-                  {`
-                    !function(f,b,e,v,n,t,s)
-                    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-                    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-                    n.queue=[];t=b.createElement(e);t.async=!0;
-                    t.src=v;s=b.getElementsByTagName(e)[0];
-                    s.parentNode.insertBefore(t,s)}(window, document,'script',
-                    'https://connect.facebook.net/en_US/fbevents.js');
-                    
-                    fbq('init', '282675836122405');
-                    fbq('set', 'autoConfig', 'false', '282675836122405');
-                  `}
-                </Script>
-
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>
