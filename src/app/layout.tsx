@@ -9,8 +9,8 @@ import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
 import { db } from "@/lib/db";
-import Script from 'next/script'; // ✅ IMPORT aDDED
-import { TrackingScripts } from '@/components/TrackingScripts'; // ✅ IMPORT aDDED
+import Script from 'next/script';
+import { TrackingScripts } from '@/components/TrackingScripts';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -92,8 +92,6 @@ export default async function RootLayout({
             dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema, null, 2) }}
           />
         )}
-
-        {/* ❌ THE PROBLEMATIC DATABASE-INJECTED SCRIPT HAS BEEN REMOVED FROM HERE */}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>
@@ -111,7 +109,7 @@ export default async function RootLayout({
                   {children}
                 </Suspense>
 
-                {/* ✅ CORRECT TRACKING IMPLEMENTATION ADDED HERE */}
+                {/* Tracking Implementation */}
                 <TrackingScripts />
                 <Script id="meta-pixel-base" strategy="afterInteractive">
                   {`
@@ -124,8 +122,8 @@ export default async function RootLayout({
                     s.parentNode.insertBefore(t,s)}(window, document,'script',
                     'https://connect.facebook.net/en_US/fbevents.js');
                     
-                    fbq('init', '${process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID}');
-                    fbq('set', 'autoConfig', 'false', '${process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID}');
+                    fbq('init', '282675836122405');
+                    fbq('set', 'autoConfig', 'false', '282675836122405');
                   `}
                 </Script>
 
