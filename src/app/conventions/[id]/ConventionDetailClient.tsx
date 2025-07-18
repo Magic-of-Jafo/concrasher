@@ -39,6 +39,15 @@ import HotelSection from '@/components/conventions/detail/HotelSection';
 import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
 import DealersSection from '@/components/conventions/detail/DealersSection';
 import MediaGallerySection from '@/components/conventions/detail/MediaGallerySection';
+import { TrackedTabs, TabData } from '@/components/TrackedTabs';
+
+// Extend the Window interface for TypeScript to recognize tracking functions
+declare global {
+    interface Window {
+        fbq?: (...args: any[]) => void;
+        gtag?: (...args: any[]) => void;
+    }
+}
 
 const statusColors: Record<ConventionStatus, 'default' | 'primary' | 'secondary' | 'error' | 'info'> = {
     [ConventionStatus.DRAFT]: 'default',
@@ -535,7 +544,30 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
                                 <ListItem key={item.id} disablePadding>
                                     <ListItemButton
                                         selected={currentView === item.id}
-                                        onClick={() => setCurrentView(item.id)}
+                                        onClick={() => {
+                                            setCurrentView(item.id);
+                                            // Track tab click for engagement analytics
+                                            // Use setTimeout to ensure this runs after hydration
+                                            setTimeout(() => {
+                                                try {
+                                                    if (typeof window !== 'undefined' && window.fbq) {
+                                                        window.fbq('track', 'ViewContent', {
+                                                            content_name: `${convention.name} - ${item.label}`,
+                                                            content_category: 'convention_tab',
+                                                        });
+                                                    }
+
+                                                    if (typeof window !== 'undefined' && window.gtag) {
+                                                        window.gtag('event', 'view_item', {
+                                                            content_name: `${convention.name} - ${item.label}`,
+                                                            content_category: 'convention_tab',
+                                                        });
+                                                    }
+                                                } catch (error) {
+                                                    console.warn('Tracking error:', error);
+                                                }
+                                            }, 0);
+                                        }}
                                         sx={{
                                             pl: 2,
                                             '&.Mui-selected': {
