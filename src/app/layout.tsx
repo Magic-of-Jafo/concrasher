@@ -109,7 +109,7 @@ export default async function RootLayout({
                   {children}
                 </Suspense>
 
-                {/* Tracking Implementation */}
+                {/* Correct Meta Pixel Implementation */}
                 <TrackingScripts />
                 <Script id="meta-pixel-base" strategy="afterInteractive">
                   {`
@@ -126,6 +126,14 @@ export default async function RootLayout({
                     fbq('set', 'autoConfig', 'false', '282675836122405');
                   `}
                 </Script>
+
+                {/* ✅ Scripts Injected from Database (for Clarity) */}
+                {seoSettings?.trackingScripts && (
+                  <script
+                    id="db-tracking-scripts"
+                    dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
+                  />
+                )}
 
               </NotificationProvider>
             </QueryProvider>
