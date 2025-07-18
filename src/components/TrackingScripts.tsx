@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react'; // 👈 Import useRef
 import { usePathname } from 'next/navigation';
 
 // A robust function to wait for tracking functions to be ready
 const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promise<void> => {
+    // ... (this function remains the same)
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
@@ -21,11 +22,16 @@ const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promis
     });
 };
 
-// The component function should match the file name.
 export function TrackingScripts() {
     const pathname = usePathname();
+    const trackedPathnameRef = useRef<string | null>(null); // 👈 Add a ref to track the path
 
     useEffect(() => {
+        // 🛑 Only track if the pathname is new and hasn't been tracked yet
+        if (pathname === trackedPathnameRef.current) {
+            return;
+        }
+
         const trackPageView = async () => {
             // Meta Pixel tracking
             try {
@@ -34,7 +40,7 @@ export function TrackingScripts() {
                     window.fbq('track', 'PageView');
                 }
             } catch (error) {
-                // Meta Pixel not available - this is expected if no tracking scripts are loaded
+                // Meta Pixel not available
             }
 
             // Google Analytics 4 tracking
@@ -46,15 +52,17 @@ export function TrackingScripts() {
                     });
                 }
             } catch (error) {
-                // GA4 not available - this is expected if no tracking scripts are loaded
+                // GA4 not available
             }
+
+            // ✅ Update the ref to the new path so we don't track it again
+            trackedPathnameRef.current = pathname;
         };
 
         trackPageView();
 
-    }, [pathname]); // This dependency array ensures the effect runs on every path change
+    }, [pathname]); // Still dependent on pathname
 
-    // This component's only job is to run the effect; it renders no HTML.
     return null;
 }
 
