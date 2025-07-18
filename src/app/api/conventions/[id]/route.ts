@@ -36,34 +36,46 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Populate dealer links with brand data (only BRAND type for now)
-    const populatedDealerLinks = await Promise.all(
-      (convention.dealerLinks || []).map(async (dl: any) => {
-        if (dl.profileType === 'BRAND') {
-          const brand = await prisma.brand.findUnique({ where: { id: dl.linkedProfileId } });
-          if (brand) {
-            return {
-              id: dl.id,
-              displayNameOverride: dl.displayNameOverride,
-              descriptionOverride: dl.descriptionOverride,
-              profileType: dl.profileType,
-              name: brand.name,
-              profileImageUrl: brand.logoUrl,
-              profileLink: `/brands/${brand.id}`,
-            };
-          }
-        }
-        // fallback minimal
-        return {
-          id: dl.id,
-          displayNameOverride: dl.displayNameOverride,
-          descriptionOverride: dl.descriptionOverride,
-          profileType: dl.profileType,
-          name: dl.displayNameOverride || 'Dealer',
-          profileImageUrl: null,
-          profileLink: undefined,
-        };
+    const brandIds = (convention.dealerLinks || [])
+      .filter((dl: any) => dl.profileType === 'BRAND')
+      .map((dl: any) => dl.linkedProfileId);
+
+    // Fetch all brands in a single query to avoid N+1
+    const brands = brandIds.length > 0
+      ? await prisma.brand.findMany({
+        where: { id: { in: brandIds } },
+        select: { id: true, name: true, logoUrl: true }
       })
-    );
+      : [];
+
+    const brandMap = new Map(brands.map(brand => [brand.id, brand]));
+
+    const populatedDealerLinks = (convention.dealerLinks || []).map((dl: any) => {
+      if (dl.profileType === 'BRAND') {
+        const brand = brandMap.get(dl.linkedProfileId);
+        if (brand) {
+          return {
+            id: dl.id,
+            displayNameOverride: dl.displayNameOverride,
+            descriptionOverride: dl.descriptionOverride,
+            profileType: dl.profileType,
+            name: brand.name,
+            profileImageUrl: brand.logoUrl,
+            profileLink: `/brands/${brand.id}`,
+          };
+        }
+      }
+      // fallback minimal
+      return {
+        id: dl.id,
+        displayNameOverride: dl.displayNameOverride,
+        descriptionOverride: dl.descriptionOverride,
+        profileType: dl.profileType,
+        name: dl.displayNameOverride || 'Dealer',
+        profileImageUrl: null,
+        profileLink: undefined,
+      };
+    });
 
     // Derive display timezone & currency from settings first (fallbacks embedded)
     const displayTimezone = getTimezoneFromSettings((convention as any).settings || []);
@@ -106,8 +118,12 @@ function transformPricingData(priceTiers: any[], priceDiscounts: any[]) {
 
     return {
       ...tier,
-      activeDiscounts,
-      currentPrice: activeDiscounts.length > 0 ? activeDiscounts[0].discountedAmount : tier.amount,
+      amount: tier.amount.toNumber(), // ✅ Convert Decimal to number
+      activeDiscounts: activeDiscounts.map(discount => ({
+        ...discount,
+        discountedAmount: discount.discountedAmount.toNumber(), // ✅ Convert Decimal to number
+      })),
+      currentPrice: activeDiscounts.length > 0 ? activeDiscounts[0].discountedAmount.toNumber() : tier.amount.toNumber(),
       hasActiveDiscount: activeDiscounts.length > 0,
       nextDiscountCutoff: activeDiscounts.length > 0 ? activeDiscounts[0].cutoffDate : null
     };
@@ -179,7 +195,8 @@ function transformScheduleEvent(event: any, timezone: string) {
     timeDisplay: formatEventTime(event.startTimeMinutes, event.durationMinutes, timezone),
     feesDisplay: event.feeTiers?.map((fee: any) => ({
       ...fee,
-      formattedAmount: formatCurrency(fee.amount, 'USD') // TODO: Use convention currency
+      amount: fee.amount.toNumber(), // ✅ Convert Decimal to number
+      formattedAmount: formatCurrency(fee.amount.toNumber(), 'USD') // ✅ Convert Decimal to number
     })) || []
   };
 }

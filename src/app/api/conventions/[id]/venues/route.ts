@@ -119,17 +119,24 @@ export async function GET(
   }
   const conventionId = params.id;
   try {
+    // ✅ Optimized: Single query with includes
     const convention = await prisma.convention.findUnique({
       where: { id: conventionId },
+      include: {
+        venues: {
+          orderBy: { isPrimaryVenue: 'desc' }, // Primary first, then others
+          include: {
+            photos: true, // Include venue photos
+          },
+        },
+      },
     });
+
     if (!convention) {
       return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
     }
-    const venues = await prisma.venue.findMany({
-      where: { conventionId },
-      orderBy: { isPrimaryVenue: 'desc' }, // Primary first, then others
-    });
-    return NextResponse.json(venues, { status: 200 });
+
+    return NextResponse.json(convention.venues, { status: 200 });
   } catch (error) {
     console.error('Error fetching venues:', error);
     return NextResponse.json({ message: 'Failed to fetch venues' }, { status: 500 });

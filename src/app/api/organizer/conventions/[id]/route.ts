@@ -119,7 +119,20 @@ export async function GET(
       return NextResponse.json({ error: 'Convention not found or has been deleted' }, { status: 404 });
     }
 
-    return NextResponse.json(convention);
+    // ✅ Fix: Serialize Decimal objects before sending to client
+    const serializedConvention = {
+      ...convention,
+      priceTiers: convention.priceTiers?.map((tier: any) => ({
+        ...tier,
+        amount: tier.amount.toNumber(), // Convert Decimal to number
+      })),
+      priceDiscounts: convention.priceDiscounts?.map((discount: any) => ({
+        ...discount,
+        discountedAmount: discount.discountedAmount.toNumber(), // Convert Decimal to number
+      })),
+    };
+
+    return NextResponse.json(serializedConvention);
   } catch (error) {
     console.error('[API GET /organizer/conventions/:id] Error fetching convention:', error);
     return NextResponse.json(

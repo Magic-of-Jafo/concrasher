@@ -127,6 +127,19 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
 
     const populatedConvention = await populateDealerLinks(convention);
 
+    // ✅ Fix: Serialize Decimal objects before passing to client component
+    const serializedConvention = {
+      ...populatedConvention,
+      priceTiers: populatedConvention.priceTiers?.map((tier: any) => ({
+        ...tier,
+        amount: tier.amount.toNumber(), // Convert Decimal to number
+      })),
+      priceDiscounts: populatedConvention.priceDiscounts?.map((discount: any) => ({
+        ...discount,
+        discountedAmount: discount.discountedAmount.toNumber(), // Convert Decimal to number
+      })),
+    };
+
     const eventJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Event',
@@ -179,7 +192,7 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd, null, 2) }}
         />
-        <ConventionDetailClient convention={populatedConvention} />
+        <ConventionDetailClient convention={serializedConvention} />
       </>
     );
   } catch (error) {

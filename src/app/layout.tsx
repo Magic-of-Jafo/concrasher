@@ -9,9 +9,8 @@ import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
 import { db } from "@/lib/db";
-
-// ✅ CORRECTED: Import the component with the correct name that matches the export in the file.
-import { TrackingScripts } from '@/components/TrackingScripts';
+import Script from 'next/script'; // ✅ IMPORT aDDED
+import { TrackingScripts } from '@/components/TrackingScripts'; // ✅ IMPORT aDDED
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,7 +31,6 @@ const montserrat = Montserrat({
   display: 'swap',
 });
 
-// ✅ CORRECTED: The generateMetadata function must be a separate named export.
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await (db as any).sEOSetting.findUnique({
     where: { id: 'singleton' },
@@ -95,13 +93,7 @@ export default async function RootLayout({
           />
         )}
 
-        {/* Inject the entire, unmodified script block from your database here. */}
-        {seoSettings?.trackingScripts && (
-          <script
-            id="admin-tracking-scripts"
-            dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
-          />
-        )}
+        {/* ❌ THE PROBLEMATIC DATABASE-INJECTED SCRIPT HAS BEEN REMOVED FROM HERE */}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>
@@ -119,8 +111,23 @@ export default async function RootLayout({
                   {children}
                 </Suspense>
 
-                {/* A single instance with NO PROPS to handle navigation tracking. */}
+                {/* ✅ CORRECT TRACKING IMPLEMENTATION ADDED HERE */}
                 <TrackingScripts />
+                <Script id="meta-pixel-base" strategy="afterInteractive">
+                  {`
+                    !function(f,b,e,v,n,t,s)
+                    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+                    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+                    n.queue=[];t=b.createElement(e);t.async=!0;
+                    t.src=v;s=b.getElementsByTagName(e)[0];
+                    s.parentNode.insertBefore(t,s)}(window, document,'script',
+                    'https://connect.facebook.net/en_US/fbevents.js');
+                    
+                    fbq('init', '${process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID}');
+                    fbq('set', 'autoConfig', 'false', '${process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID}');
+                  `}
+                </Script>
 
               </NotificationProvider>
             </QueryProvider>
