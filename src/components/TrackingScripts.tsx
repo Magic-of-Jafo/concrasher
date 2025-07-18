@@ -3,9 +3,7 @@
 import { useEffect, useRef } from 'react'; // 👈 Import useRef
 import { usePathname } from 'next/navigation';
 
-// A robust function to wait for tracking functions to be ready
 const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promise<void> => {
-    // ... (this function remains the same)
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
@@ -61,12 +59,12 @@ export function TrackingScripts() {
 
         trackPageView();
 
-    }, [pathname]); // Still dependent on pathname
+    }, [pathname]);
 
     return null;
 }
 
-// Extend the Window interface for TypeScript to recognize tracking functions
+// Extend the Window interface for TypeScript
 declare global {
     interface Window {
         fbq?: (...args: any[]) => void;

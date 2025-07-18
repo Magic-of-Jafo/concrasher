@@ -92,6 +92,14 @@ export default async function RootLayout({
             dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema, null, 2) }}
           />
         )}
+
+        {/* ✅ Scripts Injected from Database (for Clarity) MOVED HERE */}
+        {seoSettings?.trackingScripts && (
+          <script
+            id="db-tracking-scripts"
+            dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
+          />
+        )}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>
@@ -126,14 +134,6 @@ export default async function RootLayout({
                     fbq('set', 'autoConfig', 'false', '282675836122405');
                   `}
                 </Script>
-
-                {/* ✅ Scripts Injected from Database (for Clarity) */}
-                {seoSettings?.trackingScripts && (
-                  <script
-                    id="db-tracking-scripts"
-                    dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
-                  />
-                )}
 
               </NotificationProvider>
             </QueryProvider>
