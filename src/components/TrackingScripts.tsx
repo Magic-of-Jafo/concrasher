@@ -3,67 +3,52 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-interface TrackingScriptsProps {
-    scripts: string;
-}
+// A robust function to wait for the Meta Pixel (fbq) to be ready
+const waitForFbq = (maxAttempts = 20): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const check = () => {
+            if (typeof window.fbq === 'function') {
+                resolve();
+            } else if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(check, 150);
+            } else {
+                reject(new Error('Meta Pixel (fbq) not loaded after multiple attempts.'));
+            }
+        };
+        check();
+    });
+};
 
-export default function TrackingScripts({ scripts }: TrackingScriptsProps) {
+// The component function should match the file name.
+export function TrackingScripts() {
     const pathname = usePathname();
 
     useEffect(() => {
-        // Trigger pageview on route changes for various tracking services
-        if (typeof window !== 'undefined') {
-            // Facebook Pixel
-            if (window.fbq && typeof window.fbq === 'function') {
-                window.fbq('track', 'PageView');
+        const trackPageView = async () => {
+            try {
+                // Wait for the pixel to be ready before trying to use it
+                await waitForFbq();
+                if (window.fbq) {
+                    window.fbq('track', 'PageView');
+                }
+            } catch (error) {
+                // Meta Pixel not available - this is expected if no tracking scripts are loaded
             }
+        };
 
-            // Google Analytics (gtag)
-            if (window.gtag && typeof window.gtag === 'function') {
-                window.gtag('event', 'page_view', {
-                    page_path: pathname,
-                });
-            }
+        trackPageView();
 
-            // Google Analytics (ga)
-            if (window.ga && typeof window.ga === 'function') {
-                window.ga('send', 'pageview', pathname);
-            }
+    }, [pathname]); // This dependency array ensures the effect runs on every path change
 
-            // Microsoft Clarity
-            if (window.clarity && typeof window.clarity === 'function') {
-                window.clarity('set', 'page_view', pathname);
-            }
-
-            // Generic tracking for other services
-            if (window.dataLayer && Array.isArray(window.dataLayer)) {
-                window.dataLayer.push({
-                    event: 'page_view',
-                    page_path: pathname,
-                });
-            }
-        }
-    }, [pathname]);
-
-    // Extract the script content from the tag
-    const scriptContent = scripts.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
-
-    // Render the tracking scripts
-    return (
-        <script
-            type="text/javascript"
-            dangerouslySetInnerHTML={{ __html: scriptContent }}
-        />
-    );
+    // This component's only job is to run the effect; it renders no HTML.
+    return null;
 }
 
-// Extend Window interface for TypeScript
+// Extend the Window interface for TypeScript to recognize fbq
 declare global {
     interface Window {
         fbq?: (...args: any[]) => void;
-        gtag?: (...args: any[]) => void;
-        ga?: (...args: any[]) => void;
-        clarity?: (...args: any[]) => void;
-        dataLayer?: any[];
     }
-} 
+}

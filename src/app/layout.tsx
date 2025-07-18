@@ -9,31 +9,9 @@ import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
 import { db } from "@/lib/db";
-import Script from 'next/script';
-import TrackingScripts from '@/components/TrackingScripts';
 
-// A simple parser to extract attributes from a script tag string
-const parseScriptTag = (scriptTag: string): { src?: string; id?: string;[key: string]: any } => {
-  const srcMatch = scriptTag.match(/src="([^"]+)"/);
-  const idMatch = scriptTag.match(/id="([^"]+)"/);
-  const asyncMatch = scriptTag.includes('async');
-  const deferMatch = scriptTag.includes('defer');
-
-  const props: { src?: string; id?: string;[key: string]: any } = {};
-  if (srcMatch) props.src = srcMatch[1];
-  if (idMatch) props.id = idMatch[1];
-  if (asyncMatch) props.async = true;
-  if (deferMatch) props.defer = true;
-
-  // Find inner content if it's not just a src tag
-  const contentMatch = scriptTag.match(/>([^<]+)</);
-  if (contentMatch && contentMatch[1].trim()) {
-    props.dangerouslySetInnerHTML = { __html: contentMatch[1].trim() };
-  }
-
-  return props;
-};
-
+// ✅ CORRECTED: Import the component with the correct name that matches the export in the file.
+import { TrackingScripts } from '@/components/TrackingScripts';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,10 +28,11 @@ const robotoMono = Roboto_Mono({
 const montserrat = Montserrat({
   subsets: ['latin'],
   variable: '--font-montserrat',
-  weight: ['400', '700', '800'], // Regular, Bold, ExtraBold
+  weight: ['400', '700', '800'],
   display: 'swap',
 });
 
+// ✅ CORRECTED: The generateMetadata function must be a separate named export.
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await (db as any).sEOSetting.findUnique({
     where: { id: 'singleton' },
@@ -68,7 +47,6 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: seoSettings?.defaultKeywords || [],
   };
 }
-
 
 export default async function RootLayout({
   children,
@@ -99,25 +77,16 @@ export default async function RootLayout({
     },
   };
 
-  const trackingScriptTags = seoSettings?.trackingScripts
-    ? seoSettings.trackingScripts.split(/(?=<\s*script)/).filter((s: string) => s.trim())
-    : [];
-
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <head>
-        {/* Custom meta tags */}
-        <meta httpEquiv="x-error-message" content="" />
-
-        {/* Organization structured data */}
+        {/* Schema.org scripts */}
         {seoSettings && (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema, null, 2) }}
           />
         )}
-
-        {/* Website structured data */}
         {seoSettings && (
           <script
             type="application/ld+json"
@@ -125,15 +94,13 @@ export default async function RootLayout({
           />
         )}
 
-        {/* External Tracking Scripts */}
-        {trackingScriptTags.map((tag: string, index: number) => {
-          const scriptProps = parseScriptTag(tag);
-          // Only render external scripts in head
-          if (scriptProps.src) {
-            return <Script key={index} strategy="beforeInteractive" {...scriptProps} />;
-          }
-          return null;
-        })}
+        {/* Inject the entire, unmodified script block from your database here. */}
+        {seoSettings?.trackingScripts && (
+          <script
+            id="admin-tracking-scripts"
+            dangerouslySetInnerHTML={{ __html: seoSettings.trackingScripts }}
+          />
+        )}
       </head>
       <body className={`${robotoMono.variable} antialiased`}>
         <ThemeProviders>
@@ -143,11 +110,7 @@ export default async function RootLayout({
                 <Suspense fallback={null}>
                   <ErrorHandler />
                 </Suspense>
-                {/* Skip link for keyboard users */}
-                <a
-                  href="#main-content"
-                  className="skip-link"
-                >
+                <a href="#main-content" className="skip-link">
                   Skip to main content
                 </a>
                 <Header />
@@ -155,20 +118,9 @@ export default async function RootLayout({
                   {children}
                 </Suspense>
 
-                {/* Inline Tracking Scripts */}
-                {trackingScriptTags.map((tag: string, index: number) => {
-                  const scriptProps = parseScriptTag(tag);
-                  // Only render inline scripts in body
-                  if (scriptProps.dangerouslySetInnerHTML) {
-                    return (
-                      <TrackingScripts
-                        key={`inline-${index}`}
-                        scripts={tag}
-                      />
-                    );
-                  }
-                  return null;
-                })}
+                {/* A single instance with NO PROPS to handle navigation tracking. */}
+                <TrackingScripts />
+
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>
