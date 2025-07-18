@@ -39,6 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 
   return {
+    metadataBase: new URL('https://conventioncrasher.com'),
     title: {
       default: seoSettings?.organizationName || 'Convention Crasher',
       template: seoSettings?.siteTitleTemplate || '%s',
