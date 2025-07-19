@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'; // 👈 Import useRef
 import { usePathname } from 'next/navigation';
 
-const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promise<void> => {
+const waitForTrackingFunction = (functionName: string, maxAttempts = 30): Promise<void> => {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
@@ -11,9 +11,9 @@ const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promis
                 resolve();
             } else if (attempts < maxAttempts) {
                 attempts++;
-                setTimeout(check, 150);
+                setTimeout(check, 200);
             } else {
-                reject(new Error(`${functionName} not loaded after multiple attempts.`));
+                reject(new Error(`${functionName} not loaded after ${maxAttempts} attempts.`));
             }
         };
         check();
@@ -31,26 +31,14 @@ export function TrackingScripts() {
         }
 
         const trackPageView = async () => {
-            // Meta Pixel tracking
+            // Meta Pixel tracking only
             try {
                 await waitForTrackingFunction('fbq');
                 if (window.fbq) {
                     window.fbq('track', 'PageView');
                 }
             } catch (error) {
-                // Meta Pixel not available
-            }
-
-            // Google Analytics 4 tracking
-            try {
-                await waitForTrackingFunction('gtag');
-                if (window.gtag) {
-                    window.gtag('event', 'page_view', {
-                        page_path: pathname,
-                    });
-                }
-            } catch (error) {
-                // GA4 not available
+                console.error('[TrackingScripts] Meta Pixel failed:', error);
             }
 
             // ✅ Update the ref to the new path so we don't track it again
@@ -68,6 +56,5 @@ export function TrackingScripts() {
 declare global {
     interface Window {
         fbq?: (...args: any[]) => void;
-        gtag?: (...args: any[]) => void;
     }
 }

@@ -8,26 +8,9 @@ import { NotificationProvider } from "@/components/NotificationContext";
 import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
-import { db } from "@/lib/db";
+import { db } from "@/lib/db"; // Re-added for dynamic metadata
 import Script from 'next/script';
 import { TrackingScripts } from '@/components/TrackingScripts';
-
-const parseScriptTag = (scriptString: string) => {
-  const attributes: { [key: string]: string | boolean } = {};
-  const attributeRegex = /([\w-]+)=(['"])(.*?)\2/g;
-  let match;
-  while ((match = attributeRegex.exec(scriptString)) !== null) {
-    attributes[match[1]] = match[3];
-  }
-  if (scriptString.includes(' defer')) attributes.defer = true;
-  if (scriptString.includes(' async')) attributes.async = true;
-
-  const contentRegex = /<script[^>]*>([\s\S]*?)<\/script>/;
-  const contentMatch = scriptString.match(contentRegex);
-  const innerContent = contentMatch ? contentMatch[1].trim() : '';
-
-  return { attributes, innerContent };
-};
 
 const inter = Inter({
   subsets: ["latin"],
@@ -48,6 +31,7 @@ const montserrat = Montserrat({
   display: 'swap',
 });
 
+// ✅ RE-ADDED: Dynamic metadata generation from the database
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await (db as any).sEOSetting.findUnique({
     where: { id: 'singleton' },
@@ -57,10 +41,9 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL('https://conventioncrasher.com'),
     title: {
       default: seoSettings?.organizationName || 'Convention Crasher',
-      template: seoSettings?.siteTitleTemplate || '%s',
+      template: seoSettings?.siteTitleTemplate || '%s | Convention Crasher',
     },
     description: seoSettings?.siteDescription || 'Your one-stop portal for conventions.',
-    keywords: seoSettings?.defaultKeywords || [],
   };
 }
 
@@ -69,13 +52,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // ✅ RE-ADDED: Data fetching for Schema.org scripts
   const seoSettings = await (db as any).sEOSetting.findUnique({
     where: { id: 'singleton' },
   });
-
-  const dbTrackingScripts = seoSettings?.trackingScripts
-    ? seoSettings.trackingScripts.split(/(?=<\s*script)/).filter((s: string) => s.trim())
-    : [];
 
   const organizationSchema = {
     '@context': 'https://schema.org',
@@ -114,19 +94,35 @@ export default async function RootLayout({
           />
         )}
 
-        {/* Database-Injected Scripts */}
-        {dbTrackingScripts.map((scriptString: string, index: number) => {
-          const { attributes, innerContent } = parseScriptTag(scriptString);
-          return (
-            <Script key={`db-script-${index}`} strategy="beforeInteractive" {...attributes}>
-              {innerContent}
-            </Script>
-          );
-        })}
+        {/* --- Microsoft Clarity --- */}
+        <Script id="ms-clarity" strategy="afterInteractive">
+          {`
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "sf397fpiby");
+          `}
+        </Script>
 
-        {/* Meta Pixel Implementation */}
+        {/* --- Plerdy --- */}
+        <Script id="plerdy" strategy="afterInteractive">
+          {`
+            (function() {
+                var _protocol="https:"==document.location.protocol?"https://":"http://";
+                var _site_hash_code = "2939b4919e7361bb32ea4a43c08c1b36",_suid=11718, plerdyScript=document.createElement("script");
+                plerdyScript.setAttribute("defer",""),plerdyScript.dataset.plerdymainscript="plerdymainscript",
+                plerdyScript.src="https://d.plerdy.com/public/js/click/main.js?v="+Math.random();
+                var plerdymainscript=document.querySelector("[data-plerdymainscript='plerdymainscript']");
+                plerdymainscript&&plerdymainscript.parentNode.removeChild(plerdymainscript);
+                try{document.head.appendChild(plerdyScript)}catch(t){console.log(t,"unable add script tag")}
+            })();
+          `}
+        </Script>
+
+        {/* --- Meta Pixel --- */}
         <TrackingScripts />
-        <Script id="meta-pixel-base" strategy="beforeInteractive">
+        <Script id="meta-pixel-base" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
             {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
