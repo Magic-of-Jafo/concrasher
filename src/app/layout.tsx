@@ -58,25 +58,19 @@ export default function RootLayout({
           `}
         </Script>
 
-        {/* --- Plerdy (using standard script tag to force <head> placement) --- */}
-        <script
-          id="plerdy-script"
-          defer
-          data-plerdy_code="1"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                  var _protocol="https:"==document.location.protocol?"https://":"http://";
-                  var _site_hash_code = "2939b4919e7361bb32ea4a43c08c1b36",_suid=11718, plerdyScript=document.createElement("script");
-                  plerdyScript.setAttribute("defer",""),plerdyScript.dataset.plerdymainscript="plerdymainscript",
-                  plerdyScript.src="https://d.plerdy.com/public/js/click/main.js?v="+Math.random();
-                  var plerdymainscript=document.querySelector("[data-plerdymainscript='plerdymainscript']");
-                  plerdymainscript&&plerdymainscript.parentNode.removeChild(plerdymainscript);
-                  try{document.head.appendChild(plerdyScript)}catch(t){console.log(t,"unable add script tag")}
-              })();
-            `,
-          }}
+        {/* --- Google Analytics --- */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
         />
+        <Script id="google-analytics-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+          `}
+        </Script>
 
         {/* --- Meta Pixel Base Script --- */}
         <Script id="meta-pixel-base" strategy="afterInteractive">
@@ -110,7 +104,7 @@ export default function RootLayout({
                 <Suspense fallback={<div>Loading...</div>}>
                   {children}
                 </Suspense>
-                {/* --- Tracking Scripts (Client Component) --- */}
+                {/* This component handles page view tracking for Meta and GA */}
                 <TrackingScripts />
               </NotificationProvider>
             </QueryProvider>
