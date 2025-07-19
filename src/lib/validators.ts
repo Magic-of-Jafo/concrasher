@@ -58,6 +58,7 @@ const US_STATES = [
 export const RegistrationSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
+  eventId: z.string().optional(), // ✅ Add eventId for deduplication
 });
 
 export const LoginSchema = z.object({

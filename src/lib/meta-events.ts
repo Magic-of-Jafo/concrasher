@@ -3,7 +3,8 @@
 export async function sendCapiEvent(
     eventName: string,
     userData: { email?: string; ip?: string; userAgent?: string },
-    customData?: object
+    customData?: object,
+    eventId?: string
 ) {
     if (!process.env.META_PIXEL_ID || !process.env.META_CAPI_ACCESS_TOKEN) {
         console.warn('Meta CAPI environment variables are not set. Skipping event.');
@@ -11,7 +12,7 @@ export async function sendCapiEvent(
     }
 
     // 1. Log that the function is attempting to send an event
-    console.log(`[CAPI] Attempting to send event: ${eventName}`);
+    console.log(`[CAPI] Attempting to send event: ${eventName}${eventId ? ` with eventId: ${eventId}` : ''}`);
 
     const payload = {
         data: [
@@ -19,6 +20,7 @@ export async function sendCapiEvent(
                 event_name: eventName,
                 event_time: Math.floor(Date.now() / 1000),
                 action_source: 'website',
+                event_id: eventId,
                 user_data: {
                     em: userData.email,
                     client_ip_address: userData.ip,

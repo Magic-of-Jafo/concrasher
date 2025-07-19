@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { generateEventId } from '@/lib/tracking-utils';
 
 const waitForTrackingFunction = (functionName: string, maxAttempts = 30): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -20,6 +21,8 @@ const waitForTrackingFunction = (functionName: string, maxAttempts = 30): Promis
     });
 };
 
+
+
 export function TrackingScripts() {
     const pathname = usePathname();
     const trackedPathnameRef = useRef<string | null>(null);
@@ -30,11 +33,14 @@ export function TrackingScripts() {
         }
 
         const trackPageView = async () => {
+            const eventId = generateEventId(); // ✅ Generate a unique ID for this PageView
+
             // Meta Pixel tracking
             try {
                 await waitForTrackingFunction('fbq');
                 if (window.fbq) {
-                    window.fbq('track', 'PageView');
+                    // ✅ Send the eventId with the browser event
+                    window.fbq('track', 'PageView', {}, { eventID: eventId });
                 }
             } catch (error) {
                 console.error('[TrackingScripts] Meta Pixel failed:', error);

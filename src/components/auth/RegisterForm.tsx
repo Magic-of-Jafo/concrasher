@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Button, Box, Alert } from '@mui/material';
 import { AutofillTextField } from '../ui/AutofillTextField';
 import { signIn } from 'next-auth/react';
+import { generateEventId, trackPixelEvent } from '@/lib/tracking-utils';
 
 // Client-side only schema - password match is checked manually
 const ClientRegistrationSchema = z.object({
@@ -50,6 +51,14 @@ export default function RegisterForm() {
         setError(null);
         setSuccessMessage(null);
 
+        // ✅ Generate a unique event ID for this registration
+        const eventId = generateEventId();
+
+        // ✅ Fire the browser event immediately with deduplication
+        trackPixelEvent('CompleteRegistration', {
+            registration_method: 'Email',
+        }, eventId);
+
         try {
             const response = await fetch('/api/auth/register', {
                 method: 'POST',
@@ -59,6 +68,7 @@ export default function RegisterForm() {
                 body: JSON.stringify({
                     email: data.email,
                     password: data.password,
+                    eventId, // ✅ Pass the eventId to the server
                 }),
             });
             const result = await response.json();

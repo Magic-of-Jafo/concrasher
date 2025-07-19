@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const { email, password } = validation.data;
+    const { email, password, eventId } = validation.data; // ✅ Extract eventId from request
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
         {
           registration_method: 'Email',
           user_id: newUser.id,
-        }
+        },
+        eventId // ✅ Pass the eventId for deduplication
       );
     } catch (capiError) {
       console.error('[API Register] Failed to send CompleteRegistration CAPI event:', capiError);
