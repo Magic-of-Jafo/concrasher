@@ -6,8 +6,33 @@ import { Box, Grid, Paper, Typography, Theme, Button } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import Link from "next/link";
 import { getS3ImageUrl } from "@/lib/defaults";
-import Script from "next/script";
 import FacebookIcon from '@mui/icons-material/Facebook';
+import dynamic from "next/dynamic";
+
+// Dynamic import for Groove Video widget to improve page load performance
+const GrooveVideoWidget = dynamic(() => import('@/components/features/GrooveVideoWidget'), {
+  ssr: false, // This ensures it only loads on the client-side
+  loading: () => (
+    <Box
+      sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 0,
+        backgroundColor: '#1a365d',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Typography variant="body2" color="white">
+        Loading video...
+      </Typography>
+    </Box>
+  ),
+});
 
 
 const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
@@ -95,31 +120,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             }}
           >
             {/* GrooveVideo Player as "background" */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 0,
-                '& groovevideo-widget': {
-                  width: '100% !important',
-                  height: '100% !important',
-                  objectFit: 'cover',
-                },
-              }}
-            >
-              <link href="https://widget.groovevideo.com/widget/app.css" rel="stylesheet" />
-              <Script
-                src="https://widget.groovevideo.com/widget/app.js"
-                strategy="lazyOnload"
-              />
-
-              <div dangerouslySetInnerHTML={{
-                __html: '<groovevideo-widget id="288647" permalink="UjAdn2s5J45xXy4uBUas"></groovevideo-widget>'
-              }} />
-            </Box>
+            <GrooveVideoWidget id="288647" permalink="UjAdn2s5J45xXy4uBUas" />
 
             {/* Dark overlay */}
             <Box
