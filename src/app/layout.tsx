@@ -8,7 +8,6 @@ import { NotificationProvider } from "@/components/NotificationContext";
 import { ErrorHandler } from "@/components/ErrorHandler";
 import Header from "@/components/layout/Header";
 import { Suspense } from 'react';
-import { db } from "@/lib/db"; // Re-added for dynamic metadata
 import Script from 'next/script';
 import { TrackingScripts } from '@/components/TrackingScripts';
 
@@ -31,69 +30,23 @@ const montserrat = Montserrat({
   display: 'swap',
 });
 
-// ✅ RE-ADDED: Dynamic metadata generation from the database
-export async function generateMetadata(): Promise<Metadata> {
-  const seoSettings = await (db as any).sEOSetting.findUnique({
-    where: { id: 'singleton' },
-  });
+export const metadata: Metadata = {
+  metadataBase: new URL('https://conventioncrasher.com'),
+  title: {
+    default: 'Convention Crasher',
+    template: '%s | Convention Crasher',
+  },
+  description: 'Your one-stop portal for conventions.',
+};
 
-  return {
-    metadataBase: new URL('https://conventioncrasher.com'),
-    title: {
-      default: seoSettings?.organizationName || 'Convention Crasher',
-      template: seoSettings?.siteTitleTemplate || '%s | Convention Crasher',
-    },
-    description: seoSettings?.siteDescription || 'Your one-stop portal for conventions.',
-  };
-}
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // ✅ RE-ADDED: Data fetching for Schema.org scripts
-  const seoSettings = await (db as any).sEOSetting.findUnique({
-    where: { id: 'singleton' },
-  });
-
-  const organizationSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: seoSettings?.organizationName,
-    url: seoSettings?.organizationUrl,
-    logo: seoSettings?.organizationLogo,
-    sameAs: seoSettings?.socialProfiles,
-  };
-
-  const websiteSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    url: seoSettings?.organizationUrl,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: `${seoSettings?.organizationUrl}/search?q={search_term_string}`,
-      'query-input': 'required name=search_term_string',
-    },
-  };
-
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <head>
-        {/* Schema.org scripts */}
-        {seoSettings && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema, null, 2) }}
-          />
-        )}
-        {seoSettings && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema, null, 2) }}
-          />
-        )}
-
         {/* --- Microsoft Clarity --- */}
         <Script id="ms-clarity" strategy="afterInteractive">
           {`
@@ -105,23 +58,27 @@ export default async function RootLayout({
           `}
         </Script>
 
-        {/* --- Plerdy --- */}
-        <Script id="plerdy" strategy="afterInteractive">
-          {`
-            (function() {
-                var _protocol="https:"==document.location.protocol?"https://":"http://";
-                var _site_hash_code = "2939b4919e7361bb32ea4a43c08c1b36",_suid=11718, plerdyScript=document.createElement("script");
-                plerdyScript.setAttribute("defer",""),plerdyScript.dataset.plerdymainscript="plerdymainscript",
-                plerdyScript.src="https://d.plerdy.com/public/js/click/main.js?v="+Math.random();
-                var plerdymainscript=document.querySelector("[data-plerdymainscript='plerdymainscript']");
-                plerdymainscript&&plerdymainscript.parentNode.removeChild(plerdymainscript);
-                try{document.head.appendChild(plerdyScript)}catch(t){console.log(t,"unable add script tag")}
-            })();
-          `}
-        </Script>
+        {/* --- Plerdy (using standard script tag to force <head> placement) --- */}
+        <script
+          id="plerdy-script"
+          defer
+          data-plerdy_code="1"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                  var _protocol="https:"==document.location.protocol?"https://":"http://";
+                  var _site_hash_code = "2939b4919e7361bb32ea4a43c08c1b36",_suid=11718, plerdyScript=document.createElement("script");
+                  plerdyScript.setAttribute("defer",""),plerdyScript.dataset.plerdymainscript="plerdymainscript",
+                  plerdyScript.src="https://d.plerdy.com/public/js/click/main.js?v="+Math.random();
+                  var plerdymainscript=document.querySelector("[data-plerdymainscript='plerdymainscript']");
+                  plerdymainscript&&plerdymainscript.parentNode.removeChild(plerdymainscript);
+                  try{document.head.appendChild(plerdyScript)}catch(t){console.log(t,"unable add script tag")}
+              })();
+            `,
+          }}
+        />
 
-        {/* --- Meta Pixel --- */}
-        <TrackingScripts />
+        {/* --- Meta Pixel Base Script --- */}
         <Script id="meta-pixel-base" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
@@ -153,6 +110,8 @@ export default async function RootLayout({
                 <Suspense fallback={<div>Loading...</div>}>
                   {children}
                 </Suspense>
+                {/* --- Tracking Scripts (Client Component) --- */}
+                <TrackingScripts />
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>
