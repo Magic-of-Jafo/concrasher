@@ -105,7 +105,7 @@ export default function RootLayout({
                   {children}
                 </Suspense>
                 {/* This component handles page view tracking for Meta and GA */}
-                <TrackingScripts />
+                <TrackingScripts key="tracking-scripts" />
               </NotificationProvider>
             </QueryProvider>
           </AuthProvider>

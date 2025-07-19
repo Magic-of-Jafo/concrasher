@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 // A function to generate a unique event ID
@@ -28,16 +28,38 @@ const waitForTrackingFunction = (functionName: string, maxAttempts = 20): Promis
 
 export function TrackingScripts() {
     const pathname = usePathname();
+    const lastProcessedPathname = useRef<string | null>(null);
+
+    // ✅ DEBUG: Log component mount (but only once per pathname)
+    if (lastProcessedPathname.current !== pathname) {
+        console.log('[TrackingScripts] Component mounted/rendered with pathname:', pathname);
+    }
 
     useEffect(() => {
+        // Prevent duplicate processing of the same pathname
+        if (pathname === lastProcessedPathname.current) {
+            console.log('[TrackingScripts] Skipping duplicate pathname:', pathname);
+            return;
+        }
+
+        console.log('[TrackingScripts] useEffect triggered with pathname:', pathname);
+
         const trackPageView = async () => {
             const eventId = generateEventId();
+
+            // ✅ DEBUG: Log when tracking is triggered
+            console.log('[TrackingScripts] Tracking page view:', {
+                pathname,
+                eventId,
+                timestamp: new Date().toISOString()
+            });
 
             // Meta Pixel tracking
             try {
                 await waitForTrackingFunction('fbq');
                 if (window.fbq) {
                     window.fbq('track', 'PageView', {}, { eventID: eventId });
+                    console.log('[TrackingScripts] Meta Pixel PageView sent with eventId:', eventId);
                 }
             } catch (error) {
                 console.error('[TrackingScripts] Meta Pixel failed:', error);
@@ -50,15 +72,22 @@ export function TrackingScripts() {
                     window.gtag('event', 'page_view', {
                         page_path: pathname,
                     });
+                    console.log('[TrackingScripts] GA4 page_view sent for pathname:', pathname);
                 }
             } catch (error) {
                 console.error('[TrackingScripts] GA4 failed:', error);
             }
+
+            // Mark this pathname as processed
+            lastProcessedPathname.current = pathname;
         };
 
         // We only call trackPageView if the path is not null
         if (pathname) {
+            console.log('[TrackingScripts] Pathname changed to:', pathname);
             trackPageView();
+        } else {
+            console.log('[TrackingScripts] Pathname is null, skipping tracking');
         }
 
     }, [pathname]); // This dependency array ensures the effect runs on every path change
