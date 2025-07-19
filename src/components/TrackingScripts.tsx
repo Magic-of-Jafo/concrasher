@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react'; // 👈 Import useRef
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 const waitForTrackingFunction = (functionName: string, maxAttempts = 30): Promise<void> => {
@@ -22,16 +22,15 @@ const waitForTrackingFunction = (functionName: string, maxAttempts = 30): Promis
 
 export function TrackingScripts() {
     const pathname = usePathname();
-    const trackedPathnameRef = useRef<string | null>(null); // 👈 Add a ref to track the path
+    const trackedPathnameRef = useRef<string | null>(null);
 
     useEffect(() => {
-        // 🛑 Only track if the pathname is new and hasn't been tracked yet
         if (pathname === trackedPathnameRef.current) {
             return;
         }
 
         const trackPageView = async () => {
-            // Meta Pixel tracking only
+            // Meta Pixel tracking
             try {
                 await waitForTrackingFunction('fbq');
                 if (window.fbq) {
@@ -41,7 +40,18 @@ export function TrackingScripts() {
                 console.error('[TrackingScripts] Meta Pixel failed:', error);
             }
 
-            // ✅ Update the ref to the new path so we don't track it again
+            // ✅ ADDED BACK: Google Analytics 4 tracking
+            try {
+                await waitForTrackingFunction('gtag');
+                if (window.gtag) {
+                    window.gtag('event', 'page_view', {
+                        page_path: pathname,
+                    });
+                }
+            } catch (error) {
+                console.error('[TrackingScripts] GA4 failed:', error);
+            }
+
             trackedPathnameRef.current = pathname;
         };
 
@@ -56,5 +66,6 @@ export function TrackingScripts() {
 declare global {
     interface Window {
         fbq?: (...args: any[]) => void;
+        gtag?: (...args: any[]) => void; // ✅ ADDED BACK: gtag type
     }
 }
