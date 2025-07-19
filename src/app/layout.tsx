@@ -114,19 +114,19 @@ export default async function RootLayout({
           />
         )}
 
-        {/* Database-Injected Scripts (Clarity, Plerdy, etc.) */}
+        {/* Database-Injected Scripts */}
         {dbTrackingScripts.map((scriptString: string, index: number) => {
           const { attributes, innerContent } = parseScriptTag(scriptString);
           return (
-            <Script key={`db-script-${index}`} {...attributes}>
+            <Script key={`db-script-${index}`} strategy="beforeInteractive" {...attributes}>
               {innerContent}
             </Script>
           );
         })}
 
-        {/* ✅ CORRECTED: Meta Pixel Implementation MOVED to the <head> */}
+        {/* Meta Pixel Implementation */}
         <TrackingScripts />
-        <Script id="meta-pixel-base" strategy="afterInteractive">
+        <Script id="meta-pixel-base" strategy="beforeInteractive">
           {`
             !function(f,b,e,v,n,t,s)
             {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
