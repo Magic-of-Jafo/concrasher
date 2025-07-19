@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Box } from "@mui/material";
 import Script from "next/script";
 
@@ -10,6 +10,12 @@ interface GrooveVideoWidgetProps {
 }
 
 export default function GrooveVideoWidget({ id, permalink }: GrooveVideoWidgetProps) {
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
     return (
         <Box
             sx={{
@@ -32,9 +38,11 @@ export default function GrooveVideoWidget({ id, permalink }: GrooveVideoWidgetPr
                 strategy="lazyOnload"
             />
 
-            <div dangerouslySetInnerHTML={{
-                __html: `<groovevideo-widget id="${id}" permalink="${permalink}"></groovevideo-widget>`
-            }} />
+            {isClient && (
+                <div dangerouslySetInnerHTML={{
+                    __html: `<groovevideo-widget id="${id}" permalink="${permalink}"></groovevideo-widget>`
+                }} />
+            )}
         </Box>
     );
 } 

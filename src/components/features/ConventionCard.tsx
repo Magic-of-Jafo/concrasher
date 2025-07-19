@@ -17,7 +17,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
     startDate,
     endDate,
     tags = [],
-    imageUrl,
+    coverImageUrl,
     profileImageUrl,
     slug,
   } = convention;
@@ -49,7 +49,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
     >
       <CardMedia
         component="img"
-        image={getS3ImageUrl(profileImageUrl || imageUrl)}
+        image={getS3ImageUrl(profileImageUrl || coverImageUrl)}
         alt={name}
         sx={{ width: { xs: '100%', sm: 120 }, height: 120, borderRadius: 2, objectFit: 'cover', mr: { sm: 2 }, mb: { xs: 2, sm: 0 } }}
       />
