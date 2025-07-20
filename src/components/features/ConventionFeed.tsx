@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import ConventionCard from "@/components/features/ConventionCard";
 import { Box, Grid, Paper, Typography, Theme, Button } from "@mui/material";
 import { styled } from "@mui/material/styles";
@@ -44,8 +44,12 @@ const SidebarWidget = styled(Paper)(({ theme }: { theme: Theme }) => ({
 }));
 
 export default function ConventionFeed({ conventions }: { conventions: any[] }) {
+  const [filteredSorted, setFilteredSorted] = useState<any[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
   // Helper to get status text
   const getConventionStatusText = (startDate: Date | string | null, endDate: Date | string | null) => {
+    if (!isClient) return "Loading..."; // Prevent hydration mismatch
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (!startDate) return "Date TBD";
@@ -69,21 +73,27 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
     }
   };
 
-  // Filter and sort conventions
-  const filteredSorted = conventions
-    .filter(con => {
-      if (!con.startDate) return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const end = con.endDate ? new Date(con.endDate) : new Date(con.startDate);
-      end.setHours(0, 0, 0, 0);
-      return end >= today;
-    })
-    .sort((a, b) => {
-      if (!a.startDate) return 1;
-      if (!b.startDate) return -1;
-      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-    });
+  // Handle client-side filtering and sorting
+  useEffect(() => {
+    setIsClient(true);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filtered = conventions
+      .filter(con => {
+        if (!con.startDate) return false;
+        const end = con.endDate ? new Date(con.endDate) : new Date(con.startDate);
+        end.setHours(0, 0, 0, 0);
+        return end >= today;
+      })
+      .sort((a, b) => {
+        if (!a.startDate) return 1;
+        if (!b.startDate) return -1;
+        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      });
+
+    setFilteredSorted(filtered);
+  }, [conventions]);
 
   return (
     <Box sx={{ flexGrow: 1, maxWidth: 1400, mx: "auto" }}>
@@ -264,16 +274,23 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                 >
                   Coming Soon!
                 </Typography>
-                {filteredSorted.slice(3, 6).map((con: any) => {
-                  const statusText = getConventionStatusText(con.startDate, con.endDate);
-                  if (!statusText) return null;
+                {!isClient ? (
+                  // Loading state for desktop
+                  <Box sx={{ textAlign: 'center', color: 'white' }}>
+                    <Typography>Loading...</Typography>
+                  </Box>
+                ) : (
+                  filteredSorted.slice(3, 6).map((con: any) => {
+                    const statusText = getConventionStatusText(con.startDate, con.endDate);
+                    if (!statusText) return null;
 
-                  return (
-                    <Box key={con.id}>
-                      <ConventionCard convention={con} />
-                    </Box>
-                  );
-                })}
+                    return (
+                      <Box key={con.id}>
+                        <ConventionCard convention={con} />
+                      </Box>
+                    );
+                  })
+                )}
               </Box>
             </Box>
           </Box>
@@ -300,16 +317,23 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
           Coming Soon!
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {filteredSorted.slice(3, 6).map((con: any) => {
-            const statusText = getConventionStatusText(con.startDate, con.endDate);
-            if (!statusText) return null;
+          {!isClient ? (
+            // Loading state for mobile
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography>Loading...</Typography>
+            </Box>
+          ) : (
+            filteredSorted.slice(3, 6).map((con: any) => {
+              const statusText = getConventionStatusText(con.startDate, con.endDate);
+              if (!statusText) return null;
 
-            return (
-              <Box key={con.id}>
-                <ConventionCard convention={con} />
-              </Box>
-            );
-          })}
+              return (
+                <Box key={con.id}>
+                  <ConventionCard convention={con} />
+                </Box>
+              );
+            })
+          )}
         </Box>
       </Box>
 
@@ -377,7 +401,12 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             }}
           >
             <Box display="flex" flexDirection="column" gap={3}>
-              {filteredSorted.length === 0 ? (
+              {!isClient ? (
+                // Loading state for main feed
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography>Loading conventions...</Typography>
+                </Box>
+              ) : filteredSorted.length === 0 ? (
                 <Typography color="text.secondary">No conventions found.</Typography>
               ) : (
                 filteredSorted.map((con: any, index: number) => {
