@@ -76,7 +76,7 @@ global.TextDecoder = TextDecoder;
 
 // 1. Polyfill HTMLFormElement.requestSubmit to prevent JSDOM "Not implemented" errors
 if (typeof HTMLFormElement !== 'undefined' && !HTMLFormElement.prototype.requestSubmit) {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  // eslint-disable-next-line no-empty-function
   HTMLFormElement.prototype.requestSubmit = function () { };
 }
 

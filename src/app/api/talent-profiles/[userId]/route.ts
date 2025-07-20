@@ -56,7 +56,9 @@ export async function PUT(
         }
 
         const body = await req.json();
+        console.log('Received talent profile update data:', body);
         const validatedData = TalentProfileUpdateSchema.parse(body);
+        console.log('Validated talent profile data:', validatedData);
 
         const updatedProfile = await db.talentProfile.update({
             where: {

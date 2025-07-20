@@ -88,4 +88,51 @@ export async function GET(
         console.error("[PROFILE_GET]", error);
         return new NextResponse("Internal Error", { status: 500 });
     }
-} 
+}
+
+export async function PUT(
+    req: Request,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session || session.user.id !== params.id) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { stageName } = body;
+
+        if (typeof stageName !== 'string') {
+            return new NextResponse("Invalid stage name", { status: 400 });
+        }
+
+        const updatedUser = await db.user.update({
+            where: { id: params.id },
+            data: { stageName },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                stageName: true,
+                email: true,
+                image: true,
+                bio: true,
+                roles: true,
+            }
+        });
+
+        return NextResponse.json({
+            user: {
+                ...updatedUser,
+                name: updatedUser.stageName || `${updatedUser.firstName || ''} ${updatedUser.lastName || ''}`.trim(),
+            }
+        });
+
+    } catch (error) {
+        console.error("[PROFILE_PUT]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+

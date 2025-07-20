@@ -128,6 +128,110 @@ export async function createBrand(data: BrandCreateInput): Promise<{
   }
 }
 
+export async function getUserBrands(userId: string): Promise<{
+  success: boolean;
+  brands?: any[];
+  error?: string;
+}> {
+  "use server";
+
+  try {
+    const brands = await db.brand.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          {
+            members: {
+              some: {
+                userId: userId
+              }
+            }
+          }
+        ]
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return {
+      success: true,
+      brands
+    };
+  } catch (error) {
+    console.error("Error fetching user brands:", error);
+    return {
+      success: false,
+      error: "Failed to fetch brands."
+    };
+  }
+}
+
+export async function deleteBrand(brandId: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  try {
+    const brand = await db.brand.findUnique({
+      where: { id: brandId },
+      include: {
+        members: true
+      }
+    });
+
+    if (!brand) {
+      return { success: false, error: "Brand not found." };
+    }
+
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
+    const isOwner = brand.ownerId === session.user.id;
+    const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "Authorization failed. You are not the owner of this brand." };
+    }
+
+    // Delete the brand (this will cascade delete brand members)
+    await db.brand.delete({
+      where: { id: brandId }
+    });
+
+    revalidatePath("/profile");
+
+    return {
+      success: true,
+      message: "Brand deleted successfully!"
+    };
+
+  } catch (error) {
+    console.error("Error deleting brand:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while deleting the brand."
+    };
+  }
+}
+
 export async function updateBrand(data: BrandUpdateInput): Promise<{
   success: boolean;
   message?: string;

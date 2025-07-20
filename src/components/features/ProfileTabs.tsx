@@ -9,6 +9,8 @@ import { User, Role, RoleApplication, Brand } from '@prisma/client';
 import UserProfilePictureUploader from '@/components/features/profile/UserProfilePictureUploader';
 import BasicInfoDisplay from './profile/BasicInfoDisplay';
 import AdminSettingsTab from './profile/AdminSettingsTab';
+import TalentProfileTab from './profile/TalentProfileTab';
+import BrandsTab from './profile/BrandsTab';
 
 interface ProfileTabsProps {
     user: any; // Using 'any' for now to match fetched data structure
@@ -133,12 +135,18 @@ export default function ProfileTabs({
                 </CustomTabPanel>
                 {user?.roles?.includes('ORGANIZER') && (
                     <CustomTabPanel value={value} index={2}>
-                        Brands list goes here.
+                        <BrandsTab
+                            userId={user.id}
+                            user={user}
+                        />
                     </CustomTabPanel>
                 )}
                 {isTalent && (
                     <CustomTabPanel value={value} index={3}>
-                        Talent Profile Editor goes here.
+                        <TalentProfileTab
+                            userId={user.id}
+                            user={user}
+                        />
                     </CustomTabPanel>
                 )}
                 {isAdmin && (
