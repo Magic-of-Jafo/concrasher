@@ -75,7 +75,9 @@ export default function Header() {
               <img
                 src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
                 alt="Convention Crasher Logo"
-                style={{ width: '150px', height: 'auto', display: 'block' }}
+                width="150"
+                height="77"
+                style={{ display: 'block' }}
               />
             </Link>
           </Box>

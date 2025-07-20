@@ -148,6 +148,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             maxWidth: 1400,
             mx: "auto",
             px: { xs: 1, sm: 2, md: 4 },
+            pt: 3.75, // 30px top padding
             pb: 2.5
           }}>
             {/* Main Headline */}
@@ -197,6 +198,8 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                   <img
                     src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
                     alt="Convention Crasher Logo"
+                    width="430"
+                    height="222"
                     style={{
                       width: '100%',
                       height: 'auto',
@@ -274,23 +277,16 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                 >
                   Coming Soon!
                 </Typography>
-                {!isClient ? (
-                  // Loading state for desktop
-                  <Box sx={{ textAlign: 'center', color: 'white' }}>
-                    <Typography>Loading...</Typography>
-                  </Box>
-                ) : (
-                  filteredSorted.slice(3, 6).map((con: any) => {
-                    const statusText = getConventionStatusText(con.startDate, con.endDate);
-                    if (!statusText) return null;
+                {filteredSorted.slice(3, 6).map((con: any) => {
+                  const statusText = getConventionStatusText(con.startDate, con.endDate);
+                  if (!statusText) return null;
 
-                    return (
-                      <Box key={con.id}>
-                        <ConventionCard convention={con} />
-                      </Box>
-                    );
-                  })
-                )}
+                  return (
+                    <Box key={con.id}>
+                      <ConventionCard convention={con} />
+                    </Box>
+                  );
+                })}
               </Box>
             </Box>
           </Box>
@@ -317,28 +313,21 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
           Coming Soon!
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {!isClient ? (
-            // Loading state for mobile
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography>Loading...</Typography>
-            </Box>
-          ) : (
-            filteredSorted.slice(3, 6).map((con: any) => {
-              const statusText = getConventionStatusText(con.startDate, con.endDate);
-              if (!statusText) return null;
+          {filteredSorted.slice(3, 6).map((con: any) => {
+            const statusText = getConventionStatusText(con.startDate, con.endDate);
+            if (!statusText) return null;
 
-              return (
-                <Box key={con.id}>
-                  <ConventionCard convention={con} />
-                </Box>
-              );
-            })
-          )}
+            return (
+              <Box key={con.id}>
+                <ConventionCard convention={con} />
+              </Box>
+            );
+          })}
         </Box>
       </Box>
 
       {/* Main Content */}
-      <Box sx={{ px: { xs: 1, sm: 2, md: 4 }, py: 4 }}>
+      <Box sx={{ px: { xs: 1, sm: 2, md: 4 }, py: 4, pt: 0 }}>
         <Grid
           columns={12}
           alignItems="flex-start"
@@ -401,12 +390,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             }}
           >
             <Box display="flex" flexDirection="column" gap={3}>
-              {!isClient ? (
-                // Loading state for main feed
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography>Loading conventions...</Typography>
-                </Box>
-              ) : filteredSorted.length === 0 ? (
+              {filteredSorted.length === 0 ? (
                 <Typography color="text.secondary">No conventions found.</Typography>
               ) : (
                 filteredSorted.map((con: any, index: number) => {
