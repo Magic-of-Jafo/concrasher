@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         const newProfile = await db.talentProfile.create({
             data: {
                 userId: session.user.id,
-                displayName: session.user.stageName || session.user.firstName || 'Talent',
+                displayName: session.user.name || 'Talent',
                 tagline: '',
                 bio: '',
                 profilePictureUrl: '',
