@@ -136,3 +136,5 @@ prisma/migrations/
 
 # Copy files
 copy.env.local 
+*storybook.log
+storybook-static
