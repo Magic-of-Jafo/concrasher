@@ -332,12 +332,12 @@ export const HotelSchema = z.object({
 
 }).refine((data) => {
   if (data.isPrimaryHotel) {
-    return !!data.hotelName && !!data.streetAddress && !!data.city && !!data.country;
+    return !!data.hotelName;
   }
   return true;
 }, {
-  message: 'Primary hotels must have a name, street address, city, and country.',
-  path: ['hotelName'], // Arbitrarily pick one field for the error path
+  message: 'Primary hotels must have a name.',
+  path: ['hotelName'],
 });
 
 export type HotelData = z.infer<typeof HotelSchema>;

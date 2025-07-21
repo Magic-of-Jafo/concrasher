@@ -337,6 +337,18 @@ export async function PUT(
 
       // Step 3: Handle Hotels
       if (incomingHotels) {
+        // --- Handle Primary Hotel Promotion ---
+        const hotelToPromote = incomingHotels.find((h: any) => h.markedForPrimaryPromotion);
+        if (hotelToPromote) {
+          // Set all hotels to not primary
+          for (const h of incomingHotels) {
+            h.isPrimaryHotel = false;
+            h.markedForPrimaryPromotion = false;
+          }
+          // Set the marked hotel as primary
+          hotelToPromote.isPrimaryHotel = true;
+        }
+
         const incomingHotelIds = incomingHotels.map((h: any) => h.id).filter(Boolean);
 
         // Delete hotels that are no longer present

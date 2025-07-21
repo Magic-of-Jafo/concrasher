@@ -2,16 +2,31 @@
 
 import React from 'react';
 import { Box, Typography, Paper, Button, Stack } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import MapIcon from '@mui/icons-material/Map';
 
-const HotelCard = ({ hotel }: { hotel: any }) => {
+const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boolean }) => {
     if (!hotel) return null;
 
     return (
-        <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="h6">{hotel.name}</Typography>
-            <Typography variant="body1">{hotel.streetAddress}</Typography>
-            <Typography variant="body1">{`${hotel.city}, ${hotel.stateRegion} ${hotel.postalCode}`}</Typography>
+        <Paper sx={{ p: isCompact ? 1.5 : 2, mb: 2, height: '100%' }}>
+            <Typography variant={isCompact ? 'subtitle1' : 'h6'} sx={{ fontWeight: 'bold' }}>{hotel.hotelName}</Typography>
+            {hotel.description && (
+                <Box
+                    sx={{
+                        mt: 1,
+                        mb: 2,
+                        '& p': { margin: '0.5rem 0' },
+                        '& ul, & ol': { paddingLeft: '1.5rem' },
+                        '& h1, & h2, & h3, & h4, & h5, & h6': { margin: '1rem 0 0.5rem 0' }
+                    }}
+                    dangerouslySetInnerHTML={{ __html: hotel.description }}
+                />
+            )}
+            {hotel.streetAddress && <Typography variant={isCompact ? 'body2' : 'body1'}>{hotel.streetAddress}</Typography>}
+            {(hotel.city || hotel.stateRegion || hotel.postalCode) &&
+                <Typography variant={isCompact ? 'body2' : 'body1'}>{`${hotel.city || ''}, ${hotel.stateRegion || ''} ${hotel.postalCode || ''}`.replace(/ ,|,$/g, '')}</Typography>
+            }
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Button
                     variant="outlined"
@@ -19,6 +34,7 @@ const HotelCard = ({ hotel }: { hotel: any }) => {
                     disabled={!hotel.googleMapsUrl}
                     href={hotel.googleMapsUrl}
                     target="_blank"
+                    size={isCompact ? 'small' : 'medium'}
                 >
                     Map
                 </Button>
@@ -31,7 +47,7 @@ export default function HotelSection({ convention }: { convention: any }) {
     const isVenueAlsoHotel = convention.settings?.guestsStayAtPrimaryVenue;
     const primaryVenue = convention.venues?.find((v: any) => v.isPrimaryVenue);
     const primaryHotel = isVenueAlsoHotel
-        ? { ...primaryVenue, name: primaryVenue.venueName } // Adapt venue to look like a hotel
+        ? { ...primaryVenue, hotelName: primaryVenue.venueName } // Adapt venue to look like a hotel
         : convention.hotels?.find((h: any) => h.isPrimaryHotel);
 
     const otherHotels = isVenueAlsoHotel
@@ -62,18 +78,23 @@ export default function HotelSection({ convention }: { convention: any }) {
                     target="_blank"
                     sx={{ mb: 2 }}
                 >
-                    Book your room at {primaryHotel.name}
+                    Book your room at {primaryHotel.hotelName}
                 </Button>
             )}
-            <HotelCard hotel={primaryHotel} />
+            {primaryHotel && <HotelCard hotel={primaryHotel} isCompact={false} />}
             {otherHotels.length > 0 && (
                 <Box sx={{ mt: 4 }}>
                     <Typography variant="h5" component="h3" gutterBottom>
-                        Other Nearby Hotels
+                        Additional Hotels
                     </Typography>
-                    {otherHotels.map((hotel: any) => (
-                        <HotelCard key={hotel.id} hotel={hotel} />
-                    ))}
+                    <Grid container spacing={2}>
+                        {otherHotels.map((hotel: any) => (
+                            // @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error
+                            <Grid item key={hotel.id} xs={12} sm={6} md={4}>
+                                <HotelCard hotel={hotel} isCompact={true} />
+                            </Grid>
+                        ))}
+                    </Grid>
                 </Box>
             )}
         </Paper>

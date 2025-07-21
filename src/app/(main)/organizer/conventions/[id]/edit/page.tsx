@@ -185,8 +185,6 @@ function ConventionEditPage() { // Remove params from props
   const handleStatusChange = async (newStatus: ConventionStatus) => {
     if (!conventionId || newStatus === conventionPageData.status) return;
 
-    console.log('Attempting to change status from', conventionPageData.status, 'to', newStatus);
-
     setIsUpdatingStatus(true);
     setError(null);
 
@@ -199,16 +197,12 @@ function ConventionEditPage() { // Remove params from props
         body: JSON.stringify({ status: newStatus }),
       });
 
-      console.log('Status update response:', response.status, response.statusText);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Status update failed:', errorData);
         throw new Error(errorData.error || 'Failed to update status');
       }
 
       const updatedConvention = await response.json();
-      console.log('Status updated successfully:', updatedConvention);
 
       // Update local state
       setConventionPageData(prev => ({
@@ -216,10 +210,7 @@ function ConventionEditPage() { // Remove params from props
         status: updatedConvention.status,
       }));
 
-      console.log('Local state updated with new status:', updatedConvention.status);
-
     } catch (err: any) {
-      console.error('Error updating status:', err);
       setError(err.message || 'Failed to update status');
 
       // Don't revert the UI state here - let it show the attempted change
@@ -334,16 +325,13 @@ function ConventionEditPage() { // Remove params from props
                 groupPrice: apiHotel.groupPrice || '',
               };
 
-              // If guests are NOT staying at the primary venue (i.e., they need a separate hotel),
-              // and this hotel is marked as the primary hotel, then it's our finalPrimaryHotelDetails.
+              // Add all hotels to the finalHotels array
+              finalHotels.push(commonHotelData);
+
+              // If guests are NOT staying at the primary venue and this is the primary hotel,
+              // also set it as finalPrimaryHotelDetails for backward compatibility
               if (actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel) {
                 finalPrimaryHotelDetails = commonHotelData;
-              } else {
-                // Otherwise, it's just an additional hotel (or it's the primary hotel but guests ARE at primary venue, so we don't list it separately here)
-                // We only add to finalHotels if it's NOT the primary hotel that we've already assigned to finalPrimaryHotelDetails
-                if (!(actualGuestsStayAtPrimaryVenue === false && apiHotel.isPrimaryHotel)) {
-                  finalHotels.push(commonHotelData);
-                }
               }
             });
           }
@@ -503,6 +491,33 @@ function ConventionEditPage() { // Remove params from props
         return rest;
       };
 
+      // Handle primary hotel switching logic BEFORE cleaning
+      let processedHotels = finalData.venueHotel?.hotels || [];
+
+      const hotelToPromote = processedHotels.find(h => h.markedForPrimaryPromotion);
+
+      if (hotelToPromote) {
+        // Set all hotels to not primary
+        processedHotels = processedHotels.map(h => ({
+          ...h,
+          isPrimaryHotel: false,
+          markedForPrimaryPromotion: false
+        }));
+
+        // Set the marked hotel as primary
+        const promotedHotelIndex = processedHotels.findIndex(h => h.id === hotelToPromote.id);
+        if (promotedHotelIndex !== -1) {
+          processedHotels[promotedHotelIndex] = {
+            ...processedHotels[promotedHotelIndex],
+            isPrimaryHotel: true,
+            markedForPrimaryPromotion: false
+          };
+        }
+      }
+
+      // Now clean the hotels after processing the primary hotel switching
+      const cleanedHotels = processedHotels.map(cleanObject);
+
       // Construct payload, ensuring to use the merged finalData
       const payload = {
         ...finalData,
@@ -510,7 +525,7 @@ function ConventionEditPage() { // Remove params from props
           primaryVenue: finalData.venueHotel?.primaryVenue ? cleanObject(finalData.venueHotel.primaryVenue) : null,
           secondaryVenues: finalData.venueHotel?.secondaryVenues?.map(cleanObject) || [],
           primaryHotelDetails: finalData.venueHotel?.primaryHotelDetails ? cleanObject(finalData.venueHotel.primaryHotelDetails) : null,
-          hotels: finalData.venueHotel?.hotels?.map(cleanObject) || [],
+          hotels: cleanedHotels || [],
           guestsStayAtPrimaryVenue: finalData.venueHotel?.guestsStayAtPrimaryVenue,
         }
       };

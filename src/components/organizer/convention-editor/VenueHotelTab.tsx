@@ -29,7 +29,7 @@ interface VenueHotelTabProps {
 }
 
 const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
-  const [expandedAccordion, setExpandedAccordion] = useState<string | false>('primaryVenue');
+  const [expandedAccordion, setExpandedAccordion] = useState<string | false>(false);
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<{ originalIndex: number, displayIndex: number } | null>(null);
 
@@ -54,8 +54,6 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     const finalData = { ...data, venues: combinedVenues };
     delete (finalData as any).secondaryVenues; // Clean up before sending up
     delete (finalData as any).primaryVenue; // Clean up before sending up
-
-    console.log('[VenueHotelTab] Firing onChange with final data:', finalData);
 
     onChange(finalData as VenueHotelTabData & { venues: VenueData[] }, isValid);
   }, [onChange, onValidationChange, schema, primaryVenue]);
@@ -193,7 +191,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
     return (
       <>
-        <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')}>
+        <Accordion expanded={expandedAccordion === 'primaryVenue'} onChange={handleAccordionChange('primaryVenue')} defaultExpanded={false}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>Primary Venue</Typography>
           </AccordionSummary>
@@ -239,6 +237,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
   const renderHotelForms = () => {
     const hotels = value.hotels || [];
     const primaryHotel = hotels.find(h => h.isPrimaryHotel);
+    const additionalHotels = hotels.filter(h => !h.isPrimaryHotel);
 
     return (
       <Box sx={{ mt: 4 }}>
@@ -255,39 +254,101 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
             }
             label="Guests can stay at the primary venue location (e.g., it's a hotel)"
           />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {value.guestsStayAtPrimaryVenue
+              ? "✓ Hotel forms are hidden because guests stay at the primary venue"
+              : "Hotel forms are shown below"}
+          </Typography>
         </Paper>
 
-        {!value.guestsStayAtPrimaryVenue && hotels.map((hotel, index) => (
-          <Accordion key={hotel.id || `hotel-${index}`} defaultExpanded={hotel.isPrimaryHotel}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
-                {hotel.isPrimaryHotel ? 'Primary Hotel' : `Additional Hotel ${index + 1}`}
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <HotelForm
-                formData={hotel}
-                onFormDataChange={(data: Partial<HotelData>) => handleHotelChange(index, data)}
-                isPrimaryHotel={hotel.isPrimaryHotel}
-                disabled={disabled}
-                errors={structuredErrors.hotels[index]}
-              />
-              <Button
-                startIcon={<DeleteIcon />}
-                onClick={() => handleRemoveHotel(index)}
-                color="error"
-                sx={{ mt: 1 }}
-                disabled={disabled}
-              >
-                Remove Hotel
-              </Button>
-            </AccordionDetails>
-          </Accordion>
-        ))}
         {!value.guestsStayAtPrimaryVenue && (
-          <Button startIcon={<AddIcon />} onClick={handleAddHotel} sx={{ mt: 2 }} disabled={disabled}>
-            Add Another Hotel
-          </Button>
+          <>
+            {/* Primary Hotel Section */}
+            <Accordion defaultExpanded={false}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
+                  Primary Hotel {primaryHotel ? `(${primaryHotel.hotelName})` : '(Not Set)'}
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                {primaryHotel ? (
+                  <>
+                    <HotelForm
+                      formData={primaryHotel}
+                      onFormDataChange={(data: Partial<HotelData>) => {
+                        const primaryIndex = hotels.findIndex(h => h.isPrimaryHotel);
+                        if (primaryIndex !== -1) {
+                          handleHotelChange(primaryIndex, data);
+                        }
+                      }}
+                      isPrimaryHotel={true}
+                      title="Primary Hotel Details"
+                      disabled={disabled}
+                      errors={structuredErrors.hotels?.[hotels.findIndex(h => h.isPrimaryHotel)]}
+                    />
+                  </>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <Typography color="text.secondary" gutterBottom>
+                      No primary hotel set. Add a hotel below and mark it as primary.
+                    </Typography>
+                  </Box>
+                )}
+              </AccordionDetails>
+            </Accordion>
+
+            {/* Additional Hotels Section */}
+            {additionalHotels.map((hotel, index) => {
+              const actualIndex = hotels.findIndex(h => h.id === hotel.id);
+              return (
+                <Accordion key={hotel.id || `hotel-${index}`} defaultExpanded={false}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
+                        Additional Hotel {index + 1}
+                      </Typography>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={hotel.markedForPrimaryPromotion || false}
+                            onChange={(event) => {
+                              const updatedHotel = { ...hotel, markedForPrimaryPromotion: event.target.checked };
+                              handleHotelChange(actualIndex, updatedHotel);
+                            }}
+                            disabled={disabled}
+                          />
+                        }
+                        label="Make Primary Hotel"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <HotelForm
+                      formData={hotel}
+                      onFormDataChange={(data: Partial<HotelData>) => handleHotelChange(actualIndex, data)}
+                      isPrimaryHotel={false}
+                      disabled={disabled}
+                      errors={structuredErrors.hotels?.[actualIndex]}
+                    />
+                    <Button
+                      startIcon={<DeleteIcon />}
+                      onClick={() => handleRemoveHotel(actualIndex)}
+                      color="error"
+                      sx={{ mt: 1 }}
+                      disabled={disabled}
+                    >
+                      Remove Hotel
+                    </Button>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
+
+            <Button startIcon={<AddIcon />} onClick={handleAddHotel} sx={{ mt: 2 }} disabled={disabled}>
+              Add Another Hotel
+            </Button>
+          </>
         )}
       </Box>
     );
