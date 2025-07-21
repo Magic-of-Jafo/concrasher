@@ -38,6 +38,14 @@ export async function generateMetadata({ params }: ConventionDetailPageProps): P
   // Use only the convention's specific keywords, not the default ones
   const keywords = ((convention as any).keywords || []).filter(Boolean);
 
+  // Ensure absolute URLs for images
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://conventioncrasher.com';
+  const coverImageUrl = convention.coverImageUrl
+    ? convention.coverImageUrl.startsWith('http')
+      ? convention.coverImageUrl
+      : `${baseUrl}${convention.coverImageUrl}`
+    : null;
+
   return {
     title,
     description,
@@ -45,7 +53,7 @@ export async function generateMetadata({ params }: ConventionDetailPageProps): P
     openGraph: {
       title: title,
       description: description,
-      images: convention.coverImageUrl ? [convention.coverImageUrl] : [],
+      images: coverImageUrl ? [coverImageUrl] : [],
     },
   };
 }
@@ -140,6 +148,17 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
       })),
     };
 
+    // Ensure absolute URLs for images
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://conventioncrasher.com';
+    const coverImageUrl = convention.coverImageUrl
+      ? convention.coverImageUrl.startsWith('http')
+        ? convention.coverImageUrl
+        : `${baseUrl}${convention.coverImageUrl}`
+      : null;
+
+    // Get primary venue for location details
+    const primaryVenue = convention.venues?.find(v => v.isPrimaryVenue) || convention.venues?.[0];
+
     const eventJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Event',
@@ -148,17 +167,17 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
       endDate: convention.endDate?.toISOString(),
       eventStatus: mapConventionStatusToSchemaEventStatus(convention.status),
       description: convention.descriptionShort || convention.descriptionMain,
-      image: [convention.coverImageUrl].filter(Boolean),
+      image: coverImageUrl ? [coverImageUrl] : [],
       location: {
         '@type': 'Place',
-        name: convention.venueName,
+        name: primaryVenue?.venueName || convention.venueName,
         address: {
           '@type': 'PostalAddress',
-          streetAddress: convention.venues?.[0]?.streetAddress,
-          addressLocality: convention.city,
-          addressRegion: convention.stateAbbreviation,
-          postalCode: convention.venues?.[0]?.postalCode,
-          addressCountry: convention.country,
+          streetAddress: primaryVenue?.streetAddress,
+          addressLocality: primaryVenue?.city || convention.city,
+          addressRegion: primaryVenue?.stateRegion || convention.stateAbbreviation,
+          postalCode: primaryVenue?.postalCode,
+          addressCountry: primaryVenue?.country || convention.country,
         },
       },
       offers: {
@@ -181,7 +200,13 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
       },
       organizer: {
         '@type': 'Organization',
-        name: convention.series?.name || 'Organizer', // Fallback name
+        name: convention.series?.name || convention.name,
+        url: convention.websiteUrl,
+      },
+      provider: {
+        '@type': 'Organization',
+        name: 'Convention Crasher',
+        url: 'https://conventioncrasher.com',
       },
     };
 
