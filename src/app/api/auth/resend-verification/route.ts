@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import crypto from 'crypto';
 import { sendEmail } from '@/lib/email';
-import EmailVerificationEmail from '../../../../emails/EmailVerificationEmail';
+import EmailVerificationEmail from '../../../../../emails/EmailVerificationEmail';
 
 export async function POST(request: NextRequest) {
     try {
