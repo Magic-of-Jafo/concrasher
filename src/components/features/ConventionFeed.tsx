@@ -275,7 +275,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                     color: 'white'
                   }}
                 >
-                  Coming Soon!
+                  Coming Soon
                 </Typography>
                 {filteredSorted.slice(3, 6).map((con: any) => {
                   const statusText = getConventionStatusText(con.startDate, con.endDate);
@@ -291,6 +291,30 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             </Box>
           </Box>
         </Paper>
+
+        {/* Video Credit - Positioned inside hero with negative margin */}
+        <Box sx={{
+          position: 'relative',
+          px: { xs: 1, sm: 2, md: 4 },
+          py: 0.5,
+          textAlign: 'left',
+          backgroundColor: 'transparent',
+          mt: -1, // Negative margin to push it outside the hero
+          mb: 0,
+          maxWidth: 1400,
+          mx: "auto"
+        }}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'text.secondary',
+              fontSize: '0.75rem',
+              fontStyle: 'italic'
+            }}
+          >
+            Video Source: International Brotherhood of Magicians
+          </Typography>
+        </Box>
       </Box>
 
       {/* Mobile Convention Cards Section - Only show on mobile */}
