@@ -122,6 +122,16 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
           include: {
             currency: true
           }
+        },
+
+        // Talent information
+        talent: {
+          include: {
+            talentProfile: true
+          },
+          orderBy: {
+            assignedAt: 'asc'
+          }
         }
       }
     });

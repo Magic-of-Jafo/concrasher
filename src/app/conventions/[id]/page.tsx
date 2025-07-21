@@ -159,6 +159,12 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
     // Get primary venue for location details
     const primaryVenue = convention.venues?.find(v => v.isPrimaryVenue) || convention.venues?.[0];
 
+    // Map talent to performers for structured data
+    const performers = convention.talent?.map(talent => ({
+      '@type': 'Person',
+      name: talent.overrideDisplayName || talent.talentProfile.displayName,
+    })).filter(Boolean) || [];
+
     const eventJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Event',
@@ -180,6 +186,7 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
           addressCountry: primaryVenue?.country || convention.country,
         },
       },
+      ...(performers.length > 0 && { performer: performers }),
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: convention.settings.find(s => s.key === 'currency')?.value || 'USD',

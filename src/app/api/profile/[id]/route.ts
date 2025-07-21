@@ -28,6 +28,7 @@ export async function GET(
                 image: true,
                 bio: true,
                 roles: true,
+                emailVerified: true,
             }
         });
 

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     }
 
     // Create reset URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://conventioncrasher.com';
     const resetUrl = `${appUrl}/reset-password/${resetToken}`;
 
     // Send password reset email

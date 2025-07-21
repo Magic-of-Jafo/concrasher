@@ -48,7 +48,7 @@ export default function TalentProfileEditor({
     onCancel
 }: TalentProfileEditorProps) {
     const [formData, setFormData] = useState({
-        displayName: user?.stageName || initialData?.displayName || '',
+        displayName: initialData?.displayName || user?.stageName || '',
         tagline: initialData?.tagline || '',
         bio: initialData?.bio || '',
         profilePictureUrl: initialData?.profilePictureUrl || '',
@@ -138,21 +138,6 @@ export default function TalentProfileEditor({
         setSuccess(null);
 
         try {
-            // First, update the user's stage name if it has changed
-            if (formData.displayName !== user?.stageName) {
-                const userResponse = await fetch(`/api/profile/${userId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ stageName: formData.displayName }),
-                });
-
-                if (!userResponse.ok) {
-                    const errorData = await userResponse.json();
-                    throw new Error(errorData.error || 'Failed to update stage name');
-                }
-            }
 
             // Then, update the talent profile
             console.log('Current formData:', formData);
@@ -294,7 +279,7 @@ export default function TalentProfileEditor({
                                     label="Display Name"
                                     value={formData.displayName}
                                     onChange={(e) => handleInputChange('displayName', e.target.value)}
-                                    helperText="Same as your Stage Name in your user profile."
+                                    helperText="Your stage name or professional name as you want to appear to convention organizers"
                                 />
                             </Grid>
                             {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}

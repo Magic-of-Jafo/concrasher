@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
 
     // Send verification email
     try {
-      const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify-email?token=${verificationToken}`;
+      // Use NEXT_PUBLIC_APP_URL as primary, fallback to NEXTAUTH_URL, then hardcoded domain
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://conventioncrasher.com';
+      const verificationUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
 
       await sendEmail({
         to: email,

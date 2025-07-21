@@ -229,7 +229,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   errors = {},
   isEditing
 }) => {
-  const [keywordInput, setKeywordInput] = useState('');
 
 
 
@@ -292,19 +291,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
 
   const handleStateChange = (newValue: string) => {
     onFormChange('stateName', newValue);
-  };
-
-  const handleAddKeyword = () => {
-    if (keywordInput && !value.keywords?.includes(keywordInput)) {
-      const newKeywords = [...(value.keywords || []), keywordInput];
-      onFormChange('keywords', newKeywords);
-      setKeywordInput('');
-    }
-  };
-
-  const handleDeleteKeyword = (keywordToDelete: string) => {
-    const newKeywords = (value.keywords || []).filter((keyword: string) => keyword !== keywordToDelete);
-    onFormChange('keywords', newKeywords);
   };
 
   return (
@@ -382,36 +368,6 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
             <Box sx={{ my: 2 }}>
               <Typography variant="subtitle1" gutterBottom>Main Description</Typography>
               <ProseMirrorEditor value={value.descriptionMain || ''} onChange={handleEditorChange('descriptionMain')} />
-            </Box>
-            <Box sx={{ my: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>Keywords (for SEO)</Typography>
-              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                <TextField
-                  label="New Keyword"
-                  value={keywordInput}
-                  onChange={(e) => setKeywordInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddKeyword();
-                    }
-                  }}
-                  size="small"
-                />
-                <Button onClick={handleAddKeyword} variant="outlined">Add</Button>
-              </Box>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {(value.keywords || []).map((keyword: string) => (
-                  <Chip
-                    key={keyword}
-                    label={keyword}
-                    onDelete={() => handleDeleteKeyword(keyword)}
-                  />
-                ))}
-              </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Internal keywords for search engine optimization.
-              </Typography>
             </Box>
 
             <TagEditor
