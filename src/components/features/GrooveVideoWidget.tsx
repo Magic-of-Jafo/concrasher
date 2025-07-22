@@ -10,10 +10,10 @@ interface GrooveVideoWidgetProps {
 }
 
 export default function GrooveVideoWidget({ id, permalink }: GrooveVideoWidgetProps) {
-    const [isClient, setIsClient] = useState(false);
+    const [isHydrated, setIsHydrated] = useState(false);
 
     useEffect(() => {
-        setIsClient(true);
+        setIsHydrated(true);
     }, []);
 
     return (
@@ -110,7 +110,7 @@ export default function GrooveVideoWidget({ id, permalink }: GrooveVideoWidgetPr
                 }
             `}</style>
 
-            {isClient && (
+            {isHydrated && (
                 <div dangerouslySetInnerHTML={{
                     __html: `<groovevideo-widget id="${id}" permalink="${permalink}"></groovevideo-widget>`
                 }} />

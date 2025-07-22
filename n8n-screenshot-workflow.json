@@ -1,0 +1,496 @@
+{
+    "name": "URL Screenshot Workflow",
+    "nodes": [
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "url1",
+                            "value": "https://example.com"
+                        },
+                        {
+                            "name": "url2",
+                            "value": "https://google.com"
+                        },
+                        {
+                            "name": "url3",
+                            "value": "https://github.com"
+                        },
+                        {
+                            "name": "url4",
+                            "value": "https://stackoverflow.com"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+            "name": "URL List",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url1 }}",
+                "options": {
+                    "timeout": 30000,
+                    "waitForSelector": "body",
+                    "waitUntil": "networkidle"
+                }
+            },
+            "id": "2b3c4d5e-6f7g-8h9i-0j1k-l2m3n4o5p6q7",
+            "name": "Screenshot URL 1",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                200
+            ],
+            "webhookId": "screenshot-1"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url2 }}",
+                "options": {
+                    "timeout": 30000,
+                    "waitForSelector": "body",
+                    "waitUntil": "networkidle"
+                }
+            },
+            "id": "3c4d5e6f-7g8h-9i0j-1k2l-m3n4o5p6q7r8",
+            "name": "Screenshot URL 2",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                300
+            ],
+            "webhookId": "screenshot-2"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url3 }}",
+                "options": {
+                    "timeout": 30000,
+                    "waitForSelector": "body",
+                    "waitUntil": "networkidle"
+                }
+            },
+            "id": "4d5e6f7g-8h9i-0j1k-2l3m-n4o5p6q7r8s9",
+            "name": "Screenshot URL 3",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                400
+            ],
+            "webhookId": "screenshot-3"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url4 }}",
+                "options": {
+                    "timeout": 30000,
+                    "waitForSelector": "body",
+                    "waitUntil": "networkidle"
+                }
+            },
+            "id": "5e6f7g8h-9i0j-1k2l-3m4n-o5p6q7r8s9t0",
+            "name": "Screenshot URL 4",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                500
+            ],
+            "webhookId": "screenshot-4"
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url1 }}",
+                "options": {
+                    "fullPage": true,
+                    "type": "png",
+                    "quality": 90
+                }
+            },
+            "id": "6f7g8h9i-0j1k-2l3m-4n5o-p6q7r8s9t0u1",
+            "name": "Take Screenshot 1",
+            "type": "n8n-nodes-base.browserAutomation",
+            "typeVersion": 1,
+            "position": [
+                680,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url2 }}",
+                "options": {
+                    "fullPage": true,
+                    "type": "png",
+                    "quality": 90
+                }
+            },
+            "id": "7g8h9i0j-1k2l-3m4n-5o6p-q7r8s9t0u1v2",
+            "name": "Take Screenshot 2",
+            "type": "n8n-nodes-base.browserAutomation",
+            "typeVersion": 1,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url3 }}",
+                "options": {
+                    "fullPage": true,
+                    "type": "png",
+                    "quality": 90
+                }
+            },
+            "id": "8h9i0j1k-2l3m-4n5o-6p7q-r8s9t0u1v2w3",
+            "name": "Take Screenshot 3",
+            "type": "n8n-nodes-base.browserAutomation",
+            "typeVersion": 1,
+            "position": [
+                680,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.url4 }}",
+                "options": {
+                    "fullPage": true,
+                    "type": "png",
+                    "quality": 90
+                }
+            },
+            "id": "9i0j1k2l-3m4n-5o6p-7q8r-s9t0u1v2w3x4",
+            "name": "Take Screenshot 4",
+            "type": "n8n-nodes-base.browserAutomation",
+            "typeVersion": 1,
+            "position": [
+                680,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "fileName": "screenshot-1-{{ $now.format('YYYY-MM-DD-HH-mm-ss') }}.png",
+                "options": {}
+            },
+            "id": "0j1k2l3m-4n5o-6p7q-8r9s-t0u1v2w3x4y5",
+            "name": "Save Screenshot 1",
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                900,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "fileName": "screenshot-2-{{ $now.format('YYYY-MM-DD-HH-mm-ss') }}.png",
+                "options": {}
+            },
+            "id": "1k2l3m4n-5o6p-7q8r-9s0t-u1v2w3x4y5z6",
+            "name": "Save Screenshot 2",
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "fileName": "screenshot-3-{{ $now.format('YYYY-MM-DD-HH-mm-ss') }}.png",
+                "options": {}
+            },
+            "id": "2l3m4n5o-6p7q-8r9s-0t1u-v2w3x4y5z6a7",
+            "name": "Save Screenshot 3",
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                900,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "fileName": "screenshot-4-{{ $now.format('YYYY-MM-DD-HH-mm-ss') }}.png",
+                "options": {}
+            },
+            "id": "3m4n5o6p-7q8r-9s0t-1u2v-w3x4y5z6a7b8",
+            "name": "Save Screenshot 4",
+            "type": "n8n-nodes-base.writeBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                900,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "4n5o6p7q-8r9s-0t1u-2v3w-x4y5z6a7b8c9",
+                            "leftValue": "={{ $json.url }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "string",
+                                "operation": "isNotEmpty"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "5o6p7q8r-9s0t-1u2v-3w4x-y5z6a7b8c9d0",
+            "name": "Check Success",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                1120,
+                350
+            ]
+        },
+        {
+            "parameters": {
+                "message": "Screenshots completed successfully for all URLs",
+                "options": {}
+            },
+            "id": "6p7q8r9s-0t1u-2v3w-4x5y-z6a7b8c9d0e1",
+            "name": "Success Message",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                1340,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "message": "Failed to take screenshots for some URLs",
+                "options": {}
+            },
+            "id": "7q8r9s0t-1u2v-3w4x-5y6z-a7b8c9d0e1f2",
+            "name": "Error Message",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                1340,
+                450
+            ]
+        }
+    ],
+    "connections": {
+        "URL List": {
+            "main": [
+                [
+                    {
+                        "node": "Screenshot URL 1",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Screenshot URL 2",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Screenshot URL 3",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Screenshot URL 4",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Screenshot URL 1": {
+            "main": [
+                [
+                    {
+                        "node": "Take Screenshot 1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Screenshot URL 2": {
+            "main": [
+                [
+                    {
+                        "node": "Take Screenshot 2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Screenshot URL 3": {
+            "main": [
+                [
+                    {
+                        "node": "Take Screenshot 3",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Screenshot URL 4": {
+            "main": [
+                [
+                    {
+                        "node": "Take Screenshot 4",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Take Screenshot 1": {
+            "main": [
+                [
+                    {
+                        "node": "Save Screenshot 1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Take Screenshot 2": {
+            "main": [
+                [
+                    {
+                        "node": "Save Screenshot 2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Take Screenshot 3": {
+            "main": [
+                [
+                    {
+                        "node": "Save Screenshot 3",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Take Screenshot 4": {
+            "main": [
+                [
+                    {
+                        "node": "Save Screenshot 4",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save Screenshot 1": {
+            "main": [
+                [
+                    {
+                        "node": "Check Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save Screenshot 2": {
+            "main": [
+                [
+                    {
+                        "node": "Check Success",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Save Screenshot 3": {
+            "main": [
+                [
+                    {
+                        "node": "Check Success",
+                        "type": "main",
+                        "index": 2
+                    }
+                ]
+            ]
+        },
+        "Save Screenshot 4": {
+            "main": [
+                [
+                    {
+                        "node": "Check Success",
+                        "type": "main",
+                        "index": 3
+                    }
+                ]
+            ]
+        },
+        "Check Success": {
+            "main": [
+                [
+                    {
+                        "node": "Success Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Error Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [
+        {
+            "createdAt": "2024-01-01T00:00:00.000Z",
+            "updatedAt": "2024-01-01T00:00:00.000Z",
+            "id": "screenshot-workflow",
+            "name": "Screenshot Workflow"
+        }
+    ],
+    "triggerCount": 0,
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "versionId": "1"
+}
