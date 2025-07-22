@@ -1,6 +1,7 @@
 import ConventionFeed from "@/components/features/ConventionFeed";
 import { db } from "@/lib/db";
 import { ConventionStatus } from "@prisma/client";
+import { Metadata } from 'next';
 
 async function getPublishedConventions() {
   try {
@@ -24,6 +25,31 @@ async function getPublishedConventions() {
     return [];
   }
 }
+
+export const metadata: Metadata = {
+  title: 'Convention Crasher - Your Guide to Magic Conventions',
+  description: 'Discover and explore magic conventions worldwide. Find your next magical experience with Convention Crasher.',
+  openGraph: {
+    type: 'website',
+    url: 'https://conventioncrasher.com',
+    title: 'Convention Crasher - Your Guide to Magic Conventions',
+    description: 'Discover and explore magic conventions worldwide. Find your next magical experience with Convention Crasher.',
+    images: [
+      {
+        url: 'https://convention-crasher.s3.us-east-1.amazonaws.com/images/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Convention Crasher - Magic Conventions Guide',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Convention Crasher - Your Guide to Magic Conventions',
+    description: 'Discover and explore magic conventions worldwide.',
+    images: ['https://convention-crasher.s3.us-east-1.amazonaws.com/images/og-image.png'],
+  },
+};
 
 export default async function Home() {
   const conventions = await getPublishedConventions();

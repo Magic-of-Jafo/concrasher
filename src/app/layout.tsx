@@ -37,6 +37,28 @@ export const metadata: Metadata = {
     template: '%s | Convention Crasher',
   },
   description: 'Your one-stop portal for conventions.',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://conventioncrasher.com',
+    siteName: 'Convention Crasher',
+    title: 'Convention Crasher - Your Guide to Magic Conventions',
+    description: 'Discover and explore magic conventions worldwide. Find your next magical experience with Convention Crasher.',
+    images: [
+      {
+        url: 'https://convention-crasher.s3.us-east-1.amazonaws.com/images/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Convention Crasher - Magic Conventions Guide',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Convention Crasher - Your Guide to Magic Conventions',
+    description: 'Discover and explore magic conventions worldwide.',
+    images: ['https://convention-crasher.s3.us-east-1.amazonaws.com/images/og-image.png'],
+  },
 };
 
 export default function RootLayout({
