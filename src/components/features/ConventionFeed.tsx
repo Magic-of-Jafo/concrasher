@@ -68,9 +68,16 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
     setIsHydrated(true);
   }, [conventions]);
 
+  // Initialize with empty array to prevent hydration mismatch
+  useEffect(() => {
+    if (conventions.length > 0 && filteredSorted.length === 0) {
+      setFilteredSorted(conventions);
+    }
+  }, [conventions, filteredSorted.length]);
+
   // Helper to get status text - only calculate on client
   const getConventionStatusText = (startDate: Date | string | null, endDate: Date | string | null) => {
-    if (!isHydrated) return null; // Don't calculate until hydrated
+    if (!isHydrated) return "Loading..."; // Show consistent loading state
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -99,12 +106,63 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
   if (!isHydrated) {
     return (
       <Box sx={{ flexGrow: 1, maxWidth: 1400, mx: "auto" }}>
-        <Box sx={{ px: { xs: 1, sm: 2, md: 4 }, py: 4 }}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 30%' } }}>
-              <Skeleton variant="rectangular" height={200} />
+        {/* Hero Section Skeleton */}
+        <Box sx={{
+          width: '100vw',
+          mb: 6,
+          position: 'relative',
+          overflow: 'hidden',
+          left: '50%',
+          right: '50%',
+          marginLeft: '-50vw',
+          marginRight: '-50vw'
+        }}>
+          <Paper sx={{ p: 0, borderRadius: 0, minHeight: { xs: '300px', sm: '400px', md: '500px', lg: '600px' } }}>
+            <Box sx={{
+              position: 'relative',
+              zIndex: 2,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              maxWidth: 1400,
+              mx: "auto",
+              px: { xs: 1, sm: 2, md: 4 },
+              pt: 3.75,
+              pb: 2.5
+            }}>
+              <Skeleton variant="text" sx={{ fontSize: { xs: '1.5rem', sm: '2.5rem', md: '3.5rem', lg: '4rem' }, mb: { xs: 2, sm: 3, md: 4 } }} />
+              <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', lg: 'row' },
+                gap: { xs: 3, lg: 4 },
+                alignItems: { xs: 'center', lg: 'stretch' },
+                justifyContent: { xs: 'center', lg: 'space-between' },
+                width: '100%',
+                flex: 1
+              }}>
+                <Box sx={{ width: { xs: '100%', lg: '50%' }, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <Skeleton variant="rectangular" sx={{ width: { xs: '150px', sm: '200px', md: '300px', lg: '430px' }, height: { xs: '75px', sm: '100px', md: '150px', lg: '215px' } }} />
+                  <Skeleton variant="rectangular" sx={{ width: { xs: '280px', sm: '375px' }, height: '48px' }} />
+                </Box>
+                <Box sx={{ width: { xs: '0%', lg: '50%' }, display: { xs: 'none', lg: 'flex' }, flexDirection: 'column', gap: 2 }}>
+                  <Skeleton variant="text" sx={{ fontSize: '1.5rem', mb: 2 }} />
+                  {[...Array(3)].map((_, index) => (
+                    <Skeleton key={index} variant="rectangular" height={120} />
+                  ))}
+                </Box>
+              </Box>
             </Box>
-            <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 65%' } }}>
+          </Paper>
+        </Box>
+
+        {/* Main Content Skeleton */}
+        <Box sx={{ px: { xs: 1, sm: 2, md: 4 }, py: 4, pt: 0 }}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
+            <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 0" }, minWidth: 0 }}>
+              <Skeleton variant="rectangular" height={400} />
+            </Box>
+            <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 0" }, minWidth: 0 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {[...Array(3)].map((_, index) => (
                   <Skeleton key={index} variant="rectangular" height={120} />
@@ -160,139 +218,156 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
           />
 
           {/* Hero Content - Responsive Layout */}
-          <Box
-            sx={{
-              position: 'relative',
-              zIndex: 2,
+          <Box sx={{
+            position: 'relative',
+            zIndex: 2,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            maxWidth: 1400,
+            mx: "auto",
+            px: { xs: 1, sm: 2, md: 4 },
+            pt: 3.75, // 30px top padding
+            pb: 2.5
+          }}>
+            {/* Main Headline */}
+            <Typography
+              sx={{
+                mb: { xs: 2, sm: 3, md: 4 },
+                fontSize: { xs: '1.5rem', sm: '2.5rem', md: '3.5rem', lg: '4rem' },
+                fontFamily: 'Montserrat',
+                fontWeight: 900,
+                lineHeight: 1.1,
+                textAlign: 'center',
+                color: '#f5f5dc', // Light cream color
+                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              The Best Guide to Magic Conventions
+            </Typography>
+
+            {/* Hero Content - Logo and Buttons Only on Mobile, Full Layout on Desktop */}
+            <Box sx={{
               display: 'flex',
               flexDirection: { xs: 'column', lg: 'row' },
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              p: { xs: 3, sm: 4, md: 6 },
-              minHeight: 'inherit',
-              maxWidth: 1400,
-              mx: 'auto',
-              px: { xs: 1, sm: 2, md: 4 },
-            }}
-          >
-            {/* Left Column - Text Content */}
-            <Box
-              sx={{
-                flex: { xs: '1 1 100%', lg: '1 1 50%' },
-                order: { xs: 1, lg: 1 },
-                textAlign: { xs: 'center', lg: 'left' },
-                mb: { xs: 3, lg: 0 },
-              }}
-            >
-              <Typography
-                variant="h1"
+              gap: { xs: 3, lg: 4 },
+              alignItems: { xs: 'center', lg: 'stretch' },
+              justifyContent: { xs: 'center', lg: 'space-between' },
+              width: '100%',
+              flex: 1
+            }}>
+              {/* Left Column - Logo and Buttons (Always in hero) */}
+              <Box
                 sx={{
-                  fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem', lg: '4rem' },
-                  fontFamily: 'Poppins',
-                  fontWeight: 800,
-                  lineHeight: 1.1,
-                  mb: 2,
-                  color: 'white',
+                  width: { xs: '100%', lg: '50%' },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: { xs: 2, sm: 3 },
+                  order: { xs: 1, lg: 1 },
+                  minHeight: { lg: '400px' } // Ensure minimum height for centering
                 }}
               >
-                Discover Magic
-                <br />
-                Conventions
-              </Typography>
-              <Typography
-                variant="h2"
-                sx={{
-                  fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
-                  fontFamily: 'Poppins',
-                  fontWeight: 400,
-                  lineHeight: 1.3,
-                  mb: 3,
-                  color: 'white',
-                  opacity: 0.9,
-                }}
-              >
-                Find your next magical experience
-              </Typography>
+                {/* Logo - Responsive sizing */}
+                <Box sx={{
+                  width: { xs: '150px', sm: '200px', md: '300px', lg: '430px' },
+                  transform: { xs: 'scale(0.9)', sm: 'scale(1)' }
+                }}>
+                  <img
+                    src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
+                    alt="Convention Crasher Logo"
+                    width="430"
+                    height="222"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                    }}
+                  />
+                </Box>
 
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-                width: '100%',
-                maxWidth: { xs: '280px', sm: '375px' },
-                alignItems: 'center',
-                transform: { xs: 'scale(0.9)', sm: 'scale(1)' }
-              }}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  component={Link}
-                  href="/conventions"
-                  sx={{
-                    px: { xs: 4, sm: 6 },
-                    py: 1.5,
-                    fontWeight: 600,
-                    bgcolor: '#ffd700',
-                    color: '#1a365d',
-                    fontSize: { xs: '0.9rem', sm: '1rem' },
-                    '&:hover': {
-                      bgcolor: '#ffed4e',
-                    },
-                  }}
-                >
-                  See All
-                </Button>
-                <Typography
-                  component={Link}
-                  href="/register"
-                  sx={{
-                    color: 'white',
-                    textDecoration: 'underline',
-                    fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                    '&:hover': {
-                      color: '#ffd700',
-                    },
-                  }}
-                >
-                  Sign Up for Free
-                </Typography>
+                {/* Button and Link - Responsive sizing */}
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  width: '100%',
+                  maxWidth: { xs: '280px', sm: '375px' },
+                  alignItems: 'center',
+                  transform: { xs: 'scale(0.9)', sm: 'scale(1)' }
+                }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    component={Link}
+                    href="/conventions"
+                    sx={{
+                      px: { xs: 4, sm: 6 },
+                      py: 1.5,
+                      fontWeight: 600,
+                      bgcolor: '#ffd700',
+                      color: '#1a365d',
+                      fontSize: { xs: '0.9rem', sm: '1rem' },
+                      '&:hover': {
+                        bgcolor: '#ffed4e',
+                      },
+                    }}
+                  >
+                    See All
+                  </Button>
+                  <Typography
+                    component={Link}
+                    href="/register"
+                    sx={{
+                      color: 'white',
+                      textDecoration: 'underline',
+                      fontSize: { xs: '0.8rem', sm: '0.9rem' },
+                      '&:hover': {
+                        color: '#ffd700',
+                      },
+                    }}
+                  >
+                    Sign Up for Free
+                  </Typography>
+                </Box>
               </Box>
-            </Box>
 
-            {/* Right Column - Convention Cards (Only show on desktop) */}
-            <Box
-              sx={{
-                width: { xs: '0%', lg: '50%' }, // Hidden on mobile
-                display: { xs: 'none', lg: 'flex' },
-                flexDirection: "column",
-                gap: 2,
-                order: { xs: 2, lg: 2 }
-              }}
-            >
-              {/* Coming Soon Header */}
-              <Typography
-                variant="h3"
+              {/* Right Column - Convention Cards (Only show on desktop) */}
+              <Box
                 sx={{
-                  mb: 2,
-                  fontSize: '1.5rem',
-                  fontFamily: 'Poppins',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  color: 'white'
+                  width: { xs: '0%', lg: '50%' }, // Hidden on mobile
+                  display: { xs: 'none', lg: 'flex' },
+                  flexDirection: "column",
+                  gap: 2,
+                  order: { xs: 2, lg: 2 }
                 }}
               >
-                Coming Soon
-              </Typography>
-              {filteredSorted.slice(0, 3).map((con: any) => {
-                const statusText = getConventionStatusText(con.startDate, con.endDate);
-                if (!statusText) return null;
+                {/* Coming Soon Header */}
+                <Typography
+                  variant="h3"
+                  sx={{
+                    mb: 2,
+                    fontSize: '1.5rem',
+                    fontFamily: 'Poppins',
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    color: 'white'
+                  }}
+                >
+                  Coming Soon
+                </Typography>
+                {filteredSorted.slice(0, 3).map((con: any) => {
+                  const statusText = getConventionStatusText(con.startDate, con.endDate);
+                  if (!statusText) return null;
 
-                return (
-                  <Box key={con.id}>
-                    <ConventionCard convention={con} />
-                  </Box>
-                );
-              })}
+                  return (
+                    <Box key={con.id}>
+                      <ConventionCard convention={con} />
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
           </Box>
         </Paper>
