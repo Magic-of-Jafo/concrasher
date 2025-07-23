@@ -13,6 +13,9 @@ interface SettingsTabProps {
         roles: Role[];
         talentProfile?: {
             isActive: boolean;
+            displayName?: string;
+            bio?: string;
+            tagline?: string;
         } | null;
     };
     roleApplications: Pick<RoleApplication, 'requestedRole' | 'status'>[];

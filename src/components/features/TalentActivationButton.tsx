@@ -36,7 +36,7 @@ export default function TalentActivationButton({ initialIsActive, hasTalentProfi
       setIsActive(result.isActive);
       // Dispatch event to notify other components of the change
       window.dispatchEvent(new CustomEvent('talentProfileUpdated', {
-        detail: { isActive: result.isActive }
+        detail: { isActive: result.isActive, hasProfile: true }
       }));
     } else if (result) {
       setError(result.error || (shouldBeActive ? "Failed to activate talent profile." : "Failed to deactivate talent profile."));
@@ -46,16 +46,6 @@ export default function TalentActivationButton({ initialIsActive, hasTalentProfi
     }
     setIsPending(false);
   };
-
-  if (!hasTalentProfile) {
-    return (
-      <div>
-        <Typography color="text.secondary">
-          Create a talent profile first to activate it.
-        </Typography>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -70,6 +60,11 @@ export default function TalentActivationButton({ initialIsActive, hasTalentProfi
           {isActive ? "Talent Profile Active" : "Activate Talent Profile"}
         </Typography>
       </div>
+      {!hasTalentProfile && !isActive && (
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+          First-time activation will create your talent profile
+        </Typography>
+      )}
       {isPending && <Typography variant="caption" sx={{ ml: 1, display: 'block' }}>Processing...</Typography>}
       {message && <Typography color="primary" sx={{ mt: 1 }}>{message}</Typography>}
       {error && <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>}

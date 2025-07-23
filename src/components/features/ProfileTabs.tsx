@@ -67,14 +67,9 @@ export default function ProfileTabs({
     onApplicationProcessed,
     initialTab = 'profile'
 }: ProfileTabsProps) {
-    const [value, setValue] = useState(() => {
-        if (initialTab === 'settings') return 1;
-        if (initialTab === 'brands') return 2;
-        if (initialTab === 'talent') return 3;
-        if (initialTab === 'admin') return 4;
-        return 0;
-    });
+    const [value, setValue] = useState(0); // Will be updated after indices are calculated
     const [talentProfileActive, setTalentProfileActive] = useState(user?.talentProfile?.isActive ?? false);
+    const [hasTalentProfile, setHasTalentProfile] = useState(!!user?.talentProfile);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
@@ -86,12 +81,17 @@ export default function ProfileTabs({
             // Use event data immediately if available
             if (event.detail && typeof event.detail.isActive === 'boolean') {
                 setTalentProfileActive(event.detail.isActive);
+                // If profile was created, update hasTalentProfile state
+                if (event.detail.hasProfile) {
+                    setHasTalentProfile(true);
+                }
             } else {
                 // Fallback to API call
                 fetch(`/api/profile/${user.id}`)
                     .then(res => res.json())
                     .then(data => {
-                        setTalentProfileActive(data.talentProfile?.isActive ?? false);
+                        setTalentProfileActive(data.user.talentProfile?.isActive ?? false);
+                        setHasTalentProfile(!!data.user.talentProfile);
                     })
                     .catch(console.error);
             }
@@ -104,14 +104,27 @@ export default function ProfileTabs({
         };
     }, [user.id]);
 
-    const hasTalentRole = user?.roles?.includes('TALENT');
-    const hasTalentProfile = !!user?.talentProfile;
+    const hasTalentRole = user?.roles?.includes(Role.TALENT);
     const showTalentTab = hasTalentProfile && talentProfileActive; // Show tab only if profile exists and is active
-    const isAdmin = user?.roles?.includes('ADMIN');
+    const isAdmin = user?.roles?.includes(Role.ADMIN);
+    const hasBrandCreatorRole = user?.roles?.includes(Role.BRAND_CREATOR);
 
-    let adminTabIndex = 2; // Default index if no other roles are present
-    if (user?.roles?.includes('ORGANIZER')) adminTabIndex++;
-    if (showTalentTab) adminTabIndex++;
+    // Calculate tab indices dynamically
+    let currentIndex = 2; // Start after Basic Info (0) and Account Settings (1)
+    const brandsTabIndex = hasBrandCreatorRole ? currentIndex++ : -1;
+    const talentTabIndex = showTalentTab ? currentIndex++ : -1;
+    const adminTabIndex = isAdmin ? currentIndex : -1;
+
+    // Set initial tab value based on calculated indices
+    React.useEffect(() => {
+        let initialValue = 0; // Default to Basic Info
+        if (initialTab === 'settings') initialValue = 1;
+        else if (initialTab === 'brands' && brandsTabIndex !== -1) initialValue = brandsTabIndex;
+        else if (initialTab === 'talent' && talentTabIndex !== -1) initialValue = talentTabIndex;
+        else if (initialTab === 'admin' && adminTabIndex !== -1) initialValue = adminTabIndex;
+
+        setValue(initialValue);
+    }, [initialTab, brandsTabIndex, talentTabIndex, adminTabIndex]);
 
 
     return (
@@ -136,8 +149,8 @@ export default function ProfileTabs({
             >
                 <Tab label="Basic Info" {...a11yProps(0)} />
                 <Tab label="Account Settings" {...a11yProps(1)} />
-                {user?.roles?.includes('ORGANIZER') && <Tab label="My Brands" {...a11yProps(2)} />}
-                {showTalentTab && <Tab label="Talent Profile" {...a11yProps(3)} />}
+                {hasBrandCreatorRole && <Tab label="My Brands" {...a11yProps(brandsTabIndex)} />}
+                {showTalentTab && <Tab label="Talent Profile" {...a11yProps(talentTabIndex)} />}
                 {isAdmin && <Tab label="Admin Settings" {...a11yProps(adminTabIndex)} />}
             </Tabs>
 
@@ -165,8 +178,8 @@ export default function ProfileTabs({
                 <CustomTabPanel value={value} index={1}>
                     <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
                 </CustomTabPanel>
-                {user?.roles?.includes('ORGANIZER') && (
-                    <CustomTabPanel value={value} index={2}>
+                {hasBrandCreatorRole && (
+                    <CustomTabPanel value={value} index={brandsTabIndex}>
                         <BrandsTab
                             userId={user.id}
                             user={user}
@@ -174,7 +187,7 @@ export default function ProfileTabs({
                     </CustomTabPanel>
                 )}
                 {showTalentTab && (
-                    <CustomTabPanel value={value} index={3}>
+                    <CustomTabPanel value={value} index={talentTabIndex}>
                         <TalentProfileTab
                             userId={user.id}
                             user={user}

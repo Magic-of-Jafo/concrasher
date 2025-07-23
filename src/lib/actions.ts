@@ -668,15 +668,42 @@ export async function activateTalentProfile(): Promise<{
   const userId = session.user.id;
 
   try {
-    const talentProfile = await db.talentProfile.findUnique({
+    let talentProfile = await db.talentProfile.findUnique({
       where: { userId },
       select: { isActive: true },
     });
 
+    // If no talent profile exists, create one
     if (!talentProfile) {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true, stageName: true, useStageNamePublicly: true },
+      });
+
+      // Leave displayName blank as requested instead of defaulting to "Talent"
+      const displayName = '';
+
+      talentProfile = await db.talentProfile.create({
+        data: {
+          userId,
+          displayName,
+          tagline: '',
+          bio: '',
+          profilePictureUrl: '',
+          websiteUrl: '',
+          contactEmail: '',
+          skills: [],
+          isActive: true,
+        },
+        select: { isActive: true },
+      });
+
+      revalidatePath("/profile");
+
       return {
-        success: false,
-        error: "Talent profile not found. Please create a talent profile first.",
+        success: true,
+        message: "Talent profile has been created and activated successfully!",
+        isActive: talentProfile.isActive,
       };
     }
 

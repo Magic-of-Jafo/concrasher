@@ -13,9 +13,7 @@ export async function POST(req: NextRequest) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        if (!session.user.roles?.includes('TALENT')) {
-            return new NextResponse('Forbidden: User is not talent', { status: 403 });
-        }
+
 
         const existingProfile = await db.talentProfile.findUnique({
             where: { userId: session.user.id },

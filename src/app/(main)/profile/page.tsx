@@ -73,12 +73,29 @@ export default function ProfilePage() {
       );
     };
 
+    const handleTalentProfileUpdate = async () => {
+      // Refetch user data when talent profile is updated
+      if (session?.user?.id) {
+        try {
+          const response = await fetch(`/api/profile/${session.user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          }
+        } catch (error) {
+          console.error('Error refetching profile data:', error);
+        }
+      }
+    };
+
     eventBus.on('applicationProcessed', handleApplicationProcessed);
+    window.addEventListener('talentProfileUpdated', handleTalentProfileUpdate);
 
     return () => {
       eventBus.off('applicationProcessed', handleApplicationProcessed);
+      window.removeEventListener('talentProfileUpdated', handleTalentProfileUpdate);
     };
-  }, []);
+  }, [session?.user?.id]);
 
   const handleApplicationProcessed = useCallback((applicationId: string) => {
     setPendingApplications((prev) =>

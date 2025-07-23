@@ -222,8 +222,30 @@ export default function TalentProfileEditor({
         }
     };
 
+    // Debug logging
+    console.log('TalentProfileEditor render:', {
+        userId,
+        user,
+        initialData,
+        formData,
+        hasOnSave: !!onSave
+    });
+
     return (
         <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800 }}>
+            {/* Debug info - remove after fixing */}
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', color: 'info.contrastText', borderRadius: 1 }}>
+                <Typography variant="caption" display="block">
+                    Debug: TalentProfileEditor is rendering
+                </Typography>
+                <Typography variant="caption" display="block">
+                    Debug: User ID: {userId}
+                </Typography>
+                <Typography variant="caption" display="block">
+                    Debug: Display Name: {formData.displayName}
+                </Typography>
+            </Box>
+
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
