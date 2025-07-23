@@ -39,6 +39,7 @@ model User {
   firstName        String?
   lastName         String?
   stageName        String?
+  useStageNamePublicly Boolean?        @default(false)
   accounts         Account[]
   ownedBrands      Brand[]            @relation("BrandOwner")
   brandMemberships BrandUser[]
@@ -437,6 +438,7 @@ model TalentProfile {
   websiteUrl        String?
   contactEmail      String?
   skills            String[]             @default([])
+  isActive          Boolean              @default(true)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   conventions       ConventionTalent[]

@@ -247,6 +247,7 @@ export default function TalentProfileEditor({
                         <TalentProfileImageUploader
                             currentImageUrl={formData.profilePictureUrl}
                             onImageUpdate={handleImageUpload}
+                            talentProfileId={initialData?.id}
                         />
                     </Paper>
                 </Grid>

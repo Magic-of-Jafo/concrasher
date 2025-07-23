@@ -71,6 +71,7 @@ export const ProfileSchema = z.object({
   lastName: z.string().max(50, { message: "Last name must be 50 characters or less" }).optional().nullable(),
   stageName: z.string().max(50, { message: "Stage name must be 50 characters or less" }).optional().nullable(),
   bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional().nullable(),
+  useStageNamePublicly: z.boolean().optional(),
 });
 
 export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;

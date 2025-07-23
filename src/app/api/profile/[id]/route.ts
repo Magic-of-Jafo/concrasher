@@ -29,6 +29,12 @@ export async function GET(
                 bio: true,
                 roles: true,
                 emailVerified: true,
+                useStageNamePublicly: true,
+                talentProfile: {
+                    select: {
+                        isActive: true,
+                    }
+                },
             }
         });
 
@@ -121,6 +127,7 @@ export async function PUT(
                 image: true,
                 bio: true,
                 roles: true,
+                useStageNamePublicly: true,
             }
         });
 

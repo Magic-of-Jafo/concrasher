@@ -11,6 +11,9 @@ interface SettingsTabProps {
     user: {
         id: string;
         roles: Role[];
+        talentProfile?: {
+            isActive: boolean;
+        } | null;
     };
     roleApplications: Pick<RoleApplication, 'requestedRole' | 'status'>[];
     ownedBrands: Pick<Brand, 'id' | 'name'>[];
@@ -24,7 +27,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user, roleApplications, owned
             <Paper sx={{ p: 4, mb: 4 }}>
                 <Typography variant="h5" gutterBottom>Role Management</Typography>
                 <Box sx={{ my: 2 }}>
-                    <TalentActivationButton initialRoles={user.roles} />
+                    <TalentActivationButton
+                        initialIsActive={user.talentProfile?.isActive ?? false}
+                        hasTalentProfile={!!user.talentProfile}
+                    />
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <RoleRequestForm

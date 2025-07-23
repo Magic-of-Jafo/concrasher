@@ -17,20 +17,27 @@ import {
     Slider,
     Avatar,
     Link,
-    IconButton,
 } from '@mui/material';
-import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon, Close as CloseIcon } from '@mui/icons-material';
+import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { updateUserProfileImage, clearUserProfileImage } from '@/lib/actions';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { getUserProfileUrl } from '@/lib/user-utils';
 
 interface UserProfilePictureUploaderProps {
     currentImageUrl?: string | null;
     onImageUpdate: (url: string | null) => void;
+    user?: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        stageName: string | null;
+        useStageNamePublicly?: boolean | null;
+    };
 }
 
-const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({ currentImageUrl, onImageUpdate }) => {
+const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({ currentImageUrl, onImageUpdate, user }) => {
     const { data: session } = useSession(); // <-- Get session data
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
@@ -236,42 +243,98 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
                 <Avatar src={getS3ImageUrl(currentImageUrl) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
-                {currentImageUrl && (
-                    <IconButton
-                        aria-label="remove profile picture"
+            </Box>
+
+            {currentImageUrl && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <Link
+                        component="button"
+                        variant="body2"
                         onClick={() => setShowRemoveDialog(true)}
                         disabled={isProcessing}
                         sx={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            color: 'common.white',
-                            backgroundColor: 'error.main',
+                            color: 'error.main',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            border: 'none',
+                            background: 'none',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
                             '&:hover': {
-                                backgroundColor: 'error.dark',
+                                color: 'error.dark',
                             },
-                            width: 24,
-                            height: 24,
+                            '&:disabled': {
+                                color: 'text.disabled',
+                                cursor: 'not-allowed',
+                            }
                         }}
                     >
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                )}
-            </Box>
+                        Delete image (permanent)
+                    </Link>
+
+                    {user && (
+                        <Link
+                            href={getUserProfileUrl(user)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="body2"
+                            sx={{
+                                color: 'primary.main',
+                                textDecoration: 'underline',
+                                fontSize: '0.875rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                '&:hover': {
+                                    color: 'primary.dark',
+                                },
+                            }}
+                        >
+                            Preview Profile
+                            <OpenInNewIcon sx={{ fontSize: '0.75rem' }} />
+                        </Link>
+                    )}
+                </Box>
+            )}
 
             {!currentImageUrl && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<UploadIcon />}
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isProcessing}
-                    >
-                        Upload Image
-                    </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                        Profile Image Size:<br />400x400 - Max 3MB
-                    </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<UploadIcon />}
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isProcessing}
+                        >
+                            Upload Image
+                        </Button>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                            Profile Image Size:<br />400x400 - Max 3MB
+                        </Typography>
+                    </Box>
+
+                    {user && (
+                        <Link
+                            href={getUserProfileUrl(user)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="body2"
+                            sx={{
+                                color: 'primary.main',
+                                textDecoration: 'underline',
+                                fontSize: '0.875rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                '&:hover': {
+                                    color: 'primary.dark',
+                                },
+                            }}
+                        >
+                            Preview Profile
+                            <OpenInNewIcon sx={{ fontSize: '0.75rem' }} />
+                        </Link>
+                    )}
                 </Box>
             )}
 

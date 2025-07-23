@@ -31,6 +31,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
 import { deleteConvention } from '@/lib/actions';
 import { useDebounce } from '@/hooks/useDebounce';
+import { formatConventionLocation } from '@/lib/location-utils';
 
 
 
@@ -304,7 +305,9 @@ export default function AdminConventionList({ error, setError }: AdminConvention
                     <TableCell>
                       {convention.startDate ? format(new Date(convention.startDate), 'PPP') : 'TBD'}
                     </TableCell>
-                    <TableCell>{convention.city && convention.stateAbbreviation ? `${convention.city}, ${convention.stateAbbreviation}` : 'TBD'}</TableCell>
+                    <TableCell>
+                      {formatConventionLocation(convention)}
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                         <IconButton

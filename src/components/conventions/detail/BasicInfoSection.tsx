@@ -22,6 +22,7 @@ import EventIcon from '@mui/icons-material/Event';
 import WebIcon from '@mui/icons-material/Web';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { formatConventionLocation } from '@/lib/location-utils';
 
 interface BasicInfoSectionProps {
     convention: any;
@@ -55,11 +56,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
     const coverImageUrl = getS3ImageUrl(convention.coverImageUrl);
 
     // Format location display
-    const locationDisplay = [
-        convention.city,
-        convention.stateAbbreviation || convention.stateName,
-        convention.country
-    ].filter(Boolean).join(', ');
+    const locationDisplay = formatConventionLocation(convention);
 
     // Format date display for one-day or multi-day events
     const formatConventionDates = () => {

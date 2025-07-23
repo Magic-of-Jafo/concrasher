@@ -11,14 +11,14 @@ import {
     DialogContent,
     DialogActions,
     DialogContentText,
-    IconButton,
     Alert,
     Typography,
     Slider,
     LinearProgress,
-    CircularProgress
+    CircularProgress,
+    Link
 } from '@mui/material';
-import { Upload as UploadIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Upload as UploadIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Area } from 'react-easy-crop/types';
 
@@ -234,28 +234,34 @@ const BrandLogoUploader: React.FC<BrandLogoUploaderProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
                 <Avatar src={getS3ImageUrl(currentImageUrl || null) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
-                {currentImageUrl && (
-                    <IconButton
-                        aria-label="remove brand logo"
-                        onClick={() => setShowRemoveDialog(true)}
-                        disabled={isProcessing}
-                        sx={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            color: 'common.white',
-                            backgroundColor: 'error.main',
-                            '&:hover': {
-                                backgroundColor: 'error.dark',
-                            },
-                            width: 24,
-                            height: 24,
-                        }}
-                    >
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                )}
             </Box>
+
+            {currentImageUrl && (
+                <Link
+                    component="button"
+                    variant="body2"
+                    onClick={() => setShowRemoveDialog(true)}
+                    disabled={isProcessing}
+                    sx={{
+                        color: 'error.main',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: 'none',
+                        fontSize: '0.875rem',
+                        fontFamily: 'inherit',
+                        '&:hover': {
+                            color: 'error.dark',
+                        },
+                        '&:disabled': {
+                            color: 'text.disabled',
+                            cursor: 'not-allowed',
+                        }
+                    }}
+                >
+                    Delete image (permanent)
+                </Link>
+            )}
 
             {!currentImageUrl && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>

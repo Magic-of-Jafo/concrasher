@@ -20,6 +20,7 @@ interface ProfileFormProps {
   currentLastName?: string | null;
   currentStageName?: string | null;
   currentBio?: string | null;
+  currentUseStageNamePublicly?: boolean | null;
   onProfileUpdate?: (updatedData: ProfileSchemaInput) => void;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -30,18 +31,21 @@ export default function ProfileForm({
   currentLastName,
   currentStageName,
   currentBio,
+  currentUseStageNamePublicly,
   onProfileUpdate,
   onSuccess,
   onCancel
 }: ProfileFormProps) {
   const [serverMessage, setServerMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined> | null>(null);
-  const [useStageNamePublicly, setUseStageNamePublicly] = useState(false);
+  const [isUpdatingToggle, setIsUpdatingToggle] = useState(false);
 
   const {
     control,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileSchemaInput>({
     resolver: ProfileSchema ? zodResolver(ProfileSchema) : undefined,
@@ -50,8 +54,11 @@ export default function ProfileForm({
       lastName: currentLastName || '',
       stageName: currentStageName || '',
       bio: currentBio || '',
+      useStageNamePublicly: currentUseStageNamePublicly || false,
     },
   });
+
+  const useStageNamePublicly = watch('useStageNamePublicly');
 
   useEffect(() => {
     reset({
@@ -59,8 +66,59 @@ export default function ProfileForm({
       lastName: currentLastName || '',
       stageName: currentStageName || '',
       bio: currentBio || '',
+      useStageNamePublicly: currentUseStageNamePublicly || false,
     });
-  }, [currentFirstName, currentLastName, currentStageName, currentBio, reset]);
+  }, [currentFirstName, currentLastName, currentStageName, currentBio, currentUseStageNamePublicly, reset]);
+
+  // Auto-save the stage name toggle immediately when changed
+  const handleToggleChange = async (newValue: boolean) => {
+    setIsUpdatingToggle(true);
+    setServerMessage(null);
+    setFieldErrors(null);
+
+    try {
+      // Update the form value
+      setValue('useStageNamePublicly', newValue);
+
+      // Prepare data with only the current values from the form
+      const currentFormData = {
+        firstName: currentFirstName,
+        lastName: currentLastName,
+        stageName: currentStageName,
+        bio: currentBio,
+        useStageNamePublicly: newValue,
+      };
+
+      const result = await updateUserProfile(currentFormData);
+
+      if (result.success) {
+        setServerMessage({ 
+          type: 'success', 
+          message: `Stage name preference ${newValue ? 'enabled' : 'disabled'}` 
+        });
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setServerMessage(null);
+        }, 3000);
+
+        if (onProfileUpdate) {
+          onProfileUpdate(currentFormData);
+        }
+      } else {
+        setServerMessage({ type: 'error', message: result.error || 'Failed to update preference.' });
+        // Revert the toggle if the update failed
+        setValue('useStageNamePublicly', !newValue);
+      }
+    } catch (error) {
+      console.error('Error updating stage name preference:', error);
+      setServerMessage({ type: 'error', message: 'An unexpected error occurred.' });
+      // Revert the toggle if the update failed
+      setValue('useStageNamePublicly', !newValue);
+    } finally {
+      setIsUpdatingToggle(false);
+    }
+  };
 
   const onSubmit = async (data: ProfileSchemaInput) => {
     setServerMessage(null);
@@ -153,15 +211,27 @@ export default function ProfileForm({
             />
           )}
         />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={useStageNamePublicly}
-              onChange={(e) => setUseStageNamePublicly(e.target.checked)}
-              name="useStageNamePublicly"
+        <Controller
+          name="useStageNamePublicly"
+          control={control}
+          render={({ field }) => (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={field.value || false}
+                  onChange={(e) => handleToggleChange(e.target.checked)}
+                  name="useStageNamePublicly"
+                  disabled={isUpdatingToggle}
+                />
+              }
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  Use stage name publicly
+                  {isUpdatingToggle && <CircularProgress size={16} />}
+                </Box>
+              }
             />
-          }
-          label="Use stage name publicly"
+          )}
         />
       </Box>
 

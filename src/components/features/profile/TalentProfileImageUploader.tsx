@@ -17,19 +17,24 @@ import {
     Slider,
     Avatar,
     Link,
-    IconButton,
 } from '@mui/material';
-import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon, Close as CloseIcon } from '@mui/icons-material';
+import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { getTalentProfileUrl } from '@/lib/user-utils';
 
 interface TalentProfileImageUploaderProps {
     currentImageUrl?: string | null;
     onImageUpdate: (url: string | null) => void;
+    talentProfileId?: string;
 }
 
-const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({ currentImageUrl, onImageUpdate }) => {
+const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
+    currentImageUrl,
+    onImageUpdate,
+    talentProfileId
+}) => {
     const { data: session } = useSession();
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
@@ -223,28 +228,82 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
                 <Avatar src={getS3ImageUrl(currentImageUrl) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
-                {currentImageUrl && (
-                    <IconButton
-                        aria-label="remove profile picture"
+            </Box>
+
+            {currentImageUrl && (
+                <>
+                    <Link
+                        component="button"
+                        variant="body2"
                         onClick={() => setShowRemoveDialog(true)}
                         disabled={isProcessing}
                         sx={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            color: 'common.white',
-                            backgroundColor: 'error.main',
+                            color: 'error.main',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            border: 'none',
+                            background: 'none',
+                            fontSize: '0.875rem',
+                            fontFamily: 'inherit',
                             '&:hover': {
-                                backgroundColor: 'error.dark',
+                                color: 'error.dark',
                             },
-                            width: 24,
-                            height: 24,
+                            '&:disabled': {
+                                color: 'text.disabled',
+                                cursor: 'not-allowed',
+                            }
                         }}
                     >
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                )}
-            </Box>
+                        Delete image (permanent)
+                    </Link>
+
+                    {talentProfileId && (
+                        <Link
+                            href={getTalentProfileUrl({ id: talentProfileId })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="body2"
+                            sx={{
+                                color: 'primary.main',
+                                textDecoration: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                fontSize: '0.875rem',
+                                '&:hover': {
+                                    textDecoration: 'underline',
+                                },
+                            }}
+                        >
+                            Preview Profile
+                            <OpenInNewIcon sx={{ fontSize: '0.875rem' }} />
+                        </Link>
+                    )}
+                </>
+            )}
+
+            {talentProfileId && !currentImageUrl && (
+                <Link
+                    href={getTalentProfileUrl({ id: talentProfileId })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="body2"
+                    sx={{
+                        color: 'primary.main',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        fontSize: '0.875rem',
+                        '&:hover': {
+                            textDecoration: 'underline',
+                        },
+                    }}
+                >
+                    Preview Profile
+                    <OpenInNewIcon sx={{ fontSize: '0.875rem' }} />
+                </Link>
+            )}
 
             {!currentImageUrl && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>

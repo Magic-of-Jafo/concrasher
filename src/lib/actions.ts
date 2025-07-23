@@ -332,6 +332,7 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
         lastName: validatedData.data.lastName,
         stageName: validatedData.data.stageName,
         bio: validatedData.data.bio,
+        useStageNamePublicly: validatedData.data.useStageNamePublicly,
       },
     });
 
@@ -643,6 +644,130 @@ export async function deactivateTalentRole(): Promise<{
     return {
       success: false,
       error: "An unexpected error occurred while deactivating the Talent role. Please try again.",
+    };
+  }
+}
+
+export async function activateTalentProfile(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  isActive?: boolean;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      error: "Authentication required. Please log in.",
+    };
+  }
+
+  const userId = session.user.id;
+
+  try {
+    const talentProfile = await db.talentProfile.findUnique({
+      where: { userId },
+      select: { isActive: true },
+    });
+
+    if (!talentProfile) {
+      return {
+        success: false,
+        error: "Talent profile not found. Please create a talent profile first.",
+      };
+    }
+
+    if (talentProfile.isActive) {
+      return {
+        success: false,
+        error: "Talent profile is already active.",
+        isActive: talentProfile.isActive,
+      };
+    }
+
+    const updatedProfile = await db.talentProfile.update({
+      where: { userId },
+      data: { isActive: true },
+      select: { isActive: true },
+    });
+
+    revalidatePath("/profile");
+
+    return {
+      success: true,
+      message: "Talent profile has been activated successfully!",
+      isActive: updatedProfile.isActive,
+    };
+  } catch (error) {
+    console.error("Error activating talent profile:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while activating the talent profile. Please try again.",
+    };
+  }
+}
+
+export async function deactivateTalentProfile(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+  isActive?: boolean;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      error: "Authentication required. Please log in.",
+    };
+  }
+
+  const userId = session.user.id;
+
+  try {
+    const talentProfile = await db.talentProfile.findUnique({
+      where: { userId },
+      select: { isActive: true },
+    });
+
+    if (!talentProfile) {
+      return {
+        success: false,
+        error: "Talent profile not found.",
+      };
+    }
+
+    if (!talentProfile.isActive) {
+      return {
+        success: false,
+        error: "Talent profile is already inactive.",
+        isActive: talentProfile.isActive,
+      };
+    }
+
+    const updatedProfile = await db.talentProfile.update({
+      where: { userId },
+      data: { isActive: false },
+      select: { isActive: true },
+    });
+
+    revalidatePath("/profile");
+
+    return {
+      success: true,
+      message: "Talent profile has been deactivated successfully!",
+      isActive: updatedProfile.isActive,
+    };
+  } catch (error) {
+    console.error("Error deactivating talent profile:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while deactivating the talent profile. Please try again.",
     };
   }
 }

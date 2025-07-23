@@ -3,6 +3,7 @@
 import { Box, Typography, Card, CardContent, useTheme, useMediaQuery, Skeleton, Avatar } from "@mui/material";
 import { Convention } from "@prisma/client";
 import { useRouter } from "next/navigation";
+import { formatLocationForGrid } from '@/lib/location-utils';
 
 interface ConventionGridProps {
   conventions: Convention[];
@@ -105,12 +106,7 @@ export default function ConventionGrid({
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {conventions.map((convention) => {
           const daysText = getConventionStatusText(convention.startDate, convention.endDate);
-          const city = convention.city || '';
-          const state = convention.stateAbbreviation || '';
-          const country = convention.country || '';
-          const location = country === 'United States' || country === 'USA' || country === 'US'
-            ? (state ? `${city}, ${state}` : city)
-            : `${city}, ${country}`;
+          const location = formatLocationForGrid(convention);
 
           return (
             <Card

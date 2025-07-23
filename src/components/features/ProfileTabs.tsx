@@ -11,6 +11,7 @@ import BasicInfoDisplay from './profile/BasicInfoDisplay';
 import AdminSettingsTab from './profile/AdminSettingsTab';
 import TalentProfileTab from './profile/TalentProfileTab';
 import BrandsTab from './profile/BrandsTab';
+import React from 'react'; // Added for useEffect
 
 interface ProfileTabsProps {
     user: any; // Using 'any' for now to match fetched data structure
@@ -56,14 +57,6 @@ function a11yProps(index: number) {
     };
 }
 
-const TAB_MAP: { [key: string]: number } = {
-    profile: 0,
-    settings: 1,
-    brands: 2,
-    talent: 3,
-    admin: 4, // This may need to be dynamic if other tabs can appear before it
-};
-
 export default function ProfileTabs({
     user,
     roleApplications,
@@ -74,21 +67,56 @@ export default function ProfileTabs({
     onApplicationProcessed,
     initialTab = 'profile'
 }: ProfileTabsProps) {
-    const [value, setValue] = useState(TAB_MAP[initialTab] || 0);
+    const [value, setValue] = useState(() => {
+        if (initialTab === 'settings') return 1;
+        if (initialTab === 'brands') return 2;
+        if (initialTab === 'talent') return 3;
+        if (initialTab === 'admin') return 4;
+        return 0;
+    });
+    const [talentProfileActive, setTalentProfileActive] = useState(user?.talentProfile?.isActive ?? false);
 
     const handleChange = (event: React.SyntheticEvent, newValue: number) => {
         setValue(newValue);
     };
 
-    const isTalent = user?.roles?.includes('TALENT');
+    // Listen for talent profile activation changes
+    React.useEffect(() => {
+        const handleTalentProfileUpdate = (event: any) => {
+            // Use event data immediately if available
+            if (event.detail && typeof event.detail.isActive === 'boolean') {
+                setTalentProfileActive(event.detail.isActive);
+            } else {
+                // Fallback to API call
+                fetch(`/api/profile/${user.id}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        setTalentProfileActive(data.talentProfile?.isActive ?? false);
+                    })
+                    .catch(console.error);
+            }
+        };
+
+        // Listen for updates from the talent activation button
+        window.addEventListener('talentProfileUpdated', handleTalentProfileUpdate);
+        return () => {
+            window.removeEventListener('talentProfileUpdated', handleTalentProfileUpdate);
+        };
+    }, [user.id]);
+
+    const hasTalentRole = user?.roles?.includes('TALENT');
+    const hasTalentProfile = !!user?.talentProfile;
+    const showTalentTab = hasTalentProfile && talentProfileActive; // Show tab only if profile exists and is active
     const isAdmin = user?.roles?.includes('ADMIN');
+
     let adminTabIndex = 2; // Default index if no other roles are present
     if (user?.roles?.includes('ORGANIZER')) adminTabIndex++;
-    if (isTalent) adminTabIndex++;
+    if (showTalentTab) adminTabIndex++;
 
 
     return (
         <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)' }}>
+
             <Tabs
                 orientation="vertical"
                 variant="scrollable"
@@ -109,7 +137,7 @@ export default function ProfileTabs({
                 <Tab label="Basic Info" {...a11yProps(0)} />
                 <Tab label="Account Settings" {...a11yProps(1)} />
                 {user?.roles?.includes('ORGANIZER') && <Tab label="My Brands" {...a11yProps(2)} />}
-                {isTalent && <Tab label="Talent Profile" {...a11yProps(3)} />}
+                {showTalentTab && <Tab label="Talent Profile" {...a11yProps(3)} />}
                 {isAdmin && <Tab label="Admin Settings" {...a11yProps(adminTabIndex)} />}
             </Tabs>
 
@@ -125,7 +153,11 @@ export default function ProfileTabs({
                         {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                         <Grid item xs={12} md={5} lg={4}>
                             <Paper sx={{ p: 2, height: '100%', minHeight: { xs: 'auto', md: 350 } }}>
-                                <UserProfilePictureUploader currentImageUrl={currentImageUrl} onImageUpdate={onImageUpdate} />
+                                <UserProfilePictureUploader
+                                    currentImageUrl={currentImageUrl}
+                                    onImageUpdate={onImageUpdate}
+                                    user={user}
+                                />
                             </Paper>
                         </Grid>
                     </Grid>
@@ -141,7 +173,7 @@ export default function ProfileTabs({
                         />
                     </CustomTabPanel>
                 )}
-                {isTalent && (
+                {showTalentTab && (
                     <CustomTabPanel value={value} index={3}>
                         <TalentProfileTab
                             userId={user.id}

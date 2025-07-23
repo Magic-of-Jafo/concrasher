@@ -18,6 +18,7 @@ interface BasicInfoDisplayProps {
         bio: string | null;
         roles: Role[];
         emailVerified?: Date | null;
+        useStageNamePublicly?: boolean | null;
     };
 }
 
@@ -149,6 +150,7 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user }) => {
                     currentLastName={user.lastName}
                     currentStageName={user.stageName}
                     currentBio={user.bio}
+                    currentUseStageNamePublicly={user.useStageNamePublicly}
                     onSuccess={handleSuccess}
                     onCancel={() => setIsEditing(false)}
                 />
