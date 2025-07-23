@@ -15,6 +15,8 @@ import {
     Stack,
     Alert,
     Button,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { format } from 'date-fns';
 import { ConventionStatus } from '@prisma/client';
@@ -139,33 +141,43 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const hasRegistrationUrl = convention.registrationUrl &&
         convention.status === ConventionStatus.PUBLISHED;
 
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '2rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
+
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h1" component="h1" gutterBottom color="text.primary">
+        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+            <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>
                 {convention.name} Pricing Tiers
             </Typography>
 
-            <TableContainer component={Paper} sx={{ mt: 3 }}>
+            <TableContainer sx={{ mt: 3, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
                 <Table>
                     <TableHead>
                         {/* First header row - spanning header only */}
                         {uniqueCutoffDates.length > 0 && (
                             <TableRow>
-                                <TableCell sx={{ border: 'none' }}></TableCell>
+                                <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
                                 <TableCell
                                     align="center"
                                     colSpan={uniqueCutoffDates.length}
                                     sx={{
                                         borderBottom: 'none',
                                         backgroundColor: '#f5f5f5',
-                                        color: 'text.primary'
+                                        color: 'text.primary',
+                                        py: 2
                                     }}
                                 >
-                                    <Typography variant="h6">
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                         Price good through
                                     </Typography>
                                 </TableCell>
-                                <TableCell sx={{ border: 'none' }}></TableCell>
+                                <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
                             </TableRow>
                         )}
                         {/* Second header row - all column headers */}
@@ -173,9 +185,10 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                             <TableCell sx={{
                                 backgroundColor: 'grey.800',
                                 color: 'white',
-                                py: 1
+                                py: 2.5,
+                                px: 3
                             }}>
-                                <Typography variant="h6" sx={{ color: 'white' }}>
+                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
                                     Attendee Category
                                 </Typography>
                             </TableCell>
@@ -186,10 +199,12 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                     sx={{
                                         backgroundColor: 'grey.300',
                                         color: 'text.primary',
-                                        py: 1
+                                        py: 2.5,
+                                        px: 2,
+                                        minWidth: 120
                                     }}
                                 >
-                                    <Typography variant="h6">
+                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
                                         {formatDiscountDate(date, conventionTimezone)}
                                     </Typography>
                                 </TableCell>
@@ -199,25 +214,33 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                 sx={{
                                     backgroundColor: 'grey.800',
                                     color: 'white',
-                                    py: 1
+                                    py: 2.5,
+                                    px: 2,
+                                    minWidth: 120
                                 }}
                             >
-                                <Typography variant="h6" sx={{ color: 'white' }}>
+                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
                                     {uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}
                                 </Typography>
                             </TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {sortedTiers.map((tier: any) => {
+                        {sortedTiers.map((tier: any, tierIndex: number) => {
                             const tierDiscounts = discountsByTier[tier.id] || [];
                             const { current, original } = getCurrentPrice(tier, tierDiscounts);
                             const hasDiscount = current < original;
 
                             return (
-                                <TableRow key={tier.id}>
-                                    <TableCell>
-                                        <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                                <TableRow
+                                    key={tier.id}
+                                    sx={{
+                                        '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
+                                        '&:hover': { backgroundColor: 'action.selected' }
+                                    }}
+                                >
+                                    <TableCell sx={{ py: 2.5, px: 3 }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>
                                             {tier.label}
                                         </Typography>
                                     </TableCell>
@@ -233,22 +256,41 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                             <TableCell
                                                 key={index}
                                                 align="center"
-                                                sx={{ backgroundColor: 'grey.100' }}
+                                                sx={{
+                                                    backgroundColor: 'grey.50',
+                                                    py: 2.5,
+                                                    px: 2
+                                                }}
                                             >
-                                                <Typography variant="body1">
+                                                <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
                                                     {formatPrice(discountPrice, currencySymbol, currencyCode)}
                                                 </Typography>
                                             </TableCell>
                                         );
                                     })}
-                                    <TableCell align="center">
-                                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                                    <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                        <Stack
+                                            direction={{ xs: 'column', md: 'row' }}
+                                            spacing={{ xs: 0, md: 1 }}
+                                            justifyContent="center"
+                                            alignItems="center"
+                                        >
                                             {hasDiscount && (
-                                                <Typography variant="body1" sx={{ textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'bold' }}>
+                                                <Typography variant="body2" sx={{
+                                                    textDecoration: 'line-through',
+                                                    color: '#D32F2F',
+                                                    fontWeight: 'medium',
+                                                    fontSize: '0.875rem',
+                                                    order: { xs: 1, md: 1 }
+                                                }}>
                                                     {formatPrice(original, currencySymbol, currencyCode)}
                                                 </Typography>
                                             )}
-                                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                            <Typography variant="h6" sx={{
+                                                fontWeight: 'bold',
+                                                fontSize: '1.25rem',
+                                                order: { xs: 2, md: 2 }
+                                            }}>
                                                 {formatPrice(current, currencySymbol, currencyCode)}
                                             </Typography>
                                         </Stack>
@@ -260,28 +302,36 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                 </Table>
             </TableContainer>
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                    variant="contained"
-                    size="large"
-                    href={hasRegistrationUrl ? convention.registrationUrl : undefined}
-                    target={hasRegistrationUrl ? "_blank" : undefined}
-                    rel={hasRegistrationUrl ? "noopener noreferrer" : undefined}
-                    disabled={!hasRegistrationUrl}
-                    sx={{
-                        minWidth: 200, // Ensure button has a good size
-                        ...(hasRegistrationUrl ? {} : {
-                            bgcolor: 'grey.400',
-                            color: 'grey.600',
-                            '&:hover': {
-                                bgcolor: 'grey.500',
-                            }
-                        })
-                    }}
-                >
-                    {hasRegistrationUrl ? 'Click here to Register' : 'Check back for register link'}
-                </Button>
+            {uniqueCutoffDates.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 3, fontStyle: 'italic' }}>
+                    No active discount periods available.
+                </Typography>
+            )}
+
+            {/* Registration Section */}
+            <Box sx={{ mt: 4, p: 3, backgroundColor: 'action.hover', borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                    Ready to Register?
+                </Typography>
+                {hasRegistrationUrl ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        size="large"
+                        component="a"
+                        href={convention.registrationUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ mt: 1 }}
+                    >
+                        Click here to Register
+                    </Button>
+                ) : (
+                    <Typography variant="body1" color="text.secondary">
+                        Check back later for registration link
+                    </Typography>
+                )}
             </Box>
-        </Paper>
+        </Box>
     );
 } 

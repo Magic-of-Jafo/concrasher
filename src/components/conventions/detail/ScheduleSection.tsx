@@ -9,6 +9,8 @@ import {
     ListItem,
     ListItemText,
     Divider,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { add, format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -63,6 +65,9 @@ const formatDate = (date: Date, timeZone: string): string => {
 
 
 export default function ScheduleSection({ convention }: ScheduleSectionProps) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
     const scheduleDays: ScheduleDay[] = convention.scheduleDays || [];
     const timeZone = convention.timezone?.ianaId || 'UTC';
     const conventionStartDate = new Date(convention.startDate);
@@ -71,17 +76,32 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     // Calculate the difference in days for the main convention duration
     const conventionDurationDays = Math.round((conventionEndDate.getTime() - conventionStartDate.getTime()) / (1000 * 60 * 60 * 24));
 
+    // Responsive image sizing
+    const imageSize = isMobile ? 120 : 200;
+    const imageStyles = {
+        position: 'absolute' as const,
+        top: isMobile ? 8 : 16,
+        right: isMobile ? 8 : 16,
+        opacity: 0.7,
+        zIndex: 1,
+    };
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '1.5rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
 
     if (scheduleDays.length === 0) {
         return (
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h1" component="h1" gutterBottom>
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
                     Schedule
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     The schedule for this convention has not been released yet.
                 </Typography>
-            </Paper>
+            </Box>
         );
     }
 
@@ -91,19 +111,19 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     const postConventionDays = sortedDays.filter(day => day.dayOffset > conventionDurationDays);
 
     return (
-        <>
+        <Box sx={{ width: '100%' }}>
             {preConventionDays.length > 0 && (
-                <Paper sx={{ p: 3, mb: 3, position: 'relative' }}>
-                    <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
+                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative', mb: 3 }}>
+                    <Box sx={imageStyles}>
                         <Image
                             src="https://convention-crasher.s3.amazonaws.com/images/pre-con-schedule.png"
                             alt="Pre-convention schedule graphic"
-                            width={200}
-                            height={200}
+                            width={imageSize}
+                            height={imageSize}
                             unoptimized
                         />
                     </Box>
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: isMobile ? 12 : 28 }}>
                         Pre-Convention Schedule
                     </Typography>
                     {preConventionDays.map(day => {
@@ -146,23 +166,23 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             </Box>
                         );
                     })}
-                </Paper>
+                </Box>
             )}
 
             {mainConventionDays.length > 0 && (
-                <Paper sx={{ p: 3, mb: 3, position: 'relative' }}>
+                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative', mb: 3 }}>
                     {(preConventionDays.length > 0 || postConventionDays.length > 0) && (
-                        <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
+                        <Box sx={imageStyles}>
                             <Image
                                 src="https://convention-crasher.s3.amazonaws.com/images/main-schedule.png"
                                 alt="Main schedule graphic"
-                                width={200}
-                                height={200}
+                                width={imageSize}
+                                height={imageSize}
                                 unoptimized
                             />
                         </Box>
                     )}
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: (preConventionDays.length > 0 || postConventionDays.length > 0) ? (isMobile ? 12 : 28) : 0 }}>
                         Convention Schedule
                     </Typography>
                     {mainConventionDays.map(day => {
@@ -206,21 +226,21 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             </Box>
                         );
                     })}
-                </Paper>
+                </Box>
             )}
 
             {postConventionDays.length > 0 && (
-                <Paper sx={{ p: 3, mb: 3, position: 'relative' }}>
-                    <Box sx={{ position: 'absolute', top: 16, right: 16, opacity: 0.7 }}>
+                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative' }}>
+                    <Box sx={imageStyles}>
                         <Image
                             src="https://convention-crasher.s3.amazonaws.com/images/post-con-schedule.png"
                             alt="Post-convention schedule graphic"
-                            width={200}
-                            height={200}
+                            width={imageSize}
+                            height={imageSize}
                             unoptimized
                         />
                     </Box>
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ color: 'text.secondary' }}>
+                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: isMobile ? 12 : 28 }}>
                         Post-Convention Schedule
                     </Typography>
                     {postConventionDays.map(day => {
@@ -263,8 +283,8 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             </Box>
                         );
                     })}
-                </Paper>
+                </Box>
             )}
-        </>
+        </Box>
     );
 } 

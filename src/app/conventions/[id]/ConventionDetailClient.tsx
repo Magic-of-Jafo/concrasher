@@ -20,6 +20,8 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { format } from 'date-fns';
 import { ConventionStatus } from '@prisma/client';
@@ -477,6 +479,9 @@ function PlaceholderView({ title }: { title: string }) {
 }
 
 export default function ConventionDetailClient({ convention }: ConventionDetailClientProps) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
     // Generate navigation items dynamically based on available data
     const navigationItems: NavigationItem[] = [
         { id: 'basic', label: 'Details', icon: InfoIcon },
@@ -503,6 +508,64 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
     // Initialize current view to the first available tab
     const [currentView, setCurrentView] = useState<ViewType>(navigationItems[0].id);
 
+    const handleTabClick = (tabId: ViewType, tabLabel: string) => {
+        setCurrentView(tabId);
+        // Track tab click for engagement analytics
+        setTimeout(() => {
+            try {
+                if (typeof window !== 'undefined' && window.fbq) {
+                    window.fbq('track', 'ViewContent', {
+                        content_name: `${convention.name} - ${tabLabel}`,
+                        content_category: 'convention_tab',
+                    });
+                }
+
+                if (typeof window !== 'undefined' && window.gtag) {
+                    window.gtag('event', 'view_item', {
+                        content_name: `${convention.name} - ${tabLabel}`,
+                        content_category: 'convention_tab',
+                    });
+                }
+            } catch (error) {
+                console.warn('Tracking error:', error);
+            }
+        }, 0);
+    };
+
+    const renderNavigationList = () => (
+        <List sx={{ p: 0 }}>
+            {navigationItems.map((item: NavigationItem) => {
+                const IconComponent = item.icon;
+                return (
+                    <ListItem key={item.id} disablePadding>
+                        <ListItemButton
+                            selected={currentView === item.id}
+                            onClick={() => handleTabClick(item.id, item.label)}
+                            sx={{
+                                pl: 2,
+                                '&.Mui-selected': {
+                                    backgroundColor: 'primary.main',
+                                    color: 'primary.contrastText',
+                                    '&:hover': {
+                                        backgroundColor: 'primary.dark',
+                                    },
+                                    '& .MuiListItemIcon-root': {
+                                        color: 'primary.contrastText',
+                                    },
+                                },
+                            }}
+                        >
+                            <ListItemIcon>
+                                <IconComponent />
+                            </ListItemIcon>
+                            <ListItemText primary={item.label} />
+                        </ListItemButton>
+                    </ListItem>
+                );
+            })}
+        </List>
+    );
+
     const renderCurrentView = () => {
         switch (currentView) {
             case 'basic':
@@ -526,75 +589,107 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
 
     return (
         <Container id="main-content" maxWidth="lg" sx={{ py: 4 }}>
-            <Box sx={{ display: 'flex', gap: 3 }}>
-                {/* Left Sidebar Navigation */}
-                <Paper
-                    sx={{
-                        width: 160,
-                        height: 'fit-content',
-                        position: 'sticky',
-                        top: 20,
-                        flexShrink: 0,
-                    }}
-                >
-                    <List sx={{ p: 0 }}>
-                        {navigationItems.map((item: NavigationItem) => {
-                            const IconComponent = item.icon;
-                            return (
-                                <ListItem key={item.id} disablePadding>
-                                    <ListItemButton
-                                        selected={currentView === item.id}
-                                        onClick={() => {
-                                            setCurrentView(item.id);
-                                            // Track tab click for engagement analytics
-                                            // Use setTimeout to ensure this runs after hydration
-                                            setTimeout(() => {
-                                                try {
-                                                    if (typeof window !== 'undefined' && window.fbq) {
-                                                        window.fbq('track', 'ViewContent', {
-                                                            content_name: `${convention.name} - ${item.label}`,
-                                                            content_category: 'convention_tab',
-                                                        });
-                                                    }
-
-                                                    if (typeof window !== 'undefined' && window.gtag) {
-                                                        window.gtag('event', 'view_item', {
-                                                            content_name: `${convention.name} - ${item.label}`,
-                                                            content_category: 'convention_tab',
-                                                        });
-                                                    }
-                                                } catch (error) {
-                                                    console.warn('Tracking error:', error);
-                                                }
-                                            }, 0);
-                                        }}
+            {isMobile ? (
+                <>
+                    {/* Mobile: Horizontal Scrollable Tabs */}
+                    <Paper
+                        elevation={2}
+                        sx={{
+                            mb: 3,
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 100,
+                            borderRadius: 2,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                overflowX: 'auto',
+                                px: 1,
+                                py: 1,
+                                gap: 1,
+                                '&::-webkit-scrollbar': {
+                                    height: 6,
+                                },
+                                '&::-webkit-scrollbar-track': {
+                                    backgroundColor: 'transparent',
+                                },
+                                '&::-webkit-scrollbar-thumb': {
+                                    backgroundColor: 'primary.main',
+                                    borderRadius: 3,
+                                },
+                            }}
+                        >
+                            {navigationItems.map((item: NavigationItem) => {
+                                const IconComponent = item.icon;
+                                const isActive = currentView === item.id;
+                                return (
+                                    <Button
+                                        key={item.id}
+                                        variant={isActive ? "contained" : "outlined"}
+                                        size="small"
+                                        onClick={() => handleTabClick(item.id, item.label)}
+                                        startIcon={<IconComponent />}
                                         sx={{
-                                            pl: 2,
-                                            '&.Mui-selected': {
+                                            whiteSpace: 'nowrap',
+                                            minWidth: 'auto',
+                                            px: 2,
+                                            py: 1.5,
+                                            flexShrink: 0,
+                                            fontSize: '0.875rem',
+                                            ...(isActive ? {
                                                 backgroundColor: 'primary.main',
                                                 color: 'primary.contrastText',
                                                 '&:hover': {
                                                     backgroundColor: 'primary.dark',
-                                                },
-                                                '& .MuiListItemIcon-root': {
-                                                    color: 'primary.contrastText',
-                                                },
-                                            },
+                                                }
+                                            } : {
+                                                borderColor: 'primary.main',
+                                                color: 'primary.main',
+                                                '&:hover': {
+                                                    backgroundColor: 'primary.light',
+                                                    borderColor: 'primary.dark',
+                                                }
+                                            })
                                         }}
                                     >
-                                        <ListItemText primary={item.label} />
-                                    </ListItemButton>
-                                </ListItem>
-                            );
-                        })}
-                    </List>
-                </Paper>
+                                        {item.label}
+                                    </Button>
+                                );
+                            })}
+                        </Box>
+                    </Paper>
 
-                {/* Main Content Area */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    {renderCurrentView()}
-                </Box>
-            </Box>
+                    {/* Mobile: Main Content */}
+                    <Box>
+                        {renderCurrentView()}
+                    </Box>
+                </>
+            ) : (
+                <>
+                    {/* Desktop: Original Layout */}
+                    <Box sx={{ display: 'flex', gap: 3 }}>
+                        {/* Left Sidebar Navigation */}
+                        <Paper
+                            sx={{
+                                width: 200,
+                                height: 'fit-content',
+                                position: 'sticky',
+                                top: 20,
+                                flexShrink: 0,
+                            }}
+                        >
+                            {renderNavigationList()}
+                        </Paper>
+
+                        {/* Main Content Area */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            {renderCurrentView()}
+                        </Box>
+                    </Box>
+                </>
+            )}
         </Container>
     );
 } 

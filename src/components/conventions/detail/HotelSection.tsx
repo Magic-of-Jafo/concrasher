@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Paper, Button, Stack } from '@mui/material';
+import { Box, Typography, Paper, Button, Stack, useTheme, useMediaQuery } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import MapIcon from '@mui/icons-material/Map';
 
@@ -44,6 +44,15 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boole
 };
 
 export default function HotelSection({ convention }: { convention: any }) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '2rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
+
     const isVenueAlsoHotel = convention.settings?.guestsStayAtPrimaryVenue;
     const primaryVenue = convention.venues?.find((v: any) => v.isPrimaryVenue);
     const primaryHotel = isVenueAlsoHotel
@@ -56,18 +65,18 @@ export default function HotelSection({ convention }: { convention: any }) {
 
     if (!primaryHotel) {
         return (
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h1" component="h2" gutterBottom>
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                <Typography variant="h1" component="h2" gutterBottom sx={h1Styles}>
                     Hotel
                 </Typography>
                 <Typography>Hotel information is not yet available.</Typography>
-            </Paper>
+            </Box>
         );
     }
 
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h1" component="h2" gutterBottom>
+        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+            <Typography variant="h1" component="h2" gutterBottom sx={h1Styles}>
                 Hotel
             </Typography>
             {primaryHotel?.websiteUrl && (
@@ -97,6 +106,6 @@ export default function HotelSection({ convention }: { convention: any }) {
                     </Grid>
                 </Box>
             )}
-        </Paper>
+        </Box>
     );
 } 

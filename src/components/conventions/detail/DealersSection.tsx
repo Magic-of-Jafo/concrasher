@@ -10,6 +10,8 @@ import {
     Avatar,
     Button,
     CardActionArea,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import Grid from '@mui/material/Grid'; // Specific import for Grid
 import NextLink from 'next/link';
@@ -36,24 +38,33 @@ interface DealersSectionProps {
 }
 
 export default function DealersSection({ convention }: DealersSectionProps) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '2rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
+
     const dealers = convention.dealerLinks || [];
 
     if (dealers.length === 0) {
         return (
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h1" component="h1" gutterBottom>
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
                     Dealers
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     The list of exhibitors has not been announced yet.
                 </Typography>
-            </Paper>
+            </Box>
         );
     }
 
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h1" component="h1" gutterBottom>
+        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+            <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
                 Dealers
             </Typography>
             <Grid container spacing={3}>
@@ -85,6 +96,6 @@ export default function DealersSection({ convention }: DealersSectionProps) {
                     </Grid>
                 ))}
             </Grid>
-        </Paper>
+        </Box>
     );
 } 

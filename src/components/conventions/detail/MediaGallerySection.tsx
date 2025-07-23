@@ -13,6 +13,8 @@ import {
     Box,
     Tabs,
     Tab,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { getS3ImageUrl } from '@/lib/defaults';
 
@@ -30,18 +32,27 @@ interface MediaGallerySectionProps {
 }
 
 export default function MediaGallerySection({ convention }: MediaGallerySectionProps) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '2rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
+
     const media = convention.media || [];
 
     if (media.length === 0) {
         return (
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h1" component="h1" gutterBottom>
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
                     Media Gallery
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     No media has been added for this convention yet.
                 </Typography>
-            </Paper>
+            </Box>
         );
     }
 
@@ -53,8 +64,8 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
     const handleTabChange = (_e: React.SyntheticEvent, val: 'photos' | 'videos') => setTab(val);
 
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h1" component="h1" gutterBottom>
+        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+            <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
                 Media Gallery
             </Typography>
 
@@ -103,7 +114,7 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
                     ))}
                 </Box>
             )}
-        </Paper>
+        </Box>
     );
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Paper, Button, Stack } from '@mui/material';
+import { Box, Typography, Paper, Button, Stack, useTheme, useMediaQuery } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import MapIcon from '@mui/icons-material/Map';
@@ -46,12 +46,21 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any, isCompact?: boole
 
 
 export default function VenueSection({ convention }: { convention: any }) {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Responsive h1 Typography styles
+    const h1Styles = {
+        fontSize: { xs: '2rem', md: '3rem' },
+        lineHeight: { xs: 1.2, md: 1.167 },
+    };
+
     const primaryVenue = convention.venues?.find((v: any) => v.isPrimaryVenue);
     const secondaryVenues = convention.venues?.filter((v: any) => !v.isPrimaryVenue) || [];
 
     return (
-        <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h1" component="h2" gutterBottom>
+        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+            <Typography variant="h1" component="h2" gutterBottom sx={h1Styles}>
                 Venue
             </Typography>
             {primaryVenue?.websiteUrl && (
@@ -81,6 +90,6 @@ export default function VenueSection({ convention }: { convention: any }) {
                     </Grid>
                 </Box>
             )}
-        </Paper>
+        </Box>
     );
 } 
