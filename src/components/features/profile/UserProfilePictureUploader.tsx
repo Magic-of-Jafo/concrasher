@@ -18,7 +18,7 @@ import {
     Avatar,
     Link,
 } from '@mui/material';
-import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
+import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon, AccountCircle } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { updateUserProfileImage, clearUserProfileImage } from '@/lib/actions';
@@ -242,7 +242,18 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
-                <Avatar src={getS3ImageUrl(currentImageUrl) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
+                <Avatar
+                    src={getS3ImageUrl(currentImageUrl) || undefined}
+                    sx={{
+                        width: 200,
+                        height: 200,
+                        backgroundColor: currentImageUrl ? 'transparent' : 'grey.300',
+                        color: currentImageUrl ? 'inherit' : 'grey.600'
+                    }}
+                    variant="circular"
+                >
+                    {!currentImageUrl && <AccountCircle sx={{ fontSize: 120 }} />}
+                </Avatar>
             </Box>
 
             {currentImageUrl && (
@@ -271,29 +282,6 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
                     >
                         Delete image (permanent)
                     </Link>
-
-                    {user && (
-                        <Link
-                            href={getUserProfileUrl(user)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            variant="body2"
-                            sx={{
-                                color: 'primary.main',
-                                textDecoration: 'underline',
-                                fontSize: '0.875rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                '&:hover': {
-                                    color: 'primary.dark',
-                                },
-                            }}
-                        >
-                            Preview Profile
-                            <OpenInNewIcon sx={{ fontSize: '0.75rem' }} />
-                        </Link>
-                    )}
                 </Box>
             )}
 
@@ -312,29 +300,6 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
                             Profile Image Size:<br />400x400 - Max 3MB
                         </Typography>
                     </Box>
-
-                    {user && (
-                        <Link
-                            href={getUserProfileUrl(user)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            variant="body2"
-                            sx={{
-                                color: 'primary.main',
-                                textDecoration: 'underline',
-                                fontSize: '0.875rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                '&:hover': {
-                                    color: 'primary.dark',
-                                },
-                            }}
-                        >
-                            Preview Profile
-                            <OpenInNewIcon sx={{ fontSize: '0.75rem' }} />
-                        </Link>
-                    )}
                 </Box>
             )}
 

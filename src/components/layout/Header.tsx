@@ -228,8 +228,12 @@ export default function Header() {
             // Mobile Layout
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               {isAuthenticated && (
-                <IconButton component={Link} href="/profile" sx={{ p: 0 }}>
-                  <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} sx={{ width: 32, height: 32 }} />
+                <IconButton component={Link} href={`/u/${session?.user?.id}`} sx={{ p: 0 }}>
+                  {imageUrl ? (
+                    <Avatar alt="Profile" src={getS3ImageUrl(imageUrl)} sx={{ width: 32, height: 32 }} />
+                  ) : (
+                    <AccountCircle sx={{ color: 'white', fontSize: 32 }} />
+                  )}
                 </IconButton>
               )}
               <IconButton
@@ -314,7 +318,11 @@ export default function Header() {
                   </Button>
 
                   <IconButton component={Link} href={`/u/${session?.user?.id}`} sx={{ p: 0, ml: 1 }}>
-                    <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
+                    {imageUrl ? (
+                      <Avatar alt="Profile" src={getS3ImageUrl(imageUrl)} />
+                    ) : (
+                      <AccountCircle sx={{ color: 'white', fontSize: 40 }} />
+                    )}
                   </IconButton>
                 </>
               ) : (
@@ -322,7 +330,7 @@ export default function Header() {
                   <Button color="inherit" component={Link} href="/login" sx={{ mr: 1 }}>
                     Sign in/Sign Up
                   </Button>
-                  <AccountCircle sx={{ color: 'white' }} />
+                  <AccountCircle sx={{ color: 'white', fontSize: 40 }} />
                 </>
               )}
             </Box>

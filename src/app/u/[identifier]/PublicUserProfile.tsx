@@ -14,11 +14,6 @@ import {
   Divider,
   useMediaQuery,
   useTheme,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Grid,
-  Paper,
 } from '@mui/material';
 import {
   Message as MessageIcon,
@@ -26,15 +21,14 @@ import {
   Share as ShareIcon,
   Report as ReportIcon,
   Edit as EditIcon,
-  Close as CloseIcon,
+  AccountCircle,
 } from '@mui/icons-material';
 import { Role } from '@prisma/client';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { getUserDisplayName, formatRoleLabel, getRoleColor } from '@/lib/user-utils';
+import eventBus from '@/lib/event-bus';
 import AboutTab from './components/AboutTab';
 import UpcomingAppearancesTab from './components/UpcomingAppearancesTab';
-import ProfileForm from '@/components/features/ProfileForm';
-import UserProfilePictureUploader from '@/components/features/profile/UserProfilePictureUploader';
 
 interface PublicUserProfileProps {
   user: {
@@ -58,7 +52,6 @@ interface PublicUserProfileProps {
 
 const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user, currentUserId }) => {
   const [currentTab, setCurrentTab] = useState(0);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(user.image);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -78,20 +71,14 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user, currentUser
   };
 
   const handleEditProfile = () => {
-    setIsEditModalOpen(true);
-  };
-
-  const handleCloseEdit = () => {
-    setIsEditModalOpen(false);
-  };
-
-  const handleProfileUpdateSuccess = () => {
-    setIsEditModalOpen(false);
-    // Optionally refresh the page or update local state
+    // Navigate to user settings with basic info tab (default tab)
+    window.location.href = `/profile`;
   };
 
   const handleImageUpdate = (url: string | null) => {
     setCurrentImageUrl(url);
+    // Emit event to update header navigation icon
+    eventBus.emit('profileImageChanged', url);
   };
 
 
@@ -160,16 +147,40 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user, currentUser
           }}
         >
           {/* Avatar */}
-          <Avatar
-            src={getS3ImageUrl(currentImageUrl) || undefined}
-            sx={{
-              width: { xs: 100, sm: 150, md: 180 },
-              height: { xs: 100, sm: 150, md: 180 },
-              border: '4px solid white',
-              boxShadow: 3,
-              mb: 2,
-            }}
-          />
+          {currentImageUrl ? (
+            <Avatar
+              src={getS3ImageUrl(currentImageUrl)}
+              sx={{
+                width: { xs: 100, sm: 150, md: 180 },
+                height: { xs: 100, sm: 150, md: 180 },
+                border: '4px solid white',
+                boxShadow: 3,
+                mb: 2,
+              }}
+            />
+          ) : (
+            <Box
+              sx={{
+                width: { xs: 100, sm: 150, md: 180 },
+                height: { xs: 100, sm: 150, md: 180 },
+                border: '4px solid white',
+                boxShadow: 3,
+                mb: 2,
+                borderRadius: '50%',
+                bgcolor: '#f5f5f5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                zIndex: 10,
+              }}
+            >
+              <AccountCircle sx={{
+                fontSize: { xs: 60, sm: 90, md: 110 },
+                color: '#9e9e9e'
+              }} />
+            </Box>
+          )}
 
           {/* Name and Roles */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
@@ -338,75 +349,7 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user, currentUser
         </Box>
       </Container>
 
-      {/* Edit Profile Modal */}
-      <Dialog
-        open={isEditModalOpen}
-        onClose={handleCloseEdit}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 0, sm: 2 },
-            maxHeight: '90vh',
-            margin: { xs: 0, sm: '32px' },
-            width: { xs: '100%', sm: 'calc(100% - 64px)' },
-            maxWidth: { xs: '100%', sm: 'md' },
-            boxShadow: { xs: 'none', sm: 3 },
-            border: 'none',
-            outline: 'none',
-          }
-        }}
-      >
-        <DialogTitle sx={{ pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6" component="div">
-            Edit Profile
-          </Typography>
-          <IconButton onClick={handleCloseEdit} size="small">
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2, px: { xs: 0, sm: 3 } }}>
-          <Grid container spacing={0}>
-            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-            <Grid item xs={12} md={5} lg={4} sx={{
-              order: 1,
-              p: 3,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'flex-start',
-              width: '100%'
-            }}>
-              <Box sx={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center'
-              }}>
-                <UserProfilePictureUploader
-                  currentImageUrl={currentImageUrl}
-                  onImageUpdate={handleImageUpdate}
-                  user={user}
-                />
-              </Box>
-            </Grid>
-            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-            <Grid item xs={12} md={7} lg={8} sx={{ order: 2, p: 3 }}>
-              <Paper sx={{ p: 3 }}>
-                <ProfileForm
-                  currentFirstName={user.firstName}
-                  currentLastName={user.lastName}
-                  currentStageName={user.stageName}
-                  currentBio={user.bio}
-                  currentUseStageNamePublicly={user.useStageNamePublicly}
-                  onSuccess={handleProfileUpdateSuccess}
-                  onCancel={handleCloseEdit}
-                />
-              </Paper>
-            </Grid>
-          </Grid>
-        </DialogContent>
-      </Dialog>
+      {/* Edit functionality moved to profile settings page */}
     </Box>
   );
 };

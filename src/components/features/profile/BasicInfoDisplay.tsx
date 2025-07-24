@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Typography, Divider, Button, Chip, Alert, CircularProgress } from '@mui/material';
 import { Email as EmailIcon, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import ProfileForm from '@/components/features/ProfileForm';
+import UserProfilePictureUploader from './UserProfilePictureUploader';
 import { User, Role } from '@prisma/client';
 import { useState } from 'react';
 
@@ -20,16 +21,16 @@ interface BasicInfoDisplayProps {
         emailVerified?: Date | null;
         useStageNamePublicly?: boolean | null;
     };
+    currentImageUrl?: string | null;
+    onImageUpdate?: (url: string | null) => void;
 }
 
-const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user }) => {
-    const [isEditing, setIsEditing] = useState(false);
+const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageUrl, onImageUpdate }) => {
     const [isResending, setIsResending] = useState(false);
     const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const handleSuccess = () => {
-        setIsEditing(false);
-        // We might want to trigger a data re-fetch here in the parent component
+        // Profile updated successfully - parent component will handle any refresh if needed
     };
 
     const handleResendVerification = async () => {
@@ -69,82 +70,20 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user }) => {
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Account Information</Typography>
-                {!isEditing && (
-                    <Button onClick={() => setIsEditing(true)}>Edit</Button>
-                )}
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Typography><strong>Email:</strong> {user.email}</Typography>
-                {user.emailVerified ? (
-                    <Chip
-                        icon={<CheckCircleIcon />}
-                        label="Verified"
-                        color="success"
-                        size="small"
-                        variant="outlined"
+            {/* Profile Picture Upload - Top Priority */}
+            {currentImageUrl !== undefined && onImageUpdate && (
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                    <UserProfilePictureUploader
+                        currentImageUrl={currentImageUrl}
+                        onImageUpdate={onImageUpdate}
+                        user={user}
                     />
-                ) : (
-                    <Chip
-                        icon={<EmailIcon />}
-                        label="Unverified"
-                        color="warning"
-                        size="small"
-                        variant="outlined"
-                    />
-                )}
-            </Box>
-
-            {!user.emailVerified && (
-                <Box sx={{ mb: 2 }}>
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={handleResendVerification}
-                        disabled={isResending}
-                        startIcon={isResending ? <CircularProgress size={16} /> : <EmailIcon />}
-                    >
-                        {isResending ? 'Sending...' : 'Resend Verification Email'}
-                    </Button>
-                    {resendMessage && (
-                        <Alert
-                            severity={resendMessage.type}
-                            sx={{ mt: 1 }}
-                            onClose={() => setResendMessage(null)}
-                        >
-                            {resendMessage.message}
-                        </Alert>
-                    )}
                 </Box>
             )}
-            <Typography component="div" sx={{ mb: 2 }}>
-                <strong>Roles:</strong>{' '}
-                {user.roles.map((role: Role) => (
-                    <Box component="span" key={role} sx={{
-                        display: 'inline-block',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '12px',
-                        fontSize: '0.875rem',
-                        mr: 1,
-                        backgroundColor:
-                            role === Role.ADMIN ? 'secondary.light' :
-                                role === Role.ORGANIZER ? 'primary.light' :
-                                    role === Role.TALENT ? 'success.light' : 'grey.200',
-                        color:
-                            role === Role.ADMIN ? 'secondary.contrastText' :
-                                role === Role.ORGANIZER ? 'primary.contrastText' :
-                                    role === Role.TALENT ? 'success.contrastText' : 'text.primary',
-                    }}>
-                        {role}
-                    </Box>
-                ))}
-            </Typography>
-            <Divider sx={{ my: 2 }} />
 
-            {isEditing ? (
+            {/* Profile Edit Form - Always Visible */}
+            <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Edit Profile</Typography>
                 <ProfileForm
                     currentFirstName={user.firstName}
                     currentLastName={user.lastName}
@@ -152,19 +91,83 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user }) => {
                     currentBio={user.bio}
                     currentUseStageNamePublicly={user.useStageNamePublicly}
                     onSuccess={handleSuccess}
-                    onCancel={() => setIsEditing(false)}
                 />
-            ) : (
-                <Box>
-                    <Typography><strong>Name:</strong> {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Not set'}</Typography>
-                    <Typography><strong>Bio:</strong></Typography>
-                    <Typography
-                        variant="body2"
-                        sx={{ pl: 2, '& p': { margin: 0 } }}
-                        dangerouslySetInnerHTML={{ __html: user.bio || 'Not set' }}
-                    />
+            </Box>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Account Information */}
+            <Box>
+                <Typography variant="h6" sx={{ mb: 2 }}>Account Information</Typography>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography><strong>Email:</strong> {user.email}</Typography>
+                    {user.emailVerified ? (
+                        <Chip
+                            icon={<CheckCircleIcon />}
+                            label="Verified"
+                            color="success"
+                            size="small"
+                            variant="outlined"
+                        />
+                    ) : (
+                        <Chip
+                            icon={<EmailIcon />}
+                            label="Unverified"
+                            color="warning"
+                            size="small"
+                            variant="outlined"
+                        />
+                    )}
                 </Box>
-            )}
+
+                {!user.emailVerified && (
+                    <Box sx={{ mb: 2 }}>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleResendVerification}
+                            disabled={isResending}
+                            startIcon={isResending ? <CircularProgress size={16} /> : <EmailIcon />}
+                        >
+                            {isResending ? 'Sending...' : 'Resend Verification Email'}
+                        </Button>
+                        {resendMessage && (
+                            <Alert
+                                severity={resendMessage.type}
+                                sx={{ mt: 1 }}
+                                onClose={() => setResendMessage(null)}
+                            >
+                                {resendMessage.message}
+                            </Alert>
+                        )}
+                    </Box>
+                )}
+
+                <Typography component="div" sx={{ mb: 2 }}>
+                    <strong>Roles:</strong>{' '}
+                    {user.roles.map((role: Role) => (
+                        <Box component="span" key={role} sx={{
+                            display: 'inline-block',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: '12px',
+                            fontSize: '0.875rem',
+                            mr: 1,
+                            backgroundColor:
+                                role === Role.ADMIN ? 'secondary.light' :
+                                    role === Role.ORGANIZER ? 'primary.light' :
+                                        role === Role.TALENT ? 'success.light' : 'grey.200',
+                            color:
+                                role === Role.ADMIN ? 'secondary.contrastText' :
+                                    role === Role.ORGANIZER ? 'primary.contrastText' :
+                                        role === Role.TALENT ? 'success.contrastText' : 'text.primary',
+                        }}>
+                            {role}
+                        </Box>
+                    ))}
+                </Typography>
+            </Box>
         </Box>
     );
 };

@@ -3,10 +3,8 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Tabs, Tab, Box, Paper } from '@mui/material';
-import Grid from '@mui/material/Grid';
 import SettingsTab from './profile/SettingsTab';
 import { User, Role, RoleApplication, Brand } from '@prisma/client';
-import UserProfilePictureUploader from '@/components/features/profile/UserProfilePictureUploader';
 import BasicInfoDisplay from './profile/BasicInfoDisplay';
 import AdminSettingsTab from './profile/AdminSettingsTab';
 import TalentProfileTab from './profile/TalentProfileTab';
@@ -156,24 +154,13 @@ export default function ProfileTabs({
 
             <Box sx={{ flexGrow: 1 }}>
                 <CustomTabPanel value={value} index={0}>
-                    <Grid container spacing={3}>
-                        {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                        <Grid item xs={12} md={7} lg={8}>
-                            <Paper sx={{ p: 2, height: '100%' }}>
-                                <BasicInfoDisplay user={user} />
-                            </Paper>
-                        </Grid>
-                        {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                        <Grid item xs={12} md={5} lg={4}>
-                            <Paper sx={{ p: 2, height: '100%', minHeight: { xs: 'auto', md: 350 } }}>
-                                <UserProfilePictureUploader
-                                    currentImageUrl={currentImageUrl}
-                                    onImageUpdate={onImageUpdate}
-                                    user={user}
-                                />
-                            </Paper>
-                        </Grid>
-                    </Grid>
+                    <Paper sx={{ p: 2 }}>
+                        <BasicInfoDisplay
+                            user={user}
+                            currentImageUrl={currentImageUrl}
+                            onImageUpdate={onImageUpdate}
+                        />
+                    </Paper>
                 </CustomTabPanel>
                 <CustomTabPanel value={value} index={1}>
                     <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />

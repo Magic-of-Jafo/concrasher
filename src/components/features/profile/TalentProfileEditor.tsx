@@ -38,6 +38,7 @@ interface TalentProfileEditorProps {
     };
     onSave?: (data: TalentProfileCreateInput | TalentProfileUpdateInput) => void;
     onCancel?: () => void;
+    onDeleteDialogStateChange?: (isOpen: boolean) => void;
 }
 
 export default function TalentProfileEditor({
@@ -45,7 +46,8 @@ export default function TalentProfileEditor({
     user,
     initialData,
     onSave,
-    onCancel
+    onCancel,
+    onDeleteDialogStateChange
 }: TalentProfileEditorProps) {
     const [formData, setFormData] = useState({
         displayName: initialData?.displayName || user?.stageName || '',
@@ -61,6 +63,7 @@ export default function TalentProfileEditor({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
         setFormData(prev => ({
@@ -196,8 +199,12 @@ export default function TalentProfileEditor({
                     }),
                 });
 
-                if (!response.ok) {
-                    // Failed to save image URL to database
+                if (response.ok) {
+                    // Notify parent component about the image change for real-time updates
+                    if (onSave) {
+                        const updatedData = { profilePictureUrl: url || '' };
+                        onSave(updatedData);
+                    }
                 }
             } catch (error) {
                 // Error saving image URL
@@ -205,8 +212,13 @@ export default function TalentProfileEditor({
         }
     };
 
+    const handleDeleteDialogStateChange = (isOpen: boolean) => {
+        setIsDeleteDialogOpen(isOpen);
+        onDeleteDialogStateChange?.(isOpen);
+    };
+
     return (
-        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, pb: 2.5 }}>
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -222,15 +234,33 @@ export default function TalentProfileEditor({
             <Grid container spacing={3}>
                 {/* Profile Picture */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
-                    <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                <Grid item xs={12} sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%'
+                }}>
+                    <Paper elevation={0} sx={{
+                        p: 3,
+                        boxShadow: 'none !important',
+                        border: 'none !important',
+                        backgroundColor: 'transparent !important',
+                        textAlign: 'center',
+                        borderRadius: 0,
+                        '&.MuiPaper-root': {
+                            boxShadow: 'none !important',
+                            backgroundColor: 'transparent !important',
+                            border: 'none !important'
+                        }
+                    }}>
+                        <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 3 }}>
                             Profile Picture
                         </Typography>
                         <TalentProfileImageUploader
                             currentImageUrl={formData.profilePictureUrl}
                             onImageUpdate={handleImageUpload}
                             talentProfileId={initialData?.id}
+                            onDeleteDialogStateChange={handleDeleteDialogStateChange}
                         />
                     </Paper>
                 </Grid>
@@ -378,16 +408,17 @@ export default function TalentProfileEditor({
 
                 {/* Action Buttons */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
+                <Grid item xs={12} sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%'
+                }}>
                     <Box sx={{
                         display: 'flex',
                         gap: 2,
                         justifyContent: 'center',
-                        width: '100%',
-                        alignItems: 'center',
-                        '@media (min-width: 900px)': {
-                            justifyContent: 'flex-end'
-                        }
+                        alignItems: 'center'
                     }}>
                         {onCancel && (
                             <Button

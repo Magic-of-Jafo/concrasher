@@ -18,7 +18,7 @@ import {
     Avatar,
     Link,
 } from '@mui/material';
-import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
+import { CloudUpload as UploadIcon, OpenInNew as OpenInNewIcon, AccountCircle } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { getS3ImageUrl } from '@/lib/defaults';
@@ -28,12 +28,14 @@ interface TalentProfileImageUploaderProps {
     currentImageUrl?: string | null;
     onImageUpdate: (url: string | null) => void;
     talentProfileId?: string;
+    onDeleteDialogStateChange?: (isOpen: boolean) => void;
 }
 
 const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
     currentImageUrl,
     onImageUpdate,
-    talentProfileId
+    talentProfileId,
+    onDeleteDialogStateChange
 }) => {
     const { data: session } = useSession();
     const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -221,13 +223,25 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
         } finally {
             setIsProcessing(false);
             setShowRemoveDialog(false);
+            onDeleteDialogStateChange?.(false);
         }
     };
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
-                <Avatar src={getS3ImageUrl(currentImageUrl) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
+                <Avatar
+                    src={getS3ImageUrl(currentImageUrl) || undefined}
+                    sx={{
+                        width: 200,
+                        height: 200,
+                        backgroundColor: currentImageUrl ? 'transparent' : 'grey.300',
+                        color: currentImageUrl ? 'inherit' : 'grey.600'
+                    }}
+                    variant="circular"
+                >
+                    {!currentImageUrl && <AccountCircle sx={{ fontSize: 120 }} />}
+                </Avatar>
             </Box>
 
             {currentImageUrl && (
@@ -235,7 +249,10 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
                     <Link
                         component="button"
                         variant="body2"
-                        onClick={() => setShowRemoveDialog(true)}
+                        onClick={() => {
+                            setShowRemoveDialog(true);
+                            onDeleteDialogStateChange?.(true);
+                        }}
                         disabled={isProcessing}
                         sx={{
                             color: 'error.main',
@@ -256,54 +273,10 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
                     >
                         Delete image (permanent)
                     </Link>
-
-                    {talentProfileId && (
-                        <Link
-                            href={getTalentProfileUrl({ id: talentProfileId })}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            variant="body2"
-                            sx={{
-                                color: 'primary.main',
-                                textDecoration: 'none',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                fontSize: '0.875rem',
-                                '&:hover': {
-                                    textDecoration: 'underline',
-                                },
-                            }}
-                        >
-                            Preview Profile
-                            <OpenInNewIcon sx={{ fontSize: '0.875rem' }} />
-                        </Link>
-                    )}
                 </>
             )}
 
-            {talentProfileId && !currentImageUrl && (
-                <Link
-                    href={getTalentProfileUrl({ id: talentProfileId })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="body2"
-                    sx={{
-                        color: 'primary.main',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        fontSize: '0.875rem',
-                        '&:hover': {
-                            textDecoration: 'underline',
-                        },
-                    }}
-                >
-                    Preview Profile
-                    <OpenInNewIcon sx={{ fontSize: '0.875rem' }} />
-                </Link>
-            )}
+
 
             {!currentImageUrl && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
@@ -370,7 +343,10 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
             {/* Remove Confirmation Dialog */}
             <Dialog
                 open={showRemoveDialog}
-                onClose={() => setShowRemoveDialog(false)}
+                onClose={() => {
+                    setShowRemoveDialog(false);
+                    onDeleteDialogStateChange?.(false);
+                }}
             >
                 <DialogTitle>Delete Profile Picture?</DialogTitle>
                 <DialogContent>
@@ -379,7 +355,10 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setShowRemoveDialog(false)} disabled={isProcessing}>
+                    <Button onClick={() => {
+                        setShowRemoveDialog(false);
+                        onDeleteDialogStateChange?.(false);
+                    }} disabled={isProcessing}>
                         Cancel
                     </Button>
                     <Button onClick={handleRemove} color="error" variant="contained" disabled={isProcessing}>
