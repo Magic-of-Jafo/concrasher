@@ -185,7 +185,7 @@ export default function Header() {
               </ListItem>
             )}
             <ListItem disablePadding>
-              <ListItemButton component={Link} href="/profile?tab=settings" onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
+              <ListItemButton component={Link} href="/profile" onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
                 <ListItemText primary="Settings" />
               </ListItemButton>
             </ListItem>
@@ -308,7 +308,7 @@ export default function Header() {
                         My Talent Profile
                       </MenuItem>
                     )}
-                    <MenuItem component={Link} href="/profile?tab=settings" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
+                    <MenuItem component={Link} href="/profile" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
                       Settings
                     </MenuItem>
                   </Menu>

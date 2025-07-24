@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { redirect, useSearchParams } from "next/navigation";
+import { redirect } from "next/navigation";
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
@@ -21,8 +21,6 @@ interface RoleApplicationWithUser extends RoleApplication {
 
 export default function ProfilePage() {
   const { data: session, status, update: updateSession } = useSession();
-  const searchParams = useSearchParams();
-  const initialTab = (searchParams && searchParams.get('tab')) || 'profile';
 
   const [user, setUser] = useState<User | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined);
@@ -73,29 +71,12 @@ export default function ProfilePage() {
       );
     };
 
-    const handleTalentProfileUpdate = async () => {
-      // Refetch user data when talent profile is updated
-      if (session?.user?.id) {
-        try {
-          const response = await fetch(`/api/profile/${session.user.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-          }
-        } catch (error) {
-          console.error('Error refetching profile data:', error);
-        }
-      }
-    };
-
     eventBus.on('applicationProcessed', handleApplicationProcessed);
-    window.addEventListener('talentProfileUpdated', handleTalentProfileUpdate);
 
     return () => {
       eventBus.off('applicationProcessed', handleApplicationProcessed);
-      window.removeEventListener('talentProfileUpdated', handleTalentProfileUpdate);
     };
-  }, [session?.user?.id]);
+  }, []);
 
   const handleApplicationProcessed = useCallback((applicationId: string) => {
     setPendingApplications((prev) =>
@@ -142,7 +123,6 @@ export default function ProfilePage() {
           onImageUpdate={handleImageUpdate}
           pendingApplications={pendingApplications}
           onApplicationProcessed={handleApplicationProcessed}
-          initialTab={initialTab}
         />
       </Paper>
 

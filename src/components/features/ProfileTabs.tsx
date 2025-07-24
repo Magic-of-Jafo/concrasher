@@ -19,7 +19,6 @@ interface ProfileTabsProps {
     onImageUpdate: (url: string | null) => void;
     pendingApplications: any[];
     onApplicationProcessed: (applicationId: string) => void;
-    initialTab?: string;
 }
 
 interface TabPanelProps {
@@ -62,8 +61,7 @@ export default function ProfileTabs({
     currentImageUrl,
     onImageUpdate,
     pendingApplications,
-    onApplicationProcessed,
-    initialTab = 'profile'
+    onApplicationProcessed
 }: ProfileTabsProps) {
     const [value, setValue] = useState(0); // Will be updated after indices are calculated
     const [talentProfileActive, setTalentProfileActive] = useState(user?.talentProfile?.isActive ?? false);
@@ -113,16 +111,10 @@ export default function ProfileTabs({
     const talentTabIndex = showTalentTab ? currentIndex++ : -1;
     const adminTabIndex = isAdmin ? currentIndex : -1;
 
-    // Set initial tab value based on calculated indices
+    // Default to Basic Info tab (index 0)
     React.useEffect(() => {
-        let initialValue = 0; // Default to Basic Info
-        if (initialTab === 'settings') initialValue = 1;
-        else if (initialTab === 'brands' && brandsTabIndex !== -1) initialValue = brandsTabIndex;
-        else if (initialTab === 'talent' && talentTabIndex !== -1) initialValue = talentTabIndex;
-        else if (initialTab === 'admin' && adminTabIndex !== -1) initialValue = adminTabIndex;
-
-        setValue(initialValue);
-    }, [initialTab, brandsTabIndex, talentTabIndex, adminTabIndex]);
+        setValue(0);
+    }, []);
 
 
     return (
@@ -149,7 +141,7 @@ export default function ProfileTabs({
                 <Tab label="Account Settings" {...a11yProps(1)} />
                 {hasBrandCreatorRole && <Tab label="My Brands" {...a11yProps(brandsTabIndex)} />}
                 {showTalentTab && <Tab label="Talent Profile" {...a11yProps(talentTabIndex)} />}
-                {isAdmin && <Tab label="Admin Settings" {...a11yProps(adminTabIndex)} />}
+                {isAdmin && <Tab label="Admin Panel" {...a11yProps(adminTabIndex)} />}
             </Tabs>
 
             <Box sx={{ flexGrow: 1 }}>
