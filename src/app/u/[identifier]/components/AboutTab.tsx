@@ -53,26 +53,6 @@ const AboutTab: React.FC<AboutTabProps> = ({ user }) => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
-              Display Name
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-              {displayName}
-            </Typography>
-          </Box>
-
-          {showAlternateName && (
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
-                Legal Name
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                {fullName}
-              </Typography>
-            </Box>
-          )}
-
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
               Member Since
             </Typography>
             <Typography variant="body1" sx={{ fontWeight: 500 }}>

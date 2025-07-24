@@ -75,6 +75,7 @@ export const authOptions: AuthOptions = {
         session.user.id = token.id as string;
         session.user.roles = token.roles as Role[];
         session.user.image = token.picture as string | null | undefined;
+        session.user.talentProfile = token.talentProfile as { id: string; isActive: boolean } | null;
       }
       return session;
     },
@@ -101,7 +102,19 @@ export const authOptions: AuthOptions = {
       // or on initial sign-in, we need to refetch from the DB to get the latest data.
       const dbUser = await db.user.findUnique({
         where: { id: token.id as string },
-        select: { image: true, roles: true, firstName: true, lastName: true, stageName: true }
+        select: {
+          image: true,
+          roles: true,
+          firstName: true,
+          lastName: true,
+          stageName: true,
+          talentProfile: {
+            select: {
+              id: true,
+              isActive: true
+            }
+          }
+        }
       });
       console.log('[JWT] DB user fetched:', dbUser);
 
@@ -118,6 +131,7 @@ export const authOptions: AuthOptions = {
       token.name = name;
       token.picture = dbUser.image;
       token.roles = dbUser.roles;
+      token.talentProfile = dbUser.talentProfile;
 
       console.log('[JWT] Final token before returning:', token);
       console.log('--- [JWT Callback] End ---');

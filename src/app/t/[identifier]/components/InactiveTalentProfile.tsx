@@ -4,17 +4,20 @@ import React from 'react';
 import { Box, Typography, Button, Container, Chip } from '@mui/material';
 import { PersonOff as PersonOffIcon } from '@mui/icons-material';
 import Link from 'next/link';
+import { getUserDisplayName } from '@/lib/user-utils';
 
 interface InactiveTalentProfileProps {
     user: {
         id: string;
         firstName: string | null;
         lastName: string | null;
+        stageName: string | null;
+        useStageNamePublicly: boolean | null;
     };
 }
 
 const InactiveTalentProfile: React.FC<InactiveTalentProfileProps> = ({ user }) => {
-    const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
+    const userName = getUserDisplayName(user);
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>

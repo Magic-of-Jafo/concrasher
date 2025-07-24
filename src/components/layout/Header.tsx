@@ -40,6 +40,7 @@ export default function Header() {
   const [manageMenuAnchor, setManageMenuAnchor] = useState<null | HTMLElement>(null);
   const [myStuffMenuAnchor, setMyStuffMenuAnchor] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [talentProfileActive, setTalentProfileActive] = useState(session?.user?.talentProfile?.isActive ?? false);
 
   const isAuthenticated = status === 'authenticated';
   const userRoles = session?.user?.roles || [];
@@ -47,6 +48,7 @@ export default function Header() {
   const isOrganizer = isAuthenticated && userRoles.includes(Role.ORGANIZER);
   const isBrandCreator = isAuthenticated && userRoles.includes(Role.BRAND_CREATOR);
   const hasTalentProfile = isAuthenticated && userRoles.includes(Role.TALENT);
+  const hasActiveTalentProfile = isAuthenticated && talentProfileActive;
 
   useEffect(() => {
     if (session?.user?.image !== undefined) {
@@ -63,6 +65,25 @@ export default function Header() {
       eventBus.off('profileImageChanged', handleImageUpdate);
     };
   }, []);
+
+  // Listen for talent profile activation changes
+  useEffect(() => {
+    const handleTalentProfileUpdate = (event: CustomEvent) => {
+      if (event.detail && typeof event.detail.isActive === 'boolean') {
+        setTalentProfileActive(event.detail.isActive);
+      }
+    };
+
+    window.addEventListener('talentProfileUpdated', handleTalentProfileUpdate as EventListener);
+    return () => {
+      window.removeEventListener('talentProfileUpdated', handleTalentProfileUpdate as EventListener);
+    };
+  }, []);
+
+  // Update local state when session changes
+  useEffect(() => {
+    setTalentProfileActive(session?.user?.talentProfile?.isActive ?? false);
+  }, [session?.user?.talentProfile?.isActive]);
 
   const handleMenuOpen = (setter: React.Dispatch<React.SetStateAction<HTMLElement | null>>) => (event: React.MouseEvent<HTMLElement>) => {
     setter(event.currentTarget);
@@ -152,10 +173,17 @@ export default function Header() {
               <ListItemText primary="My Stuff" sx={{ px: 2, py: 1, fontWeight: 'medium', fontSize: '0.875rem', color: 'text.secondary' }} />
             </ListItem>
             <ListItem disablePadding>
-              <ListItemButton component={Link} href="/profile" onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
+              <ListItemButton component={Link} href={`/u/${session?.user?.id}`} onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
                 <ListItemText primary="My Profile" />
               </ListItemButton>
             </ListItem>
+            {hasActiveTalentProfile && (
+              <ListItem disablePadding>
+                <ListItemButton component={Link} href={`/t/${session?.user?.talentProfile?.id}`} onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
+                  <ListItemText primary="My Talent Profile" />
+                </ListItemButton>
+              </ListItem>
+            )}
             <ListItem disablePadding>
               <ListItemButton component={Link} href="/profile?tab=settings" onClick={handleMobileMenuClose} sx={{ pl: 4 }}>
                 <ListItemText primary="Settings" />
@@ -268,9 +296,14 @@ export default function Header() {
                     open={Boolean(myStuffMenuAnchor)}
                     onClose={handleMenuClose(setMyStuffMenuAnchor)}
                   >
-                    <MenuItem component={Link} href="/profile" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
+                    <MenuItem component={Link} href={`/u/${session?.user?.id}`} onClick={handleMenuClose(setMyStuffMenuAnchor)}>
                       My Profile
                     </MenuItem>
+                    {hasActiveTalentProfile && (
+                      <MenuItem component={Link} href={`/t/${session?.user?.talentProfile?.id}`} onClick={handleMenuClose(setMyStuffMenuAnchor)}>
+                        My Talent Profile
+                      </MenuItem>
+                    )}
                     <MenuItem component={Link} href="/profile?tab=settings" onClick={handleMenuClose(setMyStuffMenuAnchor)}>
                       Settings
                     </MenuItem>
@@ -280,7 +313,7 @@ export default function Header() {
                     Sign Out
                   </Button>
 
-                  <IconButton component={Link} href="/profile" sx={{ p: 0, ml: 1 }}>
+                  <IconButton component={Link} href={`/u/${session?.user?.id}`} sx={{ p: 0, ml: 1 }}>
                     <Avatar alt="Profile" src={getS3ImageUrl(imageUrl) || undefined} />
                   </IconButton>
                 </>

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Metadata } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import PublicTalentProfile from './PublicTalentProfile';
 import InactiveTalentProfile from './components/InactiveTalentProfile';
 
@@ -45,6 +47,9 @@ export async function generateMetadata({ params }: PublicTalentProfilePageProps)
 }
 
 export default async function PublicTalentProfilePage({ params }: PublicTalentProfilePageProps) {
+    const session = await getServerSession(authOptions);
+    const currentUserId = session?.user?.id || null;
+
     const talentProfile = await db.talentProfile.findUnique({
         where: {
             id: params.identifier,
@@ -67,6 +72,8 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
                     id: true,
                     firstName: true,
                     lastName: true,
+                    stageName: true,
+                    useStageNamePublicly: true,
                     roles: true,
                     createdAt: true,
                 },
@@ -116,7 +123,7 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
         return <InactiveTalentProfile user={talentProfile.user} />;
     }
 
-    return <PublicTalentProfile talentProfile={talentProfile} />;
+    return <PublicTalentProfile talentProfile={talentProfile} currentUserId={currentUserId} />;
 }
 
 export const revalidate = 3600; // Revalidate every hour 

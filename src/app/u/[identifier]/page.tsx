@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Metadata } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { getUserDisplayName } from '@/lib/user-utils';
 import PublicUserProfile from './PublicUserProfile';
 
@@ -50,6 +52,9 @@ export async function generateMetadata({ params }: PublicUserProfilePageProps): 
 }
 
 export default async function PublicUserProfilePage({ params }: PublicUserProfilePageProps) {
+  const session = await getServerSession(authOptions);
+  const currentUserId = session?.user?.id || null;
+
   const user = await db.user.findUnique({
     where: {
       id: params.identifier,
@@ -78,7 +83,7 @@ export default async function PublicUserProfilePage({ params }: PublicUserProfil
     notFound();
   }
 
-  return <PublicUserProfile user={user} />;
+  return <PublicUserProfile user={user} currentUserId={currentUserId} />;
 }
 
 export const revalidate = 3600; // Revalidate every hour 

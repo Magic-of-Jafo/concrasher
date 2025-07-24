@@ -14,18 +14,27 @@ import {
   Divider,
   useMediaQuery,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Grid,
+  Paper,
 } from '@mui/material';
 import {
   Message as MessageIcon,
   PersonAdd as FollowIcon,
   Share as ShareIcon,
   Report as ReportIcon,
+  Edit as EditIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { Role } from '@prisma/client';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { getUserDisplayName, formatRoleLabel, getRoleColor } from '@/lib/user-utils';
 import AboutTab from './components/AboutTab';
 import UpcomingAppearancesTab from './components/UpcomingAppearancesTab';
+import ProfileForm from '@/components/features/ProfileForm';
+import UserProfilePictureUploader from '@/components/features/profile/UserProfilePictureUploader';
 
 interface PublicUserProfileProps {
   user: {
@@ -44,14 +53,18 @@ interface PublicUserProfileProps {
       isActive: boolean;
     } | null;
   };
+  currentUserId?: string | null;
 }
 
-const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user }) => {
+const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user, currentUserId }) => {
   const [currentTab, setCurrentTab] = useState(0);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(user.image);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const displayName = getUserDisplayName(user);
+  const isOwner = currentUserId === user.id;
 
   const quickActions = [
     { icon: MessageIcon, label: 'Message' },
@@ -62,6 +75,23 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user }) => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
+  };
+
+  const handleEditProfile = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditModalOpen(false);
+  };
+
+  const handleProfileUpdateSuccess = () => {
+    setIsEditModalOpen(false);
+    // Optionally refresh the page or update local state
+  };
+
+  const handleImageUpdate = (url: string | null) => {
+    setCurrentImageUrl(url);
   };
 
 
@@ -131,7 +161,7 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user }) => {
         >
           {/* Avatar */}
           <Avatar
-            src={getS3ImageUrl(user.image) || undefined}
+            src={getS3ImageUrl(currentImageUrl) || undefined}
             sx={{
               width: { xs: 100, sm: 150, md: 180 },
               height: { xs: 100, sm: 150, md: 180 },
@@ -142,18 +172,34 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user }) => {
           />
 
           {/* Name and Roles */}
-          <Typography
-            variant="h4"
-            component="h1"
-            fontWeight="bold"
-            textAlign="center"
-            sx={{
-              fontSize: { xs: '1.5rem', sm: '2rem' },
-              mb: 1,
-            }}
-          >
-            {displayName}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+            <Typography
+              variant="h4"
+              component="h1"
+              fontWeight="bold"
+              textAlign="center"
+              sx={{
+                fontSize: { xs: '1.5rem', sm: '2rem' },
+              }}
+            >
+              {displayName}
+            </Typography>
+            {isOwner && (
+              <IconButton
+                onClick={handleEditProfile}
+                size="small"
+                sx={{
+                  ml: 1,
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                  },
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
 
           {/* Role Badges */}
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center', mb: 2 }}>
@@ -291,6 +337,76 @@ const PublicUserProfile: React.FC<PublicUserProfileProps> = ({ user }) => {
           </Box>
         </Box>
       </Container>
+
+      {/* Edit Profile Modal */}
+      <Dialog
+        open={isEditModalOpen}
+        onClose={handleCloseEdit}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 0, sm: 2 },
+            maxHeight: '90vh',
+            margin: { xs: 0, sm: '32px' },
+            width: { xs: '100%', sm: 'calc(100% - 64px)' },
+            maxWidth: { xs: '100%', sm: 'md' },
+            boxShadow: { xs: 'none', sm: 3 },
+            border: 'none',
+            outline: 'none',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="div">
+            Edit Profile
+          </Typography>
+          <IconButton onClick={handleCloseEdit} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2, px: { xs: 0, sm: 3 } }}>
+          <Grid container spacing={0}>
+            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
+            <Grid item xs={12} md={5} lg={4} sx={{
+              order: 1,
+              p: 3,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              width: '100%'
+            }}>
+              <Box sx={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                textAlign: 'center'
+              }}>
+                <UserProfilePictureUploader
+                  currentImageUrl={currentImageUrl}
+                  onImageUpdate={handleImageUpdate}
+                  user={user}
+                />
+              </Box>
+            </Grid>
+            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
+            <Grid item xs={12} md={7} lg={8} sx={{ order: 2, p: 3 }}>
+              <Paper sx={{ p: 3 }}>
+                <ProfileForm
+                  currentFirstName={user.firstName}
+                  currentLastName={user.lastName}
+                  currentStageName={user.stageName}
+                  currentBio={user.bio}
+                  currentUseStageNamePublicly={user.useStageNamePublicly}
+                  onSuccess={handleProfileUpdateSuccess}
+                  onCancel={handleCloseEdit}
+                />
+              </Paper>
+            </Grid>
+          </Grid>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

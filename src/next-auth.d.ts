@@ -12,6 +12,8 @@ declare module "next-auth" {
       id: string;
       /** The user's roles. */
       roles?: Role[];
+      /** The user's talent profile. */
+      talentProfile?: { id: string; isActive: boolean } | null;
     } & DefaultSession["user"]; // Keep existing DefaultSession user properties
   }
 
@@ -32,5 +34,7 @@ declare module "next-auth/jwt" {
     id?: string;
     /** The user's roles. */
     roles?: Role[];
+    /** The user's talent profile. */
+    talentProfile?: { id: string; isActive: boolean } | null;
   }
 } 

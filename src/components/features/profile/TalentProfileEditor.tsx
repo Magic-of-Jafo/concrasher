@@ -379,7 +379,16 @@ export default function TalentProfileEditor({
                 {/* Action Buttons */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                 <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    <Box sx={{
+                        display: 'flex',
+                        gap: 2,
+                        justifyContent: 'center',
+                        width: '100%',
+                        alignItems: 'center',
+                        '@media (min-width: 900px)': {
+                            justifyContent: 'flex-end'
+                        }
+                    }}>
                         {onCancel && (
                             <Button
                                 variant="outlined"

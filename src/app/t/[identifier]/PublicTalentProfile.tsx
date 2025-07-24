@@ -13,12 +13,19 @@ import {
     Divider,
     useMediaQuery,
     useTheme,
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from '@mui/material';
 import {
     Work as BookIcon,
     Email as ContactIcon,
     PersonAdd as FollowIcon,
     Share as ShareIcon,
+    Edit as EditIcon,
+    Close as CloseIcon,
 } from '@mui/icons-material';
 import { Role, ConventionStatus } from '@prisma/client';
 import { getS3ImageUrl } from '@/lib/defaults';
@@ -27,6 +34,7 @@ import AboutTab from './components/AboutTab';
 import PortfolioTab from './components/PortfolioTab';
 import UpcomingShowsTab from './components/UpcomingShowsTab';
 import ContactTab from './components/ContactTab';
+import TalentProfileEditor from '@/components/features/profile/TalentProfileEditor';
 
 interface TalentProfileData {
     id: string;
@@ -70,12 +78,17 @@ interface TalentProfileData {
 
 interface PublicTalentProfileProps {
     talentProfile: TalentProfileData;
+    currentUserId?: string | null;
 }
 
-const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile }) => {
+const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile, currentUserId }) => {
     const [currentTab, setCurrentTab] = useState(0);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [profileData, setProfileData] = useState(talentProfile);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const isOwner = currentUserId === talentProfile.userId;
 
     const quickActions = [
         { icon: BookIcon, label: 'Book' },
@@ -83,6 +96,36 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
         { icon: FollowIcon, label: 'Follow' },
         { icon: ShareIcon, label: 'Share' },
     ];
+
+    const handleEditProfile = () => {
+        setIsEditModalOpen(true);
+    };
+
+    const handleCloseEdit = () => {
+        setIsEditModalOpen(false);
+    };
+
+    const handleSaveProfile = async (updatedData: any) => {
+        try {
+            const response = await fetch(`/api/talent-profiles/${talentProfile.userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatedData),
+            });
+
+            if (response.ok) {
+                const updatedProfile = await response.json();
+                setProfileData({ ...profileData, ...updatedProfile });
+                setIsEditModalOpen(false);
+            } else {
+                throw new Error('Failed to update profile');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+        }
+    };
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
@@ -151,7 +194,7 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                 >
                     {/* Avatar */}
                     <Avatar
-                        src={getS3ImageUrl(talentProfile.profilePictureUrl) || undefined}
+                        src={getS3ImageUrl(profileData.profilePictureUrl) || undefined}
                         sx={{
                             width: { xs: 100, sm: 150, md: 180 },
                             height: { xs: 100, sm: 150, md: 180 },
@@ -162,21 +205,37 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                     />
 
                     {/* Name and Tagline */}
-                    <Typography
-                        variant="h4"
-                        component="h1"
-                        fontWeight="bold"
-                        textAlign="center"
-                        sx={{
-                            fontSize: { xs: '1.5rem', sm: '2rem' },
-                            mb: 1,
-                        }}
-                    >
-                        {talentProfile.displayName}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                        <Typography
+                            variant="h4"
+                            component="h1"
+                            fontWeight="bold"
+                            textAlign="center"
+                            sx={{
+                                fontSize: { xs: '1.5rem', sm: '2rem' },
+                            }}
+                        >
+                            {profileData.displayName}
+                        </Typography>
+                        {isOwner && (
+                            <IconButton
+                                onClick={handleEditProfile}
+                                size="small"
+                                sx={{
+                                    ml: 1,
+                                    color: 'text.secondary',
+                                    '&:hover': {
+                                        color: 'primary.main',
+                                    },
+                                }}
+                            >
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        )}
+                    </Box>
 
                     {/* Tagline */}
-                    {talentProfile.tagline && (
+                    {profileData.tagline && (
                         <Typography
                             variant="h6"
                             color="text.secondary"
@@ -188,7 +247,7 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                                 fontStyle: 'italic',
                             }}
                         >
-                            {talentProfile.tagline}
+                            {profileData.tagline}
                         </Typography>
                     )}
 
@@ -297,13 +356,63 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
 
                     {/* Tab Content */}
                     <Box sx={{ pb: 4 }}>
-                        {currentTab === 0 && <AboutTab talentProfile={talentProfile} />}
-                        {currentTab === 1 && <PortfolioTab media={talentProfile.media} />}
-                        {currentTab === 2 && <UpcomingShowsTab conventions={talentProfile.conventions} />}
-                        {currentTab === 3 && <ContactTab talentProfile={talentProfile} />}
+                        {currentTab === 0 && <AboutTab talentProfile={profileData} />}
+                        {currentTab === 1 && <PortfolioTab media={profileData.media} />}
+                        {currentTab === 2 && <UpcomingShowsTab conventions={profileData.conventions} />}
+                        {currentTab === 3 && <ContactTab talentProfile={profileData} />}
                     </Box>
                 </Box>
             </Container>
+
+            {/* Edit Profile Modal */}
+            <Dialog
+                open={isEditModalOpen}
+                onClose={handleCloseEdit}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: { xs: 0, sm: 2 },
+                        maxHeight: '90vh',
+                        margin: { xs: 0, sm: '32px' },
+                        width: { xs: '100%', sm: 'calc(100% - 64px)' },
+                        maxWidth: { xs: '100%', sm: 'md' },
+                        boxShadow: { xs: 'none', sm: 3 },
+                        border: 'none',
+                        outline: 'none',
+                    }
+                }}
+            >
+                <DialogTitle sx={{ pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="h6" component="div">
+                        Edit Talent Profile
+                    </Typography>
+                    <IconButton onClick={handleCloseEdit} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2, px: { xs: 0, sm: 3 } }}>
+                    <TalentProfileEditor
+                        userId={talentProfile.userId}
+                        user={{
+                            firstName: talentProfile.user.firstName || undefined,
+                            lastName: talentProfile.user.lastName || undefined,
+                        }}
+                        initialData={{
+                            id: profileData.id,
+                            displayName: profileData.displayName,
+                            tagline: profileData.tagline || undefined,
+                            bio: profileData.bio || undefined,
+                            profilePictureUrl: profileData.profilePictureUrl || undefined,
+                            websiteUrl: profileData.websiteUrl || undefined,
+                            contactEmail: profileData.contactEmail || undefined,
+                            skills: profileData.skills || [],
+                        }}
+                        onSave={handleSaveProfile}
+                        onCancel={handleCloseEdit}
+                    />
+                </DialogContent>
+            </Dialog>
         </Box>
     );
 };
