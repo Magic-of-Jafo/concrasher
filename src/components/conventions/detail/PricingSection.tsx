@@ -83,12 +83,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const currencyCode = currencySetting?.currency?.code || 'USD';
 
 
-    // Debug timezone conversion
-    console.log('Convention timezone:', conventionTimezone);
-    if (priceDiscounts.length > 0) {
-        console.log('Sample discount date (raw):', priceDiscounts[0].cutoffDate);
-        console.log('Sample discount date (formatted):', formatDiscountDate(new Date(priceDiscounts[0].cutoffDate), conventionTimezone));
-    }
+
 
     if (priceTiers.length === 0) {
         return (
@@ -298,40 +293,54 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                 </TableRow>
                             );
                         })}
+
                     </TableBody>
                 </Table>
             </TableContainer>
 
-            {uniqueCutoffDates.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3, fontStyle: 'italic' }}>
-                    No active discount periods available.
-                </Typography>
-            )}
-
-            {/* Registration Section */}
-            <Box sx={{ mt: 4, p: 3, backgroundColor: 'action.hover', borderRadius: 2 }}>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                    Ready to Register?
-                </Typography>
-                {hasRegistrationUrl ? (
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        size="large"
-                        component="a"
-                        href={convention.registrationUrl!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ mt: 1 }}
-                    >
-                        Click here to Register
-                    </Button>
-                ) : (
-                    <Typography variant="body1" color="text.secondary">
-                        Check back later for registration link
-                    </Typography>
-                )}
+            {/* Registration button positioned to align with last column */}
+            <Box sx={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                mt: 2,
+                pr: { xs: 1, md: 2 } // Match the table's right padding
+            }}>
+                <Box sx={{
+                    minWidth: { xs: 'auto', md: 120 }, // Match the minWidth of price columns
+                    display: 'flex',
+                    justifyContent: 'center'
+                }}>
+                    {hasRegistrationUrl ? (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            component="a"
+                            href={convention.registrationUrl!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{
+                                fontWeight: 600,
+                                px: 3,
+                                py: 1.5,
+                                fontSize: '1rem',
+                                whiteSpace: 'nowrap' // Prevent text wrapping
+                            }}
+                        >
+                            Register Here
+                        </Button>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{
+                            fontStyle: 'italic',
+                            textAlign: 'center'
+                        }}>
+                            Check back later for registration link
+                        </Typography>
+                    )}
+                </Box>
             </Box>
+
+
         </Box>
     );
 } 

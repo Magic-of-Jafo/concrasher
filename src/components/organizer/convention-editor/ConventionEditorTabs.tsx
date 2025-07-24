@@ -207,35 +207,43 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     // This effect synchronizes the component's internal state with the initialConventionData prop.
     // This is crucial for populating the form when editing an existing convention.
 
-    // Only reset form data if we're editing an existing convention (has an id)
-    // or if we have substantial initial data (not just seriesId)
-    const hasExistingData = initialConventionData?.id ||
-      (initialConventionData && Object.keys(initialConventionData).length > 1);
+    // Always preserve seriesId if it exists in initialConventionData
+    if (initialConventionData?.seriesId) {
+      const hasExistingData = initialConventionData?.id ||
+        (initialConventionData && Object.keys(initialConventionData).length > 1);
 
-    if (hasExistingData) {
-      const {
-        priceTiers,
-        priceDiscounts,
-        id,
-        venueHotel,
-        media,
-        settings,
-        keywords,
-        ...basicDataFromInitial
-      } = initialConventionData || {};
+      if (hasExistingData) {
+        // Full data update for existing conventions
+        const {
+          priceTiers,
+          priceDiscounts,
+          id,
+          venueHotel,
+          media,
+          settings,
+          keywords,
+          ...basicDataFromInitial
+        } = initialConventionData || {};
 
-      setBasicInfoData({ ...initialBasicFormData, ...basicDataFromInitial });
-      setPricingTabData({
-        priceTiers: priceTiers || [],
-        priceDiscounts: priceDiscounts || [],
-      });
-      setMediaData(media || []);
-      setSettingsData({
-        currency: settings?.currency || '',
-        timezone: settings?.timezone || '',
-      });
-      setKeywords(keywords || []);
-      setVenueHotelData(venueHotel || defaultVenueHotelData);
+        setBasicInfoData({ ...initialBasicFormData, ...basicDataFromInitial });
+        setPricingTabData({
+          priceTiers: priceTiers || [],
+          priceDiscounts: priceDiscounts || [],
+        });
+        setMediaData(media || []);
+        setSettingsData({
+          currency: settings?.currency || '',
+          timezone: settings?.timezone || '',
+        });
+        setKeywords(keywords || []);
+        setVenueHotelData(venueHotel || defaultVenueHotelData);
+      } else {
+        // Just seriesId provided (new convention with selected series)
+        setBasicInfoData(prev => ({
+          ...prev,
+          seriesId: initialConventionData.seriesId
+        }));
+      }
     }
 
   }, [initialConventionData, defaultVenueHotelData]);

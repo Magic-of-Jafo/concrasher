@@ -77,7 +77,9 @@ export default function NewConventionPage() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to create new series');
       }
-      const createdSeries: ConventionSeries = await response.json();
+      const responseData = await response.json();
+      const createdSeries: ConventionSeries = responseData.series; // Extract the series from the wrapper
+
       setTopLevelConventionData(prevData => ({
         ...prevData,
         seriesId: createdSeries.id,

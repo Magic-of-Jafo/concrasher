@@ -56,7 +56,6 @@ export default function TalentProfileTab({ userId, user }: TalentProfileTabProps
                 }
             } catch (err) {
                 setError('Failed to load talent profile');
-                console.error('Error checking talent profile:', err);
             } finally {
                 setIsLoading(false);
             }
@@ -94,8 +93,6 @@ export default function TalentProfileTab({ userId, user }: TalentProfileTabProps
     };
 
     const handleProfileUpdate = async (updatedData: any) => {
-        console.log('handleProfileUpdate called with:', updatedData);
-
         try {
             // Save the data to the database
             const response = await fetch(`/api/talent-profiles/${userId}`, {
@@ -118,7 +115,6 @@ export default function TalentProfileTab({ userId, user }: TalentProfileTabProps
                 setTalentProfile(profile);
             }
         } catch (err) {
-            console.error('Error saving talent profile:', err);
             setError(err instanceof Error ? err.message : 'Failed to save talent profile');
         }
     };

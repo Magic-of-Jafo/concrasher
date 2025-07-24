@@ -63,7 +63,6 @@ export default function TalentProfileEditor({
     const [success, setSuccess] = useState<string | null>(null);
 
     const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
-        console.log(`Updating ${field} to:`, value);
         setFormData(prev => ({
             ...prev,
             [field]: value
@@ -125,11 +124,9 @@ export default function TalentProfileEditor({
     };
 
     const handleSubmit = async (event: React.FormEvent) => {
-        console.log('handleSubmit called!');
         event.preventDefault();
 
         if (!validateForm()) {
-            console.log('Form validation failed');
             return;
         }
 
@@ -140,8 +137,6 @@ export default function TalentProfileEditor({
         try {
 
             // Then, update the talent profile
-            console.log('Current formData:', formData);
-
             const talentProfileData = {
                 displayName: formData.displayName.trim(),
                 tagline: formData.tagline.trim() || undefined,
@@ -152,16 +147,9 @@ export default function TalentProfileEditor({
                 skills: formData.skills.length > 0 ? formData.skills : undefined
             };
 
-            console.log('Saving talent profile data:', talentProfileData);
-
-            console.log('onSave handler exists:', !!onSave);
-            console.log('initialData?.id:', initialData?.id);
-
             if (onSave) {
-                console.log('Using onSave handler');
                 onSave(talentProfileData);
             } else {
-                console.log('Using default API call');
                 // Default API call if no onSave handler provided
                 const url = initialData?.id
                     ? `/api/talent-profiles/${userId}`
@@ -169,7 +157,6 @@ export default function TalentProfileEditor({
 
                 const method = initialData?.id ? 'PUT' : 'POST';
 
-                console.log('Making API call to:', url, 'with method:', method);
                 const response = await fetch(url, {
                     method,
                     headers: {
@@ -178,16 +165,12 @@ export default function TalentProfileEditor({
                     body: JSON.stringify(talentProfileData),
                 });
 
-                console.log('API response status:', response.status);
-
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('API error:', errorData);
                     throw new Error(errorData.error || 'Failed to save talent profile');
                 }
 
                 const responseData = await response.json();
-                console.log('API response data:', responseData);
                 setSuccess('Talent profile saved successfully!');
             }
         } catch (err: any) {
@@ -214,38 +197,16 @@ export default function TalentProfileEditor({
                 });
 
                 if (!response.ok) {
-                    console.error('Failed to save image URL to database');
+                    // Failed to save image URL to database
                 }
             } catch (error) {
-                console.error('Error saving image URL:', error);
+                // Error saving image URL
             }
         }
     };
 
-    // Debug logging
-    console.log('TalentProfileEditor render:', {
-        userId,
-        user,
-        initialData,
-        formData,
-        hasOnSave: !!onSave
-    });
-
     return (
         <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800 }}>
-            {/* Debug info - remove after fixing */}
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', color: 'info.contrastText', borderRadius: 1 }}>
-                <Typography variant="caption" display="block">
-                    Debug: TalentProfileEditor is rendering
-                </Typography>
-                <Typography variant="caption" display="block">
-                    Debug: User ID: {userId}
-                </Typography>
-                <Typography variant="caption" display="block">
-                    Debug: Display Name: {formData.displayName}
-                </Typography>
-            </Box>
-
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
