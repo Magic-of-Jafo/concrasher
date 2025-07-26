@@ -199,6 +199,19 @@ export async function GET(request: NextRequest) {
     const items = await prisma.convention.findMany({
       where: mainQueryWhere,
       orderBy: { startDate: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        startDate: true,
+        endDate: true,
+        city: true,
+        stateName: true,
+        stateAbbreviation: true,
+        coverImageUrl: true,
+        profileImageUrl: true,
+        tags: true,
+      },
     });
 
     // --- Parallel queries to get match counts for each status ---
