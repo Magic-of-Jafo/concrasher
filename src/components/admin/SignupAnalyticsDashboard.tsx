@@ -100,7 +100,9 @@ const SignupAnalyticsDashboard: React.FC = () => {
             return response.json();
         },
         staleTime: 5 * 60 * 1000, // 5 minutes
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true, // Refetch when the window regains focus
+        refetchOnMount: true, // Refetch when the component mounts
+        refetchOnReconnect: true, // Refetch when the browser reconnects to the network
     });
 
     // Calculate KPIs
@@ -114,12 +116,30 @@ const SignupAnalyticsDashboard: React.FC = () => {
             };
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const todayFormatted = today.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+        
         const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
 
-        const signupsToday = signupData.find(item => item.date === today)?.count || 0;
+        const signupsToday = signupData.find(item => item.date === todayFormatted)?.count || 0;
         const signupsThisMonth = signupData
-            .filter(item => item.date.startsWith(thisMonth))
+            .filter(item => {
+                // Extract year and month from formatted date like "Jul 25, 2025"
+                const dateParts = item.date.split(', ');
+                if (dateParts.length === 2) {
+                    const year = parseInt(dateParts[1]);
+                    const monthPart = dateParts[0].split(' ')[0];
+                    const month = new Date(Date.parse(`${monthPart} 1, ${year}`)).getMonth();
+                    const currentMonth = today.getMonth();
+                    const currentYear = today.getFullYear();
+                    return month === currentMonth && year === currentYear;
+                }
+                return false;
+            })
             .reduce((sum, item) => sum + item.count, 0);
         const totalSignups = signupData.reduce((sum, item) => sum + item.count, 0);
         const averageDaily = signupData.length > 0 ? Math.round(totalSignups / signupData.length) : 0;
@@ -357,22 +377,14 @@ const SignupAnalyticsDashboard: React.FC = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {chartData.map((row) => {
-                                    const dateStr = row.date.includes('T') ? row.date.split('T')[0] : row.date;
-                                    const date = new Date(dateStr + 'T00:00:00');
-
-                                    return (
-                                        <TableRow key={row.date}>
-                                            <TableCell>
-                                                {date.toLocaleDateString('en-US', {
-                                                    month: 'long',
-                                                    day: 'numeric'
-                                                })}
-                                            </TableCell>
-                                            <TableCell align="right">{row.count}</TableCell>
-                                        </TableRow>
-                                    );
-                                })}
+                                {chartData.map((row) => (
+                                    <TableRow key={row.date}>
+                                        <TableCell>
+                                            {row.date}
+                                        </TableCell>
+                                        <TableCell align="right">{row.count}</TableCell>
+                                    </TableRow>
+                                ))}
                                 {chartData.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={2} align="center">

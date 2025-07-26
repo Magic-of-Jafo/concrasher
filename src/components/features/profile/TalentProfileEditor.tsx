@@ -241,16 +241,16 @@ export default function TalentProfileEditor({
                     width: '100%'
                 }}>
                     <Paper elevation={0} sx={{
-                        p: 3,
-                        boxShadow: 'none !important',
-                        border: 'none !important',
-                        backgroundColor: 'transparent !important',
+                        p: 0,
+                        boxShadow: 'none',
+                        border: 'none',
+                        backgroundColor: 'transparent',
                         textAlign: 'center',
                         borderRadius: 0,
                         '&.MuiPaper-root': {
-                            boxShadow: 'none !important',
-                            backgroundColor: 'transparent !important',
-                            border: 'none !important'
+                            boxShadow: 'none',
+                            backgroundColor: 'transparent',
+                            border: 'none'
                         }
                     }}>
                         <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 3 }}>
@@ -268,7 +268,7 @@ export default function TalentProfileEditor({
                 {/* Basic Information */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                 <Grid item xs={12}>
-                    <Paper sx={{ p: 3 }}>
+                    <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Basic Information
                         </Typography>
@@ -328,44 +328,35 @@ export default function TalentProfileEditor({
                 {/* Contact Information */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                 <Grid item xs={12}>
-                    <Paper sx={{ p: 3 }}>
+                    <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Contact Information
                         </Typography>
-                        <Grid container spacing={2}>
-                            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Contact Email"
-                                    value={formData.contactEmail}
-                                    onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                                    helperText="Email for convention organizers to contact you"
-                                    placeholder="your.email@example.com"
-                                />
-                            </Grid>
-
-                            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Website URL"
-                                    value={formData.websiteUrl}
-                                    onChange={(e) => handleInputChange('websiteUrl', e.target.value)}
-                                    helperText="Your personal or professional website"
-                                    placeholder="https://yourwebsite.com"
-                                />
-                            </Grid>
-                        </Grid>
+                        <TextField
+                            fullWidth
+                            label="Contact Email"
+                            value={formData.contactEmail}
+                            onChange={(e) => handleInputChange('contactEmail', e.target.value)}
+                            helperText="This email will be visible to convention organizers"
+                            sx={{ mt: 2 }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Website URL"
+                            value={formData.websiteUrl}
+                            onChange={(e) => handleInputChange('websiteUrl', e.target.value)}
+                            helperText="Your personal or professional website"
+                            sx={{ mt: 2 }}
+                        />
                     </Paper>
                 </Grid>
 
-                {/* Skills */}
+                {/* List Your Lectures */}
                 {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                 <Grid item xs={12}>
-                    <Paper sx={{ p: 3 }}>
+                    <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
-                            List your lectures, releases, and products
+                            List Your Lectures
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             This tells attendees what to expect at the convention.

@@ -27,9 +27,9 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user, roleApplications, owned
 
     return (
         <Box>
-            <Paper sx={{ p: 4, mb: 4 }}>
+            <Paper sx={{ p: 0, mb: 0, boxShadow: 'none', border: 'none' }}>
                 <Typography variant="h5" gutterBottom>Role Management</Typography>
-                <Box sx={{ my: 2 }}>
+                <Box sx={{ my: 0 }}>
                     <TalentActivationButton
                         initialIsActive={user.talentProfile?.isActive ?? false}
                         hasTalentProfile={!!user.talentProfile}

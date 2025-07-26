@@ -114,7 +114,7 @@ export default function ProfilePage() {
         Profile
       </Typography>
 
-      <Paper sx={{ p: { xs: 1, md: 2 } }}>
+      <Paper sx={{ p: { xs: 1, md: 2 }, boxShadow: 'none', border: 'none' }}>
         <ProfileTabs
           user={user}
           roleApplications={roleApplications}

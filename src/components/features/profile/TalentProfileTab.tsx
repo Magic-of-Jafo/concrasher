@@ -138,7 +138,7 @@ export default function TalentProfileTab({ userId, user }: TalentProfileTabProps
     // Show initialization card if no talent profile exists
     if (!talentProfile) {
         return (
-            <Box sx={{ maxWidth: 600, mx: 'auto', p: 2 }}>
+            <Box sx={{ maxWidth: 600, mx: 'auto', p: 0, boxShadow: 'none', border: 'none' }}>
                 <Card>
                     <CardContent>
                         <Typography variant="h5" gutterBottom>

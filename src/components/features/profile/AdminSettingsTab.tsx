@@ -54,7 +54,7 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
     };
 
     return (
-        <Box>
+        <Box sx={{ px: 0, mx: 0 }}>
             <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
                 Admin Panel
             </Typography>
@@ -70,7 +70,7 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
             <AdminTabPanel value={tabValue} index={0}>
                 {/* Settings Tab Content */}
                 <Box>
-                    <Paper sx={{ p: 3, mb: 4 }}>
+                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Convention Management
                         </Typography>
@@ -82,7 +82,7 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
                             Manage All Conventions
                         </Button>
                     </Paper>
-                    <Paper sx={{ p: 3, mb: 4 }}>
+                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Role Applications
                         </Typography>
@@ -91,7 +91,7 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
                             onApplicationProcessed={onApplicationProcessed}
                         />
                     </Paper>
-                    <Paper sx={{ p: 3 }}>
+                    <Paper sx={{ p: '0 0', boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Site-Wide SEO Settings
                         </Typography>

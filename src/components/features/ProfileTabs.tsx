@@ -116,22 +116,24 @@ export default function ProfileTabs({
         setValue(0);
     }, []);
 
+    const isMobile = window.innerWidth <= 600;
 
     return (
-        <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)' }}>
+        <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)', flexDirection: isMobile ? 'column' : 'row' }}>
 
             <Tabs
-                orientation="vertical"
+                orientation={isMobile ? 'horizontal' : 'vertical'}
                 variant="scrollable"
                 value={value}
                 onChange={handleChange}
                 aria-label="Profile Settings Tabs"
                 sx={{
-                    borderRight: 1,
+                    borderRight: isMobile ? 0 : 1,
+                    borderBottom: isMobile ? 1 : 0,
                     borderColor: 'divider',
-                    position: 'sticky',
+                    position: isMobile ? 'static' : 'sticky',
                     top: '20px',
-                    minWidth: 180,
+                    minWidth: isMobile ? '100%' : 180,
                     '& .MuiTab-root': {
                         alignItems: 'flex-start',
                     }
@@ -146,7 +148,7 @@ export default function ProfileTabs({
 
             <Box sx={{ flexGrow: 1 }}>
                 <CustomTabPanel value={value} index={0}>
-                    <Paper sx={{ p: 2 }}>
+                    <Paper sx={{ p: isMobile ? 0 : 2, boxShadow: 'none', border: 'none' }}>
                         <BasicInfoDisplay
                             user={user}
                             currentImageUrl={currentImageUrl}
@@ -155,7 +157,9 @@ export default function ProfileTabs({
                     </Paper>
                 </CustomTabPanel>
                 <CustomTabPanel value={value} index={1}>
-                    <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
+                    <Paper sx={{ p: isMobile ? 0 : 2, boxShadow: 'none', border: 'none' }}>
+                        <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
+                    </Paper>
                 </CustomTabPanel>
                 {hasBrandCreatorRole && (
                     <CustomTabPanel value={value} index={brandsTabIndex}>
