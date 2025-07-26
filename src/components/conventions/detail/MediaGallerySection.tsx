@@ -15,6 +15,7 @@ import {
     Tab,
     useTheme,
     useMediaQuery,
+    Skeleton,
 } from '@mui/material';
 import { getS3ImageUrl } from '@/lib/defaults';
 
@@ -29,6 +30,56 @@ interface MediaGallerySectionProps {
     convention: {
         media?: ConventionMedia[];
     };
+}
+
+// Video component with proper aspect ratio to prevent layout shift
+function VideoPlayer({ url, caption }: { url: string; caption?: string | null }) {
+    const [isLoading, setIsLoading] = useState(true);
+    const embedUrl = getEmbedUrl(url);
+
+    return (
+        <Box sx={{ position: 'relative', width: '100%' }}>
+            {/* Aspect ratio container to prevent layout shift */}
+            <Box sx={{
+                position: 'relative',
+                width: '100%',
+                paddingTop: '56.25%', // 16:9 aspect ratio
+                backgroundColor: '#f5f5f5',
+                borderRadius: 1,
+                overflow: 'hidden'
+            }}>
+                {isLoading && (
+                    <Skeleton
+                        variant="rectangular"
+                        sx={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            zIndex: 1
+                        }}
+                    />
+                )}
+                <iframe
+                    src={embedUrl}
+                    title={caption || 'Convention video'}
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        border: 0,
+                        zIndex: 2
+                    }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    onLoad={() => setIsLoading(false)}
+                />
+            </Box>
+        </Box>
+    );
 }
 
 export default function MediaGallerySection({ convention }: MediaGallerySectionProps) {
@@ -97,14 +148,7 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
                 <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
                     {videos.map((vid) => (
                         <Card key={vid.id}>
-                            <CardMedia
-                                component="iframe"
-                                src={getEmbedUrl(vid.url)}
-                                title={vid.caption || 'Convention video'}
-                                sx={{ aspectRatio: '16/9', border: 0 }}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                            />
+                            <VideoPlayer url={vid.url} caption={vid.caption} />
                             {vid.caption && (
                                 <CardContent>
                                     <Typography variant="body2">{vid.caption}</Typography>
@@ -122,7 +166,7 @@ function getEmbedUrl(url: string): string {
     try {
         const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
         if (ytMatch) {
-            return `https://www.youtube.com/embed/${ytMatch[1]}`;
+            return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1`;
         }
         const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
         if (vimeoMatch) {

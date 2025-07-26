@@ -46,6 +46,33 @@ body {
   overflow-x: hidden;
 }
 
+/* Prevent layout shifts */
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure images don't cause layout shifts */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevent iframe layout shifts */
+iframe {
+  max-width: 100%;
+}
+
+/* Font loading optimization */
+.font-display-swap {
+  font-display: swap;
+}
+
+/* Reduce layout shift for dynamic content */
+.layout-shift-guard {
+  min-height: 1px;
+  min-width: 1px;
+}
+
 a {
   color: inherit;
   text-decoration: none;

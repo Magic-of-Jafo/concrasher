@@ -500,7 +500,11 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                   if (!statusText) return null; // Hide past events
 
                   const elements = [
-                    <Box key={con.id}>
+                    <Box key={con.id} sx={{ 
+                      // Optimize rendering with transform3d for hardware acceleration
+                      transform: 'translate3d(0,0,0)',
+                      willChange: 'transform'
+                    }}>
                       <ConventionCard convention={con} />
                     </Box>
                   ];

@@ -144,7 +144,7 @@ export default function ConventionGrid({
                     <Avatar src={convention.profileImageUrl ?? undefined}>
                       {!convention.profileImageUrl && convention.name.charAt(0)}
                     </Avatar>
-                    <Typography variant="h6" component="div">
+                    <Typography component="h3" variant="h6">
                       {convention.name}
                     </Typography>
                   </Box>

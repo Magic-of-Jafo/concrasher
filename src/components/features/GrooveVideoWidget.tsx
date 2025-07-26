@@ -16,6 +16,27 @@ export default function GrooveVideoWidget({ id, permalink }: GrooveVideoWidgetPr
         setIsHydrated(true);
     }, []);
 
+    // Add iframe title for accessibility
+    useEffect(() => {
+        if (isHydrated) {
+            const addIframeTitle = () => {
+                const iframes = document.querySelectorAll('iframe[src*="groove.cm"]');
+                iframes.forEach((iframe) => {
+                    if (!iframe.getAttribute('title')) {
+                        iframe.setAttribute('title', 'Groove Video Player - Convention Crasher promotional content');
+                    }
+                });
+            };
+
+            // Try immediately
+            addIframeTitle();
+
+            // Also try after a delay to catch dynamically created iframes
+            const timer = setTimeout(addIframeTitle, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [isHydrated]);
+
     return (
         <Box
             sx={{

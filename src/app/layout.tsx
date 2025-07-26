@@ -15,12 +15,16 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
 
 const robotoMono = Roboto_Mono({
   subsets: ["latin"],
   variable: "--font-roboto-mono",
   display: 'swap',
+  preload: true,
+  fallback: ['monospace'],
 });
 
 const montserrat = Montserrat({
@@ -28,6 +32,8 @@ const montserrat = Montserrat({
   variable: '--font-montserrat',
   weight: ['400', '700', '800'],
   display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
 });
 
 export const metadata: Metadata = {
@@ -69,6 +75,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <head>
+        {/* Preconnect to external domains for performance */}
+        <link rel="preconnect" href="https://www.clarity.ms" />
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://www.google-analytics.com" />
+        <link rel="preconnect" href="https://www.youtube.com" />
+        <link rel="preconnect" href="https://widget.groovevideo.com" />
+        <link rel="preconnect" href="https://convention-crasher.s3.us-east-1.amazonaws.com" />
+
         {/* --- Microsoft Clarity --- */}
         <Script id="ms-clarity" strategy="afterInteractive">
           {`

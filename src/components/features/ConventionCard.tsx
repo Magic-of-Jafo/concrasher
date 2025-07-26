@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { Card, CardContent, CardMedia, Typography, Box, Chip, Button, Stack, useTheme, useMediaQuery } from '@mui/material';
 import Link from 'next/link';
 import { getProfileImageUrl, getS3ImageUrl } from '@/lib/defaults';
@@ -7,7 +7,7 @@ interface ConventionCardProps {
   convention: any; // TODO: Replace with proper type
 }
 
-const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
+const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -25,45 +25,53 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
     slug,
   } = convention;
 
-  // Format dates
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  // Memoize expensive calculations
+  const { daysInfo, formattedStartDate, formattedEndDate, location } = useMemo(() => {
+    // Format dates
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    };
 
-  // Calculate days until convention starts
-  const getDaysInfo = () => {
-    if (!startDate) return { type: 'no-date', text: '', days: 0 };
+    // Calculate days until convention starts
+    const getDaysInfo = () => {
+      if (!startDate) return { type: 'no-date', text: '', days: 0 };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
 
-    const end = endDate ? new Date(endDate) : new Date(startDate);
-    end.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(0, 0, 0, 0);
 
-    if (today >= start && today <= end) {
-      return { type: 'happening', text: 'Happening Now!', days: 0 };
-    }
+      if (today >= start && today <= end) {
+        return { type: 'happening', text: 'Happening Now!', days: 0 };
+      }
 
-    const diffTime = start.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffTime = start.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) {
-      return { type: 'over', text: 'Event Over', days: 0 };
-    } else if (diffDays === 0) {
-      return { type: 'today', text: 'Starts Today', days: 0 };
-    } else if (diffDays === 1) {
-      return { type: 'tomorrow', text: 'Starts Tomorrow', days: 1 };
-    } else {
-      return { type: 'future', text: '', days: diffDays };
-    }
-  };
+      if (diffDays < 0) {
+        return { type: 'over', text: 'Event Over', days: 0 };
+      } else if (diffDays === 0) {
+        return { type: 'today', text: 'Starts Today', days: 0 };
+      } else if (diffDays === 1) {
+        return { type: 'tomorrow', text: 'Starts Tomorrow', days: 1 };
+      } else {
+        return { type: 'future', text: '', days: diffDays };
+      }
+    };
 
-  const daysInfo = getDaysInfo();
+    return {
+      daysInfo: getDaysInfo(),
+      formattedStartDate: formatDate(startDate),
+      formattedEndDate: endDate ? formatDate(endDate) : '',
+      location: `${city}${city && ','} ${stateAbbreviation || stateName}`.trim(),
+    };
+  }, [startDate, endDate, city, stateName, stateAbbreviation]);
 
   // Days countdown component
   const DaysDisplay = ({ showOnMobile = false }) => {
@@ -170,18 +178,19 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
 
             {/* Convention title on right */}
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography
-                variant="h6"
-                fontWeight={700}
-                sx={{
-                  fontFamily: 'Poppins',
-                  fontSize: '1.5rem',
-                  lineHeight: '1.3em',
-                  wordBreak: 'break-word'
-                }}
-              >
-                {name}
-              </Typography>
+                          <Typography
+              component="h3"
+              variant="h6"
+              fontWeight={700}
+              sx={{
+                fontFamily: 'Poppins',
+                fontSize: '1.5rem',
+                lineHeight: '1.3em',
+                wordBreak: 'break-word'
+              }}
+            >
+              {name}
+            </Typography>
             </Box>
           </Box>
 
@@ -204,7 +213,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
                   fontWeight: 500
                 }}
               >
-                {city}{city && ','} {stateAbbreviation || stateName}
+                {location}
               </Typography>
               <Typography
                 variant="body2"
@@ -215,7 +224,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
                   lineHeight: '1.3em'
                 }}
               >
-                {formatDate(startDate)}{endDate && ` – ${formatDate(endDate)}`}
+                {formattedStartDate}{formattedEndDate && ` – ${formattedEndDate}`}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                 {tags.slice(0, 2).map((tag: string) => (
@@ -255,6 +264,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
           {/* Content */}
           <Box sx={{ flex: 1 }}>
             <Typography
+              component="h3"
               variant="h6"
               fontWeight={700}
               gutterBottom
@@ -275,7 +285,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
                 lineHeight: '1.43em'
               }}
             >
-              {city}{city && ','} {stateAbbreviation || stateName}
+              {location}
             </Typography>
             <Typography
               variant="body2"
@@ -286,7 +296,7 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
                 lineHeight: '1.43em'
               }}
             >
-              {formatDate(startDate)}{endDate && ` – ${formatDate(endDate)}`}
+              {formattedStartDate}{formattedEndDate && ` – ${formattedEndDate}`}
             </Typography>
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', mb: 1 }}>
               {tags.map((tag: string) => (
@@ -298,6 +308,6 @@ const ConventionCard: React.FC<ConventionCardProps> = ({ convention }) => {
       )}
     </Card>
   );
-};
+});
 
 export default ConventionCard; 
