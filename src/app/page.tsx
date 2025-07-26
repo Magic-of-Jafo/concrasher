@@ -13,9 +13,25 @@ async function getPublishedConventions() {
       orderBy: {
         startDate: 'asc',
       },
-      include: {
-        series: true,
-        // 'tags' was causing an error because it doesn't exist on the model.
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        startDate: true,
+        endDate: true,
+        city: true,
+        stateName: true,
+        stateAbbreviation: true,
+        coverImageUrl: true,
+        profileImageUrl: true,
+        tags: true,
+        series: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          }
+        }
       }
     });
     return conventions;

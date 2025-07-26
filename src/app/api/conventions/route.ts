@@ -137,8 +137,6 @@ export async function GET(request: NextRequest) {
           { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
           { country: { contains: params.query, mode: 'insensitive' as const } },
           { venueName: { contains: params.query, mode: 'insensitive' as const } },
-          { descriptionShort: { contains: params.query, mode: 'insensitive' as const } },
-          { descriptionMain: { contains: params.query, mode: 'insensitive' as const } },
         ],
       });
     }
@@ -234,8 +232,6 @@ export async function GET(request: NextRequest) {
             { stateAbbreviation: { contains: params.query, mode: 'insensitive' as const } },
             { country: { contains: params.query, mode: 'insensitive' as const } },
             { venueName: { contains: params.query, mode: 'insensitive' as const } },
-            { descriptionShort: { contains: params.query, mode: 'insensitive' as const } },
-            { descriptionMain: { contains: params.query, mode: 'insensitive' as const } },
           ],
         };
 
