@@ -12,6 +12,7 @@ interface HeaderMenuProps {
   isOrganizer: boolean;
   isBrandCreator: boolean;
   hasTalentProfile: boolean;
+  session: any;
 }
 
 export default function HeaderMenu({
@@ -21,6 +22,7 @@ export default function HeaderMenu({
   isOrganizer,
   isBrandCreator,
   hasTalentProfile,
+  session,
 }: HeaderMenuProps) {
   return (
     <>
@@ -41,14 +43,12 @@ export default function HeaderMenu({
             Conventions
           </MenuItem>
         )}
-        {isBrandCreator && (
-          <MenuItem component={Link} href="/brands/new" onClick={onClose}>
-            Brand
-          </MenuItem>
-        )}
+        <MenuItem component={Link} href="/profile" onClick={onClose}>
+          Settings
+        </MenuItem>
         {hasTalentProfile && (
-          <MenuItem component={Link} href="/profile?tab=talent" onClick={onClose}>
-            Talent Profile
+          <MenuItem component={Link} href={`/t/${session?.user?.talentProfile?.id}`} onClick={onClose}>
+            My Talent Profile
           </MenuItem>
         )}
       </Menu>

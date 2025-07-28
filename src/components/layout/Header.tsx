@@ -22,6 +22,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 
 // Lazy load heavy components that are only used when menus are opened
 const LazyMenu = lazy(() => import('./HeaderMenu'));
+const LazyMyStuffMenu = lazy(() => import('./HeaderMyStuffMenu'));
 const LazyMobileDrawer = lazy(() => import('./HeaderMobileDrawer'));
 
 export default function Header() {
@@ -43,8 +44,8 @@ export default function Header() {
   const hasTalentProfile = isAuthenticated && userRoles.includes(Role.TALENT);
   const hasActiveTalentProfile = isAuthenticated && talentProfileActive;
 
-  // Only show manage menu if user has organizer/brand creator roles
-  const showManageMenu = isOrganizer || isBrandCreator;
+  // Show manage menu if user has organizer role or talent profile
+  const showManageMenu = isOrganizer || hasTalentProfile;
 
   useEffect(() => {
     if (session?.user?.image !== undefined) {
@@ -152,16 +153,27 @@ export default function Header() {
                     isOrganizer={isOrganizer}
                     isBrandCreator={isBrandCreator}
                     hasTalentProfile={hasTalentProfile}
+                    session={session}
                   />
                 </Suspense>
               )}
 
-              {/* My Stuff & Auth Actions */}
+              {/* My Stuff Menu - Lazy Loaded */}
+              {isAuthenticated && (
+                <Suspense fallback={<Button color="inherit">My Stuff</Button>}>
+                  <LazyMyStuffMenu
+                    anchorEl={myStuffMenuAnchor}
+                    onClose={handleMenuClose(setMyStuffMenuAnchor)}
+                    onOpen={handleMenuOpen(setMyStuffMenuAnchor)}
+                    session={session}
+                    hasActiveTalentProfile={hasActiveTalentProfile}
+                  />
+                </Suspense>
+              )}
+
+              {/* Auth Actions */}
               {isAuthenticated ? (
                 <>
-                  <Button color="inherit" component={Link} href={`/u/${session?.user?.id}`} sx={{ mr: 1 }}>
-                    My Profile
-                  </Button>
                   <Button color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
                     Sign Out
                   </Button>
