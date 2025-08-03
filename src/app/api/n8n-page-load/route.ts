@@ -45,8 +45,6 @@ export async function GET(request: NextRequest) {
             response: responseText
         });
 
-        return response;
-
     } catch (error) {
         console.error('Error in page load webhook API:', error);
         return NextResponse.json(
