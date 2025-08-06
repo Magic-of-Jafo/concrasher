@@ -133,9 +133,7 @@ export default function RootLayout({
                 <Suspense fallback={null}>
                   <ErrorHandler />
                 </Suspense>
-                <a href="#main-content" className="skip-link">
-                  Skip to main content
-                </a>
+
                 <Header />
                 <Suspense fallback={<div>Loading...</div>}>
                   {children}

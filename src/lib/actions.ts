@@ -1474,6 +1474,7 @@ export async function addScheduleDay(conventionId: string, dayOffset: number) {
     });
 
     revalidatePath(`/organizer/conventions/edit/${conventionId}/schedule`);
+    revalidatePath('/'); // Revalidate front page
 
     return { success: true, day: newScheduleDay };
 
@@ -1585,6 +1586,7 @@ export async function deleteScheduleDay(conventionId: string, scheduleDayId: str
     });
 
     revalidatePath(`/organizer/conventions/edit/${conventionId}/schedule`);
+    revalidatePath('/'); // Revalidate front page
     return { success: true, message: "Schedule day and its associated events have been successfully processed." };
 
   } catch (error) {
@@ -2005,6 +2007,7 @@ export async function updateConventionMedia(
     });
 
     revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    revalidatePath('/'); // Revalidate front page
     return {
       success: true,
       message: "Media updated successfully!",
@@ -2079,6 +2082,7 @@ export async function updateConventionImages(
     });
 
     revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    revalidatePath('/'); // Revalidate front page
     return {
       success: true,
       message: "Convention images updated successfully!",
@@ -2222,6 +2226,7 @@ export async function updateConventionSettings(
     }
 
     revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    revalidatePath('/'); // Revalidate front page
 
     return {
       success: true,
@@ -2330,6 +2335,7 @@ export async function deleteConvention(conventionId: string): Promise<{
 
     revalidatePath('/organizer/conventions');
     revalidatePath('/conventions'); // Revalidate public listing
+    revalidatePath('/'); // Revalidate front page
 
     return {
       success: true,

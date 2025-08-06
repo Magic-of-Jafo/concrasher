@@ -73,6 +73,16 @@ export default function WaypointPage() {
         scrollToBottom();
     }, [messages, isLoading]);
 
+    // Auto-set mode to 3 when Topic ID is provided
+    useEffect(() => {
+        if (topicId.trim() !== '') {
+            setMode(3);
+        } else if (mode === 3) {
+            // Reset to mode 1 if Topic ID is cleared and we were in mode 3
+            setMode(1);
+        }
+    }, [topicId, mode]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -333,8 +343,7 @@ export default function WaypointPage() {
             display: 'flex',
             flexDirection: 'column',
             bgcolor: '#212121',
-            color: '#ECECF1',
-            pt: '64px'
+            color: '#ECECF1'
         }}>
             {/* Authentication Status Display */}
             {authStatus === 'loading' && (
@@ -591,39 +600,37 @@ export default function WaypointPage() {
                             Settings
                         </Typography>
 
-                        {/* Mode Selector */}
+                        {/* Mode Toggle */}
                         <Box>
                             <Typography variant="subtitle2" sx={{ color: '#8E8EA0', mb: 1 }}>
-                                Mode Selector
+                                Mode
                             </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {[1, 2, 3, 4].map((modeOption) => (
-                                    <Box key={modeOption} sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <input
-                                            type="radio"
-                                            id={`mode-${modeOption}`}
-                                            name="mode"
-                                            value={modeOption}
-                                            checked={mode === modeOption}
-                                            onChange={(e) => setMode(Number(e.target.value))}
-                                            style={{
-                                                accentColor: '#10A37F',
-                                                marginRight: '8px'
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor={`mode-${modeOption}`}
-                                            style={{
-                                                color: '#ECECF1',
-                                                cursor: 'pointer',
-                                                fontSize: '14px'
-                                            }}
-                                        >
-                                            Mode {modeOption}
-                                        </label>
-                                    </Box>
-                                ))}
-                            </Box>
+                            <Button
+                                variant="outlined"
+                                onClick={() => setMode(mode === 1 ? 2 : 1)}
+                                disabled={topicId.trim() !== ''}
+                                sx={{
+                                    width: '100%',
+                                    py: 1,
+                                    color: topicId.trim() !== '' ? '#565869' : (mode === 1 ? '#ECECF1' : '#10A37F'),
+                                    borderColor: topicId.trim() !== '' ? '#565869' : (mode === 1 ? '#565869' : '#10A37F'),
+                                    bgcolor: topicId.trim() !== '' ? 'rgba(86, 88, 105, 0.1)' : (mode === 1 ? 'transparent' : 'rgba(16, 163, 127, 0.1)'),
+                                    '&:hover': {
+                                        borderColor: topicId.trim() !== '' ? '#565869' : (mode === 1 ? '#8E8EA0' : '#10A37F'),
+                                        bgcolor: topicId.trim() !== '' ? 'rgba(86, 88, 105, 0.1)' : (mode === 1 ? 'rgba(86, 88, 105, 0.1)' : 'rgba(16, 163, 127, 0.2)'),
+                                    },
+                                    '&:disabled': {
+                                        color: '#565869',
+                                        borderColor: '#565869',
+                                        bgcolor: 'rgba(86, 88, 105, 0.1)',
+                                    },
+                                    textTransform: 'none',
+                                    fontSize: '14px',
+                                    fontWeight: topicId.trim() !== '' ? 'normal' : (mode === 1 ? 'normal' : 'bold'),
+                                }}
+                            >
+                                {topicId.trim() !== '' ? 'Topic Mode (3)' : (mode === 1 ? 'Regular' : 'Enhanced')}
+                            </Button>
                         </Box>
 
                         {/* Topic ID Field */}

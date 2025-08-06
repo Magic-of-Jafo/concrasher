@@ -54,6 +54,7 @@ export async function createConvention(formData: z.infer<typeof BasicInfoFormSch
 
     // Revalidate the conventions list and redirect to the new convention
     revalidatePath('/organizer/conventions');
+    revalidatePath('/'); // Revalidate front page
     redirect(`/organizer/conventions/${convention.id}/edit`);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -102,6 +103,7 @@ export async function updateConventionBasicInfo(
     // Revalidate the convention page and list
     revalidatePath(`/organizer/conventions/${conventionId}`);
     revalidatePath('/organizer/conventions');
+    revalidatePath('/'); // Revalidate front page
 
     return { success: true, convention };
   } catch (error) {

@@ -86,7 +86,7 @@ const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          width: showOnMobile ? 'auto' : '31px',
+          width: showOnMobile ? 'auto' : '45px',
           height: showOnMobile ? 'auto' : '60px',
           flexShrink: 0,
           textAlign: 'center',
@@ -119,22 +119,71 @@ const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
         </Box>
       );
     } else {
-      return (
-        <Typography
-          variant="subtitle2"
-          color={daysInfo.type === 'happening' ? 'success.main' : 'primary'}
-          fontWeight={600}
-          sx={{
+      if (daysInfo.type === 'happening') {
+        return (
+          <Box sx={{
             ...displayProps,
-            fontSize: showOnMobile ? '0.75rem' : '0.875rem',
-            mb: showOnMobile ? 0 : 0,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: showOnMobile ? 'auto' : '45px',
+            height: showOnMobile ? 'auto' : '60px',
+            flexShrink: 0,
             textAlign: 'center',
-            lineHeight: '1.2em'
-          }}
-        >
-          {daysInfo.text}
-        </Typography>
-      );
+            mb: showOnMobile ? 0 : 0,
+            mx: 1
+          }}>
+            <Typography sx={{
+              color: '#2E7D32', // success.main equivalent
+              fontSize: showOnMobile ? '0.8rem' : '0.9rem',
+              fontWeight: 600,
+              lineHeight: '1.1em',
+              textAlign: 'center'
+            }}>
+              Happening
+            </Typography>
+            <Typography sx={{
+              color: '#2E7D32', // success.main equivalent
+              fontSize: showOnMobile ? '0.8rem' : '0.9rem',
+              fontWeight: 600,
+              lineHeight: '1.1em',
+              textAlign: 'center'
+            }}>
+              Now!
+            </Typography>
+          </Box>
+        );
+             } else {
+         return (
+           <Box sx={{
+             ...displayProps,
+             display: 'flex',
+             flexDirection: 'column',
+             justifyContent: 'center',
+             alignItems: 'center',
+             width: showOnMobile ? 'auto' : '45px',
+             height: showOnMobile ? 'auto' : '60px',
+             flexShrink: 0,
+             textAlign: 'center',
+             mb: showOnMobile ? 0 : 0,
+             mx: 1
+           }}>
+             <Typography
+               variant="subtitle2"
+               color="primary"
+               fontWeight={600}
+               sx={{
+                 fontSize: showOnMobile ? '0.75rem' : '0.875rem',
+                 textAlign: 'center',
+                 lineHeight: '1.2em'
+               }}
+             >
+               {daysInfo.text}
+             </Typography>
+           </Box>
+         );
+       }
     }
   };
 
@@ -178,19 +227,19 @@ const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
 
             {/* Convention title on right */}
             <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography
-              component="h3"
-              variant="h6"
-              fontWeight={700}
-              sx={{
-                fontFamily: 'Poppins',
-                fontSize: '1.5rem',
-                lineHeight: '1.3em',
-                wordBreak: 'break-word'
-              }}
-            >
-              {name}
-            </Typography>
+              <Typography
+                component="h3"
+                variant="h6"
+                fontWeight={700}
+                sx={{
+                  fontFamily: 'Poppins',
+                  fontSize: '1.5rem',
+                  lineHeight: '1.3em',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {name}
+              </Typography>
             </Box>
           </Box>
 
