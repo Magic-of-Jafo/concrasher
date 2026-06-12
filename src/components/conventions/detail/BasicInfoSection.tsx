@@ -195,7 +195,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                 )}
 
                 {/* Main Description - Handle rich text */}
-                {convention.descriptionMain && (
+                {(convention.descriptionMain || convention.descriptionShort) && (
                     <Box>
                         <Typography
                             variant="body1"
@@ -207,7 +207,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                                 '& h1, & h2, & h3, & h4, & h5, & h6': { mb: 1, mt: 2 },
                                 '& a': { color: 'primary.main', textDecoration: 'underline' },
                             }}
-                            dangerouslySetInnerHTML={{ __html: convention.descriptionMain }}
+                            dangerouslySetInnerHTML={{ __html: convention.descriptionMain || convention.descriptionShort }}
                         />
                     </Box>
                 )}
@@ -347,7 +347,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
 
                         {/* Main Description - Last */}
                         <Box sx={{ width: '100%' }}>
-                            {convention.descriptionMain && (
+                            {(convention.descriptionMain || convention.descriptionShort) && (
                                 <Typography
                                     variant="body1"
                                     component="div"
@@ -358,7 +358,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                                         '& h1, & h2, & h3, & h4, & h5, & h6': { mb: 1, mt: 2 },
                                         '& a': { color: 'primary.main', textDecoration: 'underline' },
                                     }}
-                                    dangerouslySetInnerHTML={{ __html: convention.descriptionMain }}
+                                    dangerouslySetInnerHTML={{ __html: convention.descriptionMain || convention.descriptionShort }}
                                 />
                             )}
                         </Box>
