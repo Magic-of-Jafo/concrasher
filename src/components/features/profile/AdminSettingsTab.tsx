@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Box, Typography, Button, Paper, Divider, Tabs, Tab } from '@mui/material';
 import RoleApplicationList from '@/components/admin/RoleApplicationList';
 import SeoSettingsForm from '@/components/admin/SeoSettingsForm';
+import AiSettingsForm from '@/components/admin/AiSettingsForm';
 import SignupAnalyticsDashboard from '@/components/admin/SignupAnalyticsDashboard';
 import UserManagement from '@/components/admin/UserManagement';
 import Link from 'next/link';
@@ -90,6 +91,12 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
                             applications={applications}
                             onApplicationProcessed={onApplicationProcessed}
                         />
+                    </Paper>
+                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
+                        <Typography variant="h6" gutterBottom>
+                            AI Settings
+                        </Typography>
+                        <AiSettingsForm />
                     </Paper>
                     <Paper sx={{ p: '0 0', boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>

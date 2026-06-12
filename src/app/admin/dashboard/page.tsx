@@ -31,6 +31,14 @@ export default function AdminDashboardPage() {
               View Users →
             </a>
           </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-2">AI Settings</h2>
+            <p className="text-gray-600">OpenAI API key and model for AI features</p>
+            <a href="/admin/settings" className="text-blue-600 hover:underline mt-2 inline-block">
+              Manage AI Settings →
+            </a>
+          </div>
         </div>
       </div>
     </AdminGuard>
