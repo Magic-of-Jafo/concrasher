@@ -27,7 +27,37 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boole
             {(hotel.city || hotel.stateRegion || hotel.postalCode) &&
                 <Typography variant={isCompact ? 'body2' : 'body1'}>{`${hotel.city || ''}, ${hotel.stateRegion || ''} ${hotel.postalCode || ''}`.replace(/ ,|,$/g, '')}</Typography>
             }
+            {(hotel.groupPrice || hotel.groupRateOrBookingCode || hotel.bookingCutoffDate) && (
+                <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant={isCompact ? 'subtitle2' : 'subtitle1'} sx={{ fontWeight: 'bold' }}>
+                        Convention Room Rate
+                    </Typography>
+                    {hotel.groupPrice && (
+                        <Typography variant={isCompact ? 'body2' : 'body1'}>{hotel.groupPrice}</Typography>
+                    )}
+                    {hotel.groupRateOrBookingCode && (
+                        <Typography variant={isCompact ? 'body2' : 'body1'}>
+                            Booking code: <strong>{hotel.groupRateOrBookingCode}</strong>
+                        </Typography>
+                    )}
+                    {hotel.bookingCutoffDate && (
+                        <Typography variant={isCompact ? 'body2' : 'body1'} color="warning.main">
+                            Book by {new Date(hotel.bookingCutoffDate).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })} for this rate
+                        </Typography>
+                    )}
+                </Box>
+            )}
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                {hotel.bookingLink && (
+                    <Button
+                        variant="contained"
+                        href={hotel.bookingLink}
+                        target="_blank"
+                        size={isCompact ? 'small' : 'medium'}
+                    >
+                        Book Room
+                    </Button>
+                )}
                 <Button
                     variant="outlined"
                     startIcon={<MapIcon />}
@@ -53,15 +83,18 @@ export default function HotelSection({ convention }: { convention: any }) {
         lineHeight: { xs: 1.2, md: 1.167 },
     };
 
-    const isVenueAlsoHotel = convention.settings?.guestsStayAtPrimaryVenue;
+    // Prefer real hotel records (they carry group rates/booking info); fall
+    // back to presenting the venue as the hotel when the organizer set the
+    // guests-stay-at-venue flag without adding a hotel record.
+    const isVenueAlsoHotel = convention.guestsStayAtPrimaryVenue;
     const primaryVenue = convention.venues?.find((v: any) => v.isPrimaryVenue);
-    const primaryHotel = isVenueAlsoHotel
-        ? { ...primaryVenue, hotelName: primaryVenue.venueName } // Adapt venue to look like a hotel
-        : convention.hotels?.find((h: any) => h.isPrimaryHotel);
+    const hotelRecordPrimary = convention.hotels?.find((h: any) => h.isPrimaryHotel) || convention.hotels?.[0];
+    const primaryHotel = hotelRecordPrimary
+        ?? (isVenueAlsoHotel && primaryVenue
+            ? { ...primaryVenue, hotelName: primaryVenue.venueName } // Adapt venue to look like a hotel
+            : undefined);
 
-    const otherHotels = isVenueAlsoHotel
-        ? []
-        : convention.hotels?.filter((h: any) => !h.isPrimaryHotel) || [];
+    const otherHotels = convention.hotels?.filter((h: any) => h !== hotelRecordPrimary) || [];
 
     if (!primaryHotel) {
         return (

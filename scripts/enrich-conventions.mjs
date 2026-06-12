@@ -10,6 +10,7 @@
  *   node scripts/enrich-conventions.mjs --slug magic-live-2026      # one convention
  *   node scripts/enrich-conventions.mjs --limit 5                   # first 5 imported
  *   node scripts/enrich-conventions.mjs --all                       # everything imported
+ *   ... --tier3                                                     # venue/hotel pass instead of tier 1+2
  *   ... [--model gpt-5.5] [--dry-run]                               # dry-run: extract but don't PATCH
  *   API_BASE=https://conventioncrasher.com node scripts/...         # target production
  *
@@ -138,12 +139,97 @@ const EXTRACTION_SCHEMA = {
     },
 };
 
+// ── tier 3 extraction schema (venue + hotels) ─────────────────────────────
+
+const venueProps = {
+    name: { type: 'string' },
+    description: { type: ['string', 'null'] },
+    websiteUrl: { type: ['string', 'null'] },
+    streetAddress: { type: ['string', 'null'] },
+    city: { type: ['string', 'null'] },
+    stateRegion: { type: ['string', 'null'] },
+    postalCode: { type: ['string', 'null'] },
+    country: { type: ['string', 'null'] },
+    contactEmail: { type: ['string', 'null'] },
+    contactPhone: { type: ['string', 'null'] },
+    amenities: { type: 'array', items: { type: 'string' } },
+    parkingInfo: { type: ['string', 'null'] },
+    publicTransportInfo: { type: ['string', 'null'] },
+    accessibilityNotes: { type: ['string', 'null'] },
+};
+
+const TIER3_SCHEMA = {
+    name: 'venue_hotel_extraction',
+    strict: true,
+    schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+            tier3: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    guestsStayAtPrimaryVenue: { type: ['boolean', 'null'], description: 'true if the event venue is also the recommended hotel' },
+                    venue: {
+                        type: ['object', 'null'],
+                        additionalProperties: false,
+                        description: 'The primary event venue where the convention takes place',
+                        properties: { ...venueProps, googleMapsUrl: { type: ['string', 'null'] } },
+                        required: [...Object.keys(venueProps), 'googleMapsUrl'],
+                    },
+                    hotels: {
+                        type: 'array',
+                        description: 'Recommended guest hotels. Include the venue itself ONLY if guests are told to stay there.',
+                        items: {
+                            type: 'object',
+                            additionalProperties: false,
+                            properties: {
+                                ...venueProps,
+                                isPrimary: { type: 'boolean' },
+                                isAtVenue: { type: 'boolean' },
+                                groupRateOrBookingCode: { type: ['string', 'null'], description: 'Group/discount code or rate name attendees use' },
+                                groupPrice: { type: ['string', 'null'], description: 'Stated room rate, e.g. "$129/night"' },
+                                bookingLink: { type: ['string', 'null'] },
+                                bookingCutoffDate: { type: ['string', 'null'], description: 'YYYY-MM-DD deadline to book at the group rate' },
+                            },
+                            required: [...Object.keys(venueProps), 'isPrimary', 'isAtVenue', 'groupRateOrBookingCode', 'groupPrice', 'bookingLink', 'bookingCutoffDate'],
+                        },
+                    },
+                },
+                required: ['guestsStayAtPrimaryVenue', 'venue', 'hotels'],
+            },
+            meta: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    fieldConfidence: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            dates: { type: 'string', enum: ['low', 'medium', 'high', 'not_found'] },
+                            location: { type: 'string', enum: ['low', 'medium', 'high', 'not_found'] },
+                            venue: { type: 'string', enum: ['low', 'medium', 'high', 'not_found'] },
+                            pricing: { type: 'string', enum: ['low', 'medium', 'high', 'not_found'] },
+                            hotels: { type: 'string', enum: ['low', 'medium', 'high', 'not_found'] },
+                        },
+                        required: ['dates', 'location', 'venue', 'pricing', 'hotels'],
+                    },
+                    sourcePages: { type: 'array', items: { type: 'string' } },
+                    notes: { type: ['string', 'null'] },
+                },
+                required: ['fieldConfidence', 'sourcePages', 'notes'],
+            },
+        },
+        required: ['tier3', 'meta'],
+    },
+};
+
 // ── helpers ───────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
     const out = { _: [] };
     for (let i = 0; i < argv.length; i++) {
-        if (argv[i] === '--dry-run' || argv[i] === '--all') out[argv[i].slice(2).replace('-', '')] = true;
+        if (argv[i] === '--dry-run' || argv[i] === '--all' || argv[i] === '--tier3') out[argv[i].slice(2).replace('-', '')] = true;
         else if (argv[i].startsWith('--')) out[argv[i].slice(2)] = argv[i + 1], i++;
         else out._.push(argv[i]);
     }
@@ -269,6 +355,83 @@ async function extract(convention) {
     return { data, usage };
 }
 
+// ── tier 3 extraction: venue + hotels ─────────────────────────────────────
+
+const nullifyBadUrl = u => (u && /^https?:\/\//.test(u) ? u : null);
+
+async function extractTier3(convention) {
+    const { name, websiteUrl } = convention;
+    const homepageHtml = await fetchPage(websiteUrl);
+    const homepageText = htmlToText(homepageHtml);
+    const links = extractLinks(homepageHtml, websiteUrl);
+    const usage = [];
+
+    let extraPages = [];
+    if (links.length > 0) {
+        const pick = await callOpenAI([
+            {
+                role: 'system',
+                content: 'You select which pages of a convention website to read to find VENUE details (address, parking, accessibility) and GUEST HOTEL details (recommended hotels, group rates, booking codes, booking deadlines). Look for pages like Venue, Hotel, Travel, Location, Accommodations, FAQ. Reply with a JSON object {"urls": [...]} of up to ' + MAX_EXTRA_PAGES + ' URLs from the provided list, most useful first. Reply {"urls": []} if the homepage likely has everything.',
+            },
+            {
+                role: 'user',
+                content: `Convention: ${name}\nHomepage text (truncated):\n${homepageText.slice(0, 8000)}\n\nLinks found:\n${links.map(l => `${l.url} — "${l.text}"`).join('\n')}`,
+            },
+        ], { type: 'json_object' }).catch(() => null);
+        if (pick) {
+            usage.push(pick.usage);
+            try {
+                const parsed = JSON.parse(pick.content);
+                extraPages = (parsed.urls ?? []).filter(u => typeof u === 'string').slice(0, MAX_EXTRA_PAGES);
+            } catch { /* continue with homepage only */ }
+        }
+    }
+
+    const pageContents = [{ url: websiteUrl, text: homepageText }];
+    for (const pageUrl of extraPages) {
+        try {
+            const html = await fetchPage(pageUrl);
+            pageContents.push({ url: pageUrl, text: htmlToText(html) });
+        } catch { /* skip unfetchable page */ }
+    }
+
+    const extraction = await callOpenAI([
+        {
+            role: 'system',
+            content: [
+                'You extract VENUE and GUEST HOTEL details for a specific magic convention from its official website.',
+                'Rules:',
+                '- Only report facts stated on the provided pages. Use null for anything not found. Never guess or infer addresses.',
+                '- venue = where the convention itself happens. hotels = where attendees are told to stay (often the same building — then set guestsStayAtPrimaryVenue true and isAtVenue true on that hotel).',
+                '- Group rates: capture the stated room price as written (e.g. "$129/night + tax"), any booking/group code, the booking link, and the YYYY-MM-DD cutoff deadline if stated.',
+                '- amenities: only items explicitly stated (e.g. "free parking", "free wifi", "airport shuttle").',
+                '- CRITICAL: if the site shows a DIFFERENT year/edition than the one asked about, hotel/venue info may still be valid if clearly persistent (same venue every year, stated generically), but set confidence to medium at best and explain in notes. If the venue/hotel is explicitly tied to the wrong year, use null and low confidence.',
+                '- Set fieldConfidence.dates/location/pricing to not_found (this pass does not extract them).',
+            ].join('\n'),
+        },
+        {
+            role: 'user',
+            content: `Extract venue and hotel data for: ${name}\n\n` + pageContents.map(p => `=== PAGE: ${p.url} ===\n${p.text}`).join('\n\n'),
+        },
+    ], { type: 'json_schema', json_schema: TIER3_SCHEMA });
+    usage.push(extraction.usage);
+
+    const data = JSON.parse(extraction.content);
+    data.meta.sourcePages = [websiteUrl, ...extraPages];
+    data.meta.model = model;
+
+    // Normalize URL-ish fields the schema can't enforce.
+    if (data.tier3.venue) {
+        data.tier3.venue.websiteUrl = nullifyBadUrl(data.tier3.venue.websiteUrl);
+        data.tier3.venue.googleMapsUrl = nullifyBadUrl(data.tier3.venue.googleMapsUrl);
+    }
+    for (const h of data.tier3.hotels ?? []) {
+        h.websiteUrl = nullifyBadUrl(h.websiteUrl);
+        h.bookingLink = nullifyBadUrl(h.bookingLink);
+    }
+    return { data, usage };
+}
+
 // ── main ──────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -286,14 +449,15 @@ async function main() {
         process.exit(1);
     }
 
-    console.log(`Enriching ${items.length} convention(s) with ${model}${args.dryrun ? ' (dry run)' : ''}\n`);
+    console.log(`Enriching ${items.length} convention(s) with ${model}${args.tier3 ? ' [tier 3: venue/hotel]' : ' [tier 1+2]'}${args.dryrun ? ' (dry run)' : ''}\n`);
     const results = [];
     let totalTokens = 0;
+    const extractFn = args.tier3 ? extractTier3 : extract;
 
     for (const convention of items) {
         process.stdout.write(`• ${convention.name} … `);
         try {
-            const { data, usage } = await extract(convention);
+            const { data, usage } = await extractFn(convention);
             totalTokens += usage.reduce((s, u) => s + (u?.total_tokens ?? 0), 0);
 
             if (args.dryrun) {
@@ -311,7 +475,11 @@ async function main() {
             if (!patchRes.ok) throw new Error(`PATCH ${patchRes.status}: ${JSON.stringify(patchJson)}`);
 
             const applied = patchJson.applied.map(c => c.field).join(', ') || 'nothing new';
-            console.log(`✓ applied: ${applied}${patchJson.pricingRecordsCreated ? ` (+${patchJson.pricingRecordsCreated} pricing records)` : ''}`);
+            const extras = [
+                patchJson.pricingRecordsCreated ? `+${patchJson.pricingRecordsCreated} pricing` : '',
+                patchJson.venueHotelRecordsCreated ? `+${patchJson.venueHotelRecordsCreated} venue/hotel` : '',
+            ].filter(Boolean).join(', ');
+            console.log(`✓ applied: ${applied}${extras ? ` (${extras})` : ''}`);
             if (patchJson.skipped.length) console.log(`    skipped: ${patchJson.skipped.join('; ')}`);
             if (data.meta.notes) console.log(`    notes: ${data.meta.notes}`);
             results.push({ convention: convention.slug, extraction: data, patch: patchJson });

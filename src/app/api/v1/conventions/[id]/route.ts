@@ -37,12 +37,55 @@ const EnrichmentSchema = z.object({
             discountedAmount: z.number().nonnegative(),
         })).optional(),
     }).optional(),
+    tier3: z.object({
+        guestsStayAtPrimaryVenue: z.boolean().nullable().optional(),
+        venue: z.object({
+            name: z.string().max(200),
+            description: z.string().max(2000).nullable().optional(),
+            websiteUrl: z.string().url().max(500).nullable().optional(),
+            googleMapsUrl: z.string().url().max(1000).nullable().optional(),
+            streetAddress: z.string().max(300).nullable().optional(),
+            city: z.string().max(100).nullable().optional(),
+            stateRegion: z.string().max(100).nullable().optional(),
+            postalCode: z.string().max(20).nullable().optional(),
+            country: z.string().max(100).nullable().optional(),
+            contactEmail: z.string().max(200).nullable().optional(),
+            contactPhone: z.string().max(50).nullable().optional(),
+            amenities: z.array(z.string().max(100)).optional(),
+            parkingInfo: z.string().max(1000).nullable().optional(),
+            publicTransportInfo: z.string().max(1000).nullable().optional(),
+            accessibilityNotes: z.string().max(1000).nullable().optional(),
+        }).nullable().optional(),
+        hotels: z.array(z.object({
+            name: z.string().max(200),
+            isPrimary: z.boolean().optional(),
+            isAtVenue: z.boolean().optional(),
+            description: z.string().max(2000).nullable().optional(),
+            websiteUrl: z.string().url().max(500).nullable().optional(),
+            streetAddress: z.string().max(300).nullable().optional(),
+            city: z.string().max(100).nullable().optional(),
+            stateRegion: z.string().max(100).nullable().optional(),
+            postalCode: z.string().max(20).nullable().optional(),
+            country: z.string().max(100).nullable().optional(),
+            contactEmail: z.string().max(200).nullable().optional(),
+            contactPhone: z.string().max(50).nullable().optional(),
+            groupRateOrBookingCode: z.string().max(200).nullable().optional(),
+            groupPrice: z.string().max(500).nullable().optional(),
+            bookingLink: z.string().url().max(1000).nullable().optional(),
+            bookingCutoffDate: z.coerce.date().nullable().optional(),
+            amenities: z.array(z.string().max(100)).optional(),
+            parkingInfo: z.string().max(1000).nullable().optional(),
+            publicTransportInfo: z.string().max(1000).nullable().optional(),
+            accessibilityNotes: z.string().max(1000).nullable().optional(),
+        })).optional(),
+    }).optional(),
     meta: z.object({
         fieldConfidence: z.object({
             dates: Confidence,
             location: Confidence,
             venue: Confidence,
             pricing: Confidence,
+            hotels: Confidence.optional(),
         }),
         sourcePages: z.array(z.string()),
         notes: z.string().nullable(),
@@ -68,11 +111,11 @@ export async function PATCH(
                 { status: 400 }
             );
         }
-        const { tier1, tier2, meta } = validation.data;
+        const { tier1, tier2, tier3, meta } = validation.data;
 
         const convention = await prisma.convention.findFirst({
             where: { OR: [{ id: params.id }, { slug: params.id }], deletedAt: null },
-            include: { priceTiers: true, settings: true },
+            include: { priceTiers: true, settings: true, venues: true, hotels: true },
         });
         if (!convention) {
             return NextResponse.json({ error: 'Convention not found' }, { status: 404 });
@@ -164,9 +207,91 @@ export async function PATCH(
             }
         }
 
+        // Venue and hotels follow the same all-or-nothing rule as pricing:
+        // never mix agent records into organizer-entered ones.
+        let venueHotelCreated = 0;
+        const venueConf = meta.fieldConfidence.venue;
+        const hotelConf = meta.fieldConfidence.hotels ?? venueConf;
+        let createVenue = false;
+        let createHotels = false;
+        if (tier3?.venue) {
+            if (convention.venues.length > 0) skipped.push('venue (convention already has venues)');
+            else if (venueConf === 'low' || venueConf === 'not_found') skipped.push(`venue (confidence ${venueConf})`);
+            else createVenue = true;
+        }
+        if (tier3?.hotels?.length) {
+            if (convention.hotels.length > 0) skipped.push('hotels (convention already has hotels)');
+            else if (hotelConf === 'low' || hotelConf === 'not_found') skipped.push(`hotels (confidence ${hotelConf})`);
+            else createHotels = true;
+        }
+        if (tier3?.guestsStayAtPrimaryVenue != null && convention.guestsStayAtPrimaryVenue !== tier3.guestsStayAtPrimaryVenue) {
+            update.guestsStayAtPrimaryVenue = tier3.guestsStayAtPrimaryVenue;
+            changes.push({ field: 'guestsStayAtPrimaryVenue', from: convention.guestsStayAtPrimaryVenue, to: tier3.guestsStayAtPrimaryVenue, reason: 'tier3' });
+        }
+
         await prisma.$transaction(async tx => {
             if (Object.keys(update).length > 0) {
                 await tx.convention.update({ where: { id: convention.id }, data: update });
+            }
+
+            if (createVenue && tier3?.venue) {
+                const v = tier3.venue;
+                await tx.venue.create({
+                    data: {
+                        conventionId: convention.id,
+                        isPrimaryVenue: true,
+                        venueName: v.name,
+                        description: v.description,
+                        websiteUrl: v.websiteUrl,
+                        googleMapsUrl: v.googleMapsUrl,
+                        streetAddress: v.streetAddress,
+                        city: v.city,
+                        stateRegion: v.stateRegion,
+                        postalCode: v.postalCode,
+                        country: v.country,
+                        contactEmail: v.contactEmail,
+                        contactPhone: v.contactPhone,
+                        amenities: v.amenities ?? [],
+                        parkingInfo: v.parkingInfo,
+                        publicTransportInfo: v.publicTransportInfo,
+                        overallAccessibilityNotes: v.accessibilityNotes,
+                    },
+                });
+                venueHotelCreated++;
+                changes.push({ field: 'venue', from: null, to: v.name, reason: 'tier3' });
+            }
+
+            if (createHotels && tier3?.hotels) {
+                for (let i = 0; i < tier3.hotels.length; i++) {
+                    const h = tier3.hotels[i];
+                    await tx.hotel.create({
+                        data: {
+                            conventionId: convention.id,
+                            isPrimaryHotel: h.isPrimary ?? i === 0,
+                            isAtPrimaryVenueLocation: h.isAtVenue ?? false,
+                            hotelName: h.name,
+                            description: h.description,
+                            websiteUrl: h.websiteUrl,
+                            streetAddress: h.streetAddress,
+                            city: h.city,
+                            stateRegion: h.stateRegion,
+                            postalCode: h.postalCode,
+                            country: h.country,
+                            contactEmail: h.contactEmail,
+                            contactPhone: h.contactPhone,
+                            groupRateOrBookingCode: h.groupRateOrBookingCode,
+                            groupPrice: h.groupPrice,
+                            bookingLink: h.bookingLink,
+                            bookingCutoffDate: h.bookingCutoffDate,
+                            amenities: h.amenities ?? [],
+                            parkingInfo: h.parkingInfo,
+                            publicTransportInfo: h.publicTransportInfo,
+                            overallAccessibilityNotes: h.accessibilityNotes,
+                        },
+                    });
+                    venueHotelCreated++;
+                    changes.push({ field: 'hotel', from: null, to: h.name, reason: 'tier3' });
+                }
             }
 
             for (const t of tierCreates) {
@@ -220,6 +345,7 @@ export async function PATCH(
                 changes,
                 skipped,
                 pricingRecordsCreated: pricingCreated,
+                venueHotelRecordsCreated: venueHotelCreated,
             });
             const value = JSON.stringify(log.slice(0, MAX_LOG_ENTRIES));
             await tx.conventionSetting.upsert({
@@ -238,6 +364,7 @@ export async function PATCH(
             applied: changes,
             skipped,
             pricingRecordsCreated: pricingCreated,
+            venueHotelRecordsCreated: venueHotelCreated,
         });
     } catch (error) {
         console.error('Agent API: error enriching convention:', error);
