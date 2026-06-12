@@ -68,13 +68,6 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
     setIsHydrated(true);
   }, [conventions]);
 
-  // Initialize with empty array to prevent hydration mismatch
-  useEffect(() => {
-    if (conventions.length > 0 && filteredSorted.length === 0) {
-      setFilteredSorted(conventions);
-    }
-  }, [conventions, filteredSorted.length]);
-
   // Helper to get status text - only calculate on client
   const getConventionStatusText = (startDate: Date | string | null, endDate: Date | string | null) => {
     if (!isHydrated) return "Loading..."; // Show consistent loading state

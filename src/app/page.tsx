@@ -22,6 +22,7 @@ async function getPublishedConventions() {
         city: true,
         stateName: true,
         stateAbbreviation: true,
+        country: true,
         coverImageUrl: true,
         profileImageUrl: true,
         tags: true,

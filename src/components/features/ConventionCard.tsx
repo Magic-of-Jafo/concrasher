@@ -17,6 +17,7 @@ const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
     city,
     stateName,
     stateAbbreviation,
+    country,
     startDate,
     endDate,
     tags = [],
@@ -69,9 +70,9 @@ const ConventionCard: React.FC<ConventionCardProps> = memo(({ convention }) => {
       daysInfo: getDaysInfo(),
       formattedStartDate: formatDate(startDate),
       formattedEndDate: endDate ? formatDate(endDate) : '',
-      location: `${city}${city && ','} ${stateAbbreviation || stateName}`.trim(),
+      location: [city, stateAbbreviation || stateName || country].filter(Boolean).join(', '),
     };
-  }, [startDate, endDate, city, stateName, stateAbbreviation]);
+  }, [startDate, endDate, city, stateName, stateAbbreviation, country]);
 
   // Days countdown component
   const DaysDisplay = ({ showOnMobile = false }) => {
