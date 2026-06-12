@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Box, Typography, Paper, Button, Stack, useTheme, useMediaQuery } from '@mui/material';
-import Grid from '@mui/material/Grid';
 import MapIcon from '@mui/icons-material/Map';
 
 const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boolean }) => {
@@ -25,7 +24,9 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boole
             )}
             {hotel.streetAddress && <Typography variant={isCompact ? 'body2' : 'body1'}>{hotel.streetAddress}</Typography>}
             {(hotel.city || hotel.stateRegion || hotel.postalCode) &&
-                <Typography variant={isCompact ? 'body2' : 'body1'}>{`${hotel.city || ''}, ${hotel.stateRegion || ''} ${hotel.postalCode || ''}`.replace(/ ,|,$/g, '')}</Typography>
+                <Typography variant={isCompact ? 'body2' : 'body1'}>
+                    {[[hotel.city, hotel.stateRegion].filter(Boolean).join(', '), hotel.postalCode].filter(Boolean).join(' ')}
+                </Typography>
             }
             {(hotel.groupPrice || hotel.groupRateOrBookingCode || hotel.bookingCutoffDate) && (
                 <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
@@ -47,7 +48,7 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boole
                     )}
                 </Box>
             )}
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
                 {hotel.bookingLink && (
                     <Button
                         variant="contained"
@@ -58,16 +59,37 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any, isCompact?: boole
                         Book Room
                     </Button>
                 )}
-                <Button
-                    variant="outlined"
-                    startIcon={<MapIcon />}
-                    disabled={!hotel.googleMapsUrl}
-                    href={hotel.googleMapsUrl}
-                    target="_blank"
-                    size={isCompact ? 'small' : 'medium'}
-                >
-                    Map
-                </Button>
+                {hotel.websiteUrl && !hotel.bookingLink && (
+                    <Button
+                        variant="contained"
+                        href={hotel.websiteUrl}
+                        target="_blank"
+                        size={isCompact ? 'small' : 'medium'}
+                    >
+                        Hotel Website
+                    </Button>
+                )}
+                {hotel.websiteUrl && hotel.bookingLink && hotel.websiteUrl !== hotel.bookingLink && (
+                    <Button
+                        variant="outlined"
+                        href={hotel.websiteUrl}
+                        target="_blank"
+                        size={isCompact ? 'small' : 'medium'}
+                    >
+                        Website
+                    </Button>
+                )}
+                {hotel.googleMapsUrl && (
+                    <Button
+                        variant="outlined"
+                        startIcon={<MapIcon />}
+                        href={hotel.googleMapsUrl}
+                        target="_blank"
+                        size={isCompact ? 'small' : 'medium'}
+                    >
+                        Map
+                    </Button>
+                )}
             </Stack>
         </Paper>
     );
@@ -127,16 +149,13 @@ export default function HotelSection({ convention }: { convention: any }) {
             {otherHotels.length > 0 && (
                 <Box sx={{ mt: 4 }}>
                     <Typography variant="h5" component="h3" gutterBottom>
-                        Additional Hotels
+                        Additional Hotels & Accommodations
                     </Typography>
-                    <Grid container spacing={2}>
+                    <Stack spacing={2}>
                         {otherHotels.map((hotel: any) => (
-                            // @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error
-                            <Grid item key={hotel.id} xs={12} sm={6} md={4}>
-                                <HotelCard hotel={hotel} isCompact={true} />
-                            </Grid>
+                            <HotelCard key={hotel.id} hotel={hotel} isCompact={true} />
                         ))}
-                    </Grid>
+                    </Stack>
                 </Box>
             )}
         </Box>
