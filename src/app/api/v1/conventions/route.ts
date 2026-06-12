@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { ConventionStatus } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
@@ -137,6 +138,9 @@ export async function POST(request: NextRequest) {
                 keywords: [IMPORTED_KEYWORD],
             },
         });
+
+        revalidatePath('/');
+        revalidatePath('/conventions');
 
         return NextResponse.json({ duplicate: false, convention }, { status: 201 });
     } catch (error) {
