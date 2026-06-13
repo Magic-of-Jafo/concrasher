@@ -240,12 +240,19 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                         </Typography>
                                     </TableCell>
                                     {uniqueCutoffDates.map((cutoffDate: Date, index: number) => {
-                                        // Find discount for this cutoff date
-                                        const discount = tierDiscounts.find((d: any) =>
-                                            new Date(d.cutoffDate).getTime() === cutoffDate.getTime()
-                                        );
-
-                                        const discountPrice = discount ? Number(discount.discountedAmount) : Number(tier.amount);
+                                        // Price in effect when registering by this column's
+                                        // date: the tier's discount with the earliest cutoff
+                                        // on/after the column date. After the tier's last
+                                        // cutoff the regular price applies. Tiers with no
+                                        // date-based pricing show a dash instead of implying
+                                        // a schedule that doesn't exist.
+                                        let cellPrice: number | null = null;
+                                        if (tierDiscounts.length > 0) {
+                                            const applicable = tierDiscounts
+                                                .filter((d: any) => new Date(d.cutoffDate).getTime() >= cutoffDate.getTime())
+                                                .sort((a: any, b: any) => new Date(a.cutoffDate).getTime() - new Date(b.cutoffDate).getTime())[0];
+                                            cellPrice = applicable ? Number(applicable.discountedAmount) : Number(tier.amount);
+                                        }
 
                                         return (
                                             <TableCell
@@ -257,8 +264,8 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                                     px: 2
                                                 }}
                                             >
-                                                <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-                                                    {formatPrice(discountPrice, currencySymbol, currencyCode)}
+                                                <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'text.disabled' : 'inherit' }}>
+                                                    {cellPrice === null ? '—' : formatPrice(cellPrice, currencySymbol, currencyCode)}
                                                 </Typography>
                                             </TableCell>
                                         );
