@@ -10,7 +10,7 @@
 
 // NOTE: Requires @hello-pangea/dnd to be installed for drag-and-drop functionality.
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Checkbox, FormControlLabel, Tabs, Tab } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Tabs, Tab } from '@mui/material';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -655,17 +655,6 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
                 </Button>
               </Box>
             )}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={tabSettings?.channelsSameProduct === 'true'}
-                  onChange={e => onTabSettingsChange?.({ channelsSameProduct: e.target.checked ? 'true' : '' })}
-                  disabled={disabled}
-                />
-              }
-              label="These tabs are the same ticket sold different ways (show the dearer tab's price struck through)"
-              sx={{ display: 'block', mb: 1 }}
-            />
             <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
               <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)}>
                 Add Pricing Tab

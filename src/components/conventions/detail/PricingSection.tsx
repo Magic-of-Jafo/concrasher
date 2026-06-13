@@ -86,12 +86,6 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         || legacyDoorLabel
         || 'Standard';
 
-    // When channels are the same product sold different ways (e.g. Online vs
-    // At-the-Door), a cheaper channel can be anchored against the dearer one's
-    // price. When they are different products (e.g. Weekly vs Daily), prices
-    // are only ever anchored within their own channel. Default: within-channel.
-    const channelsSameProduct =
-        convention.settings?.find((s: any) => s.key === 'channelsSameProduct')?.value === 'true';
 
     // Distinct non-base channels present in the discount data (first-seen order).
     const nonBaseChannels: string[] = [];
@@ -278,13 +272,17 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                             const current = activeDated.length
                                 ? Math.min(...activeDated.map((e) => e.amount))
                                 : info.regular;
-                            // Anchor (struck-through "full price"): this channel's own
-                            // regular price by default, so different-product channels (e.g.
-                            // Daily) never anchor against the base/Weekly price. When channels
-                            // are the same product, also anchor against the dearer channel.
-                            const fullPrice = channelsSameProduct
-                                ? Math.max(Number(tier.amount), info.regular)
-                                : info.regular;
+                            // Anchor (struck-through "full price") = this tab's own regular
+                            // price. A non-base tab with no date-based pricing of its own is an
+                            // alternate channel of the same ticket (e.g. Online vs At the Door),
+                            // so it anchors against the base tab's full price instead — that way
+                            // a discounted price always shows the dearer price struck through.
+                            // Tabs with their own dated pricing (a distinct product, e.g. Daily)
+                            // stay anchored within themselves.
+                            let fullPrice = info.regular;
+                            if (activeChannel !== '' && info.dated.length === 0 && Number(tier.amount) > info.regular) {
+                                fullPrice = Number(tier.amount);
+                            }
                             const hasDiscount = current < fullPrice;
 
                             return (
