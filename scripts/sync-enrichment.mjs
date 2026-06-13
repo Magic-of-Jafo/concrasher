@@ -51,6 +51,8 @@ const conventions = await prisma.convention.findMany({
     include: {
         settings: true,
         priceTiers: { orderBy: { order: 'asc' }, include: { priceDiscounts: true } },
+        venues: true,
+        hotels: true,
     },
 });
 
@@ -89,13 +91,73 @@ for (const con of conventions) {
         }
     }
 
+    // Venue/hotel records replay only when the local copy was agent-created
+    // (organizer-entered venues/hotels never were, since enrichment skips
+    // conventions that already have them — and the change log records them).
+    const venueWasEnriched = log.some(entry => entry.changes?.some(c => c.field === 'venue'));
+    const hotelsWereEnriched = log.some(entry => entry.changes?.some(c => c.field === 'hotel'));
+    const tier3 = {};
+    const localVenue = con.venues.find(v => v.isPrimaryVenue) ?? con.venues[0];
+    if (venueWasEnriched && localVenue) {
+        tier3.venue = {
+            name: localVenue.venueName,
+            description: localVenue.description,
+            websiteUrl: localVenue.websiteUrl,
+            googleMapsUrl: localVenue.googleMapsUrl,
+            streetAddress: localVenue.streetAddress,
+            city: localVenue.city,
+            stateRegion: localVenue.stateRegion,
+            postalCode: localVenue.postalCode,
+            country: localVenue.country,
+            contactEmail: localVenue.contactEmail,
+            contactPhone: localVenue.contactPhone,
+            amenities: localVenue.amenities,
+            parkingInfo: localVenue.parkingInfo,
+            publicTransportInfo: localVenue.publicTransportInfo,
+            accessibilityNotes: localVenue.overallAccessibilityNotes,
+        };
+    }
+    if (hotelsWereEnriched && con.hotels.length) {
+        tier3.hotels = con.hotels.map(h => ({
+            name: h.hotelName,
+            isPrimary: h.isPrimaryHotel,
+            isAtVenue: h.isAtPrimaryVenueLocation,
+            description: h.description,
+            websiteUrl: h.websiteUrl,
+            streetAddress: h.streetAddress,
+            city: h.city,
+            stateRegion: h.stateRegion,
+            postalCode: h.postalCode,
+            country: h.country,
+            contactEmail: h.contactEmail,
+            contactPhone: h.contactPhone,
+            groupRateOrBookingCode: h.groupRateOrBookingCode,
+            groupPrice: h.groupPrice,
+            bookingLink: h.bookingLink,
+            bookingCutoffDate: dateStr(h.bookingCutoffDate),
+            amenities: h.amenities,
+            parkingInfo: h.parkingInfo,
+            publicTransportInfo: h.publicTransportInfo,
+            accessibilityNotes: h.overallAccessibilityNotes,
+        }));
+    }
+    if (Object.keys(tier3).length && con.guestsStayAtPrimaryVenue != null) {
+        tier3.guestsStayAtPrimaryVenue = con.guestsStayAtPrimaryVenue;
+    }
+
     const payload = {
         tier1,
         tier2,
+        ...(Object.keys(tier3).length ? { tier3 } : {}),
         meta: {
             // Replay uses the source run's confidence so date fills behave
-            // identically on the target.
-            fieldConfidence: latest.confidence ?? { dates: 'high', location: 'high', venue: 'high', pricing: 'high' },
+            // identically on the target — except tier3 data, which already
+            // passed the gates locally, so its acceptance is asserted.
+            fieldConfidence: {
+                ...(latest.confidence ?? { dates: 'high', location: 'high', venue: 'high', pricing: 'high' }),
+                ...(tier3.venue ? { venue: 'high' } : {}),
+                ...(tier3.hotels ? { hotels: 'high' } : {}),
+            },
             sourcePages: latest.sourcePages ?? [],
             notes: `Replayed from local enrichment run ${latest.at ?? 'unknown'}`,
             model: latest.model ?? undefined,
