@@ -82,6 +82,28 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const currencySymbol = currencySetting?.currency?.symbol || '$';
     const currencyCode = currencySetting?.currency?.code || 'USD';
 
+    // Pricing display mode: 'date_tiers' (default) renders the early-bird
+    // date matrix; 'online_door' renders two priced columns
+    // (tier amount = door/regular price, discount amount = online price).
+    const pricingMode = convention.settings?.find((s: any) => s.key === 'pricingMode')?.value || 'date_tiers';
+
+    // Channel column labels are organizer-customizable, like ticket labels.
+    // Stored as JSON {"online":..,"door":..} in the pricingChannelLabels
+    // setting; default to Online / At the Door.
+    let channelLabels = { online: 'Online', door: 'At the Door' };
+    const channelLabelsSetting = convention.settings?.find((s: any) => s.key === 'pricingChannelLabels')?.value;
+    if (channelLabelsSetting) {
+        try {
+            const parsed = JSON.parse(channelLabelsSetting);
+            channelLabels = {
+                online: parsed.online || channelLabels.online,
+                door: parsed.door || channelLabels.door,
+            };
+        } catch {
+            // Malformed setting — keep defaults.
+        }
+    }
+
 
 
 
@@ -144,6 +166,113 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         fontSize: { xs: '2rem', md: '3rem' },
         lineHeight: { xs: 1.2, md: 1.167 },
     };
+
+    const registerButton = (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, pr: { xs: 1, md: 2 } }}>
+            <Box sx={{ minWidth: { xs: 'auto', md: 120 }, display: 'flex', justifyContent: 'center' }}>
+                {hasRegistrationUrl ? (
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        size="large"
+                        component="a"
+                        href={convention.registrationUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ fontWeight: 600, px: 3, py: 1.5, fontSize: '1rem', whiteSpace: 'nowrap' }}
+                    >
+                        Register Here
+                    </Button>
+                ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center' }}>
+                        Check back later for registration link
+                    </Typography>
+                )}
+            </Box>
+        </Box>
+    );
+
+    if (pricingMode === 'online_door') {
+        const headerCellSx = { backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2 };
+        return (
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
+                <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>
+                    {convention.name} Pricing
+                </Typography>
+
+                <TableContainer sx={{ mt: 3, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ ...headerCellSx, px: 3 }}>
+                                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                                        Attendee Category
+                                    </Typography>
+                                </TableCell>
+                                <TableCell align="center" sx={{ ...headerCellSx, minWidth: 130 }}>
+                                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                                        {channelLabels.online}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell align="center" sx={{ ...headerCellSx, minWidth: 130 }}>
+                                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                                        {channelLabels.door}
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {sortedTiers.map((tier: any) => {
+                                const tierDiscounts = discountsByTier[tier.id] || [];
+                                // In this mode the tier amount is the door price and the
+                                // discount amount is the online price.
+                                const onlinePrice = tierDiscounts.length > 0
+                                    ? Math.min(...tierDiscounts.map((d: any) => Number(d.discountedAmount)))
+                                    : null;
+
+                                return (
+                                    <TableRow
+                                        key={tier.id}
+                                        sx={{
+                                            '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
+                                            '&:hover': { backgroundColor: 'action.selected' }
+                                        }}
+                                    >
+                                        <TableCell sx={{ py: 2.5, px: 3 }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>
+                                                {tier.label}
+                                            </Typography>
+                                        </TableCell>
+                                        {onlinePrice === null ? (
+                                            <TableCell align="center" colSpan={2} sx={{ py: 2.5, px: 2 }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                                                    {formatPrice(Number(tier.amount), currencySymbol, currencyCode)}
+                                                </Typography>
+                                            </TableCell>
+                                        ) : (
+                                            <>
+                                                <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                                    <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                                                        {formatPrice(onlinePrice, currencySymbol, currencyCode)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                                    <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                                                        {formatPrice(Number(tier.amount), currencySymbol, currencyCode)}
+                                                    </Typography>
+                                                </TableCell>
+                                            </>
+                                        )}
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                {registerButton}
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
@@ -305,49 +434,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                 </Table>
             </TableContainer>
 
-            {/* Registration button positioned to align with last column */}
-            <Box sx={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                mt: 2,
-                pr: { xs: 1, md: 2 } // Match the table's right padding
-            }}>
-                <Box sx={{
-                    minWidth: { xs: 'auto', md: 120 }, // Match the minWidth of price columns
-                    display: 'flex',
-                    justifyContent: 'center'
-                }}>
-                    {hasRegistrationUrl ? (
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            size="large"
-                            component="a"
-                            href={convention.registrationUrl!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            sx={{
-                                fontWeight: 600,
-                                px: 3,
-                                py: 1.5,
-                                fontSize: '1rem',
-                                whiteSpace: 'nowrap' // Prevent text wrapping
-                            }}
-                        >
-                            Register Here
-                        </Button>
-                    ) : (
-                        <Typography variant="body2" color="text.secondary" sx={{
-                            fontStyle: 'italic',
-                            textAlign: 'center'
-                        }}>
-                            Check back later for registration link
-                        </Typography>
-                    )}
-                </Box>
-            </Box>
-
-
+            {registerButton}
         </Box>
     );
 } 

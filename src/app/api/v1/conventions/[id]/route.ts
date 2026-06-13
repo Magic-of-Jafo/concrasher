@@ -27,6 +27,11 @@ const EnrichmentSchema = z.object({
     }).optional(),
     tier2: z.object({
         currency: z.string().max(10).nullable().optional(),
+        pricingMode: z.enum(['date_tiers', 'online_door']).nullable().optional(),
+        channelLabels: z.object({
+            online: z.string().max(50).nullable().optional(),
+            door: z.string().max(50).nullable().optional(),
+        }).nullable().optional(),
         priceTiers: z.array(z.object({
             label: z.string().max(100),
             amount: z.number().nonnegative(),
@@ -300,9 +305,17 @@ export async function PATCH(
                 });
                 pricingCreated++;
                 // The DB allows one discount per (tier, cutoff date); if the
-                // extraction lists several, keep the first.
+                // extraction lists several, keep the first. In online/door
+                // pricing the online price may have no stated end date — the
+                // schema requires one, so default to the convention start
+                // (online sales effectively end when the event begins).
+                const defaultCutoff =
+                    tier2?.pricingMode === 'online_door'
+                        ? ((update.startDate as Date | undefined) ?? convention.startDate)
+                        : null;
                 const seenCutoffs = new Set<number>();
-                for (const d of tier2?.priceDiscounts ?? []) {
+                for (const rawDiscount of tier2?.priceDiscounts ?? []) {
+                    const d = { ...rawDiscount, cutoffDate: rawDiscount.cutoffDate ?? defaultCutoff };
                     if (d.cutoffDate && seenCutoffs.has(d.cutoffDate.getTime())) continue;
                     if (d.tierLabel === t.label && d.cutoffDate) {
                         seenCutoffs.add(d.cutoffDate.getTime());
@@ -324,6 +337,28 @@ export async function PATCH(
                     where: { conventionId_key: { conventionId: convention.id, key: 'currency' } },
                     update: { value: tier2.currency },
                     create: { conventionId: convention.id, key: 'currency', value: tier2.currency },
+                });
+            }
+
+            if (tier2?.pricingMode) {
+                await tx.conventionSetting.upsert({
+                    where: { conventionId_key: { conventionId: convention.id, key: 'pricingMode' } },
+                    update: { value: tier2.pricingMode },
+                    create: { conventionId: convention.id, key: 'pricingMode', value: tier2.pricingMode },
+                });
+            }
+
+            // Organizer-customizable channel column names (online_door mode).
+            // Only persist labels the extraction actually supplied.
+            if (tier2?.channelLabels && (tier2.channelLabels.online || tier2.channelLabels.door)) {
+                const labels = JSON.stringify({
+                    online: tier2.channelLabels.online ?? 'Online',
+                    door: tier2.channelLabels.door ?? 'At the Door',
+                });
+                await tx.conventionSetting.upsert({
+                    where: { conventionId_key: { conventionId: convention.id, key: 'pricingChannelLabels' } },
+                    update: { value: labels },
+                    create: { conventionId: convention.id, key: 'pricingChannelLabels', value: labels },
                 });
             }
 

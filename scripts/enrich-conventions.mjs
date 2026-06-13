@@ -89,6 +89,21 @@ const EXTRACTION_SCHEMA = {
                 additionalProperties: false,
                 properties: {
                     currency: { type: ['string', 'null'], description: 'ISO 4217' },
+                    pricingMode: {
+                        type: ['string', 'null'],
+                        enum: ['date_tiers', 'online_door', null],
+                        description: 'online_door when prices differ by purchase channel (online vs at the door/gate); date_tiers for true early-bird deadlines where the price rises after a calendar date regardless of channel; null if unclear',
+                    },
+                    channelLabels: {
+                        type: ['object', 'null'],
+                        additionalProperties: false,
+                        description: 'For online_door mode only: the organizer\'s own words for each channel. online = the discounted column (e.g. "Online", "Advance"), door = the higher column (e.g. "At the Door", "At the Gate", "On Site"). Use null when the site uses ordinary "online" / "at the door" wording.',
+                        properties: {
+                            online: { type: ['string', 'null'] },
+                            door: { type: ['string', 'null'] },
+                        },
+                        required: ['online', 'door'],
+                    },
                     priceTiers: {
                         type: 'array',
                         items: {
@@ -112,7 +127,7 @@ const EXTRACTION_SCHEMA = {
                         },
                     },
                 },
-                required: ['currency', 'priceTiers', 'priceDiscounts'],
+                required: ['currency', 'pricingMode', 'channelLabels', 'priceTiers', 'priceDiscounts'],
             },
             meta: {
                 type: 'object',
@@ -334,7 +349,10 @@ async function extract(convention) {
                 'Rules:',
                 '- Only report facts stated on the provided pages. Use null for anything not found. Never guess.',
                 '- Dates must be YYYY-MM-DD. If only a month is given, use null and explain in notes.',
-                '- Prices: list every registration tier you find. Early-bird prices with deadlines go in priceDiscounts with the full price as the tier.',
+                '- Prices: list every registration tier you find. Classify the pricing pattern in pricingMode:',
+                '  * online_door: prices differ by purchase channel ("increases at the door", online vs door/gate pricing). Tier amount = at-the-door price; the online price goes in priceDiscounts (cutoffDate = the stated online sales end date, or null if not stated).',
+                '  * date_tiers: true early-bird calendar deadlines ("$300 until June 30, then $400") regardless of channel. Tier amount = final/regular price; earlier prices go in priceDiscounts with their cutoff dates.',
+                '  * null when there is only one price per tier or the pattern is unclear.',
                 '- descriptionShort: neutral, factual, no marketing superlatives.',
                 '- CRITICAL: if the site shows a DIFFERENT year/edition than the one asked about, set ALL confidence to low, use nulls, and explain in notes.',
                 '- For US locations, stateOrRegion must be the two-letter abbreviation.',
