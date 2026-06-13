@@ -14,8 +14,8 @@ import {
     Stack,
     Button,
     Link as MuiLink,
-    ToggleButton,
-    ToggleButtonGroup,
+    Tab,
+    Tabs,
 } from '@mui/material';
 import { format } from 'date-fns';
 import { ConventionStatus } from '@prisma/client';
@@ -212,19 +212,18 @@ export default function PricingSection({ convention }: PricingSectionProps) {
             </Typography>
 
             {channels.length > 1 && (
-                <ToggleButtonGroup
+                <Tabs
                     value={activeChannel}
-                    exclusive
-                    onChange={(_, val) => { if (val !== null) setSelectedChannel(val); }}
-                    sx={{ mt: 1, mb: 1, flexWrap: 'wrap' }}
-                    aria-label="Pricing channel"
+                    onChange={(_, val) => setSelectedChannel(val)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { fontWeight: 600, fontSize: '1rem', textTransform: 'none' } }}
+                    aria-label="Pricing tabs"
                 >
                     {channels.map((c) => (
-                        <ToggleButton key={c.key || 'base'} value={c.key} sx={{ px: 3, fontWeight: 600 }}>
-                            {c.label}
-                        </ToggleButton>
+                        <Tab key={c.key || 'base'} value={c.key} label={c.label} />
                     ))}
-                </ToggleButtonGroup>
+                </Tabs>
             )}
 
             <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
