@@ -560,6 +560,29 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     onChange({ ...value, priceDiscounts: value.priceDiscounts.filter(x => (x as any).channel !== channel) });
   };
 
+  const handleRenameTab = (oldName: string, rawNew: string) => {
+    const newName = rawNew.trim();
+    if (!newName || newName === oldName) return;
+    if (newName === baseTabLabel || additionalTabs.includes(newName)) {
+      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
+      return;
+    }
+    onChange({
+      ...value,
+      priceDiscounts: value.priceDiscounts.map(d =>
+        (d as any).channel === oldName ? { ...d, channel: newName } : d
+      ),
+    });
+    // Keep tab order in sync if it referenced the old name.
+    try {
+      const order: string[] = JSON.parse(tabSettings?.channelOrder || '[]');
+      if (order.includes(oldName)) {
+        onTabSettingsChange?.({ channelOrder: JSON.stringify(order.map(o => (o === oldName ? newName : o))) });
+      }
+    } catch { /* ignore */ }
+    setEditingTab(newName);
+  };
+
   return (
     <Box>
       <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
@@ -607,9 +630,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
               />
             ) : (
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Editing tab: {editingTab}</Typography>
+                <TextField
+                  key={editingTab}
+                  label="Tab name"
+                  defaultValue={editingTab}
+                  onBlur={e => handleRenameTab(editingTab, e.target.value)}
+                  disabled={disabled}
+                  sx={{ minWidth: 240 }}
+                  helperText="Press tab or click away to apply"
+                />
                 <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => { handleRemoveTab(editingTab); setEditingTab(''); }} disabled={disabled}>
-                  Remove &quot;{editingTab}&quot; tab
+                  Remove tab
                 </Button>
               </Box>
             )}
@@ -724,7 +755,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
               <Box sx={{ mt: 2 }}>
                 {group.tierDiscounts.map((tierDiscount, tierDiscountIndex) => (
                   <Box key={tierDiscount.priceTierId} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                    <Typography sx={{ minWidth: 120, flexShrink: 0 }}>
+                    <Typography sx={{ width: 240, flexShrink: 0 }}>
                       {tierDiscount.label} ({currency}{value.priceTiers.find(t => t.id === tierDiscount.priceTierId)?.amount || 0})
                     </Typography>
                     <TextField
