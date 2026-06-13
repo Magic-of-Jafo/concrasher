@@ -485,9 +485,15 @@ export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>;
 export const ConventionSettingSchema = z.object({
   currency: z.string().min(3, 'Currency must be at least 3 characters').max(3, 'Currency must be exactly 3 characters').optional(),
   timezone: z.string().min(1, 'Timezone is required').or(z.literal('')).optional().transform((val) => val || ''),
-  // Organizer label for the base pricing channel (the price stored on the
-  // tier itself), e.g. "At the Door". Shown on the pricing channel toggle.
+  // Organizer label for the base pricing tab (the price stored on the tier
+  // itself), e.g. "At the Door". Shown as the first pricing tab.
   baseChannelLabel: z.string().max(50).optional(),
+  // Pricing tab order (JSON array of tab labels) controlling tab order and
+  // which tab is the default.
+  channelOrder: z.string().max(500).optional(),
+  // 'true' when the pricing tabs are the same ticket sold different ways
+  // (enables cross-tab price anchoring).
+  channelsSameProduct: z.string().max(10).optional(),
 });
 
 export type ConventionSettingData = z.infer<typeof ConventionSettingSchema>; 

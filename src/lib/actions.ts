@@ -2197,12 +2197,18 @@ export async function updateConventionSettings(
       console.log('[updateConventionSettings] Convention timezone updated successfully');
     }
 
-    // Base pricing channel label (ConventionSetting).
-    if (validatedData.data.baseChannelLabel !== undefined) {
+    // Pricing-tab settings (ConventionSetting key/value).
+    const tabSettings: Array<[string, string | undefined]> = [
+      ['baseChannelLabel', validatedData.data.baseChannelLabel],
+      ['channelOrder', validatedData.data.channelOrder],
+      ['channelsSameProduct', validatedData.data.channelsSameProduct],
+    ];
+    for (const [key, value] of tabSettings) {
+      if (value === undefined) continue;
       await db.conventionSetting.upsert({
-        where: { conventionId_key: { conventionId, key: 'baseChannelLabel' } },
-        update: { value: validatedData.data.baseChannelLabel, updatedAt: new Date() },
-        create: { conventionId, key: 'baseChannelLabel', value: validatedData.data.baseChannelLabel },
+        where: { conventionId_key: { conventionId, key } },
+        update: { value, updatedAt: new Date() },
+        create: { conventionId, key, value },
       });
     }
 
@@ -2290,15 +2296,18 @@ export async function getConventionSettings(
       select: { value: true }
     });
 
-    const baseChannelLabelSetting = await db.conventionSetting.findUnique({
-      where: { conventionId_key: { conventionId, key: 'baseChannelLabel' } },
-      select: { value: true }
+    const tabSettingRows = await db.conventionSetting.findMany({
+      where: { conventionId, key: { in: ['baseChannelLabel', 'channelOrder', 'channelsSameProduct'] } },
+      select: { key: true, value: true },
     });
+    const tabSettings = Object.fromEntries(tabSettingRows.map((r) => [r.key, r.value]));
 
     const settingsData: ConventionSettingData = {
       currency: currencySetting?.value || '',
       timezone: convention.timezoneId || '',
-      baseChannelLabel: baseChannelLabelSetting?.value || '',
+      baseChannelLabel: tabSettings.baseChannelLabel || '',
+      channelOrder: tabSettings.channelOrder || '',
+      channelsSameProduct: tabSettings.channelsSameProduct || '',
     };
 
     console.log('[getConventionSettings] Loaded settings:', settingsData);
