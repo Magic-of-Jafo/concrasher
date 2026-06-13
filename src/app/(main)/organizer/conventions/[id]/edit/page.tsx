@@ -41,7 +41,7 @@ interface PageConventionData extends BasicInfoFormData {
   media?: ConventionMediaData[]; // Add media field
   coverImageUrl?: string; // Add cover image URL
   profileImageUrl?: string; // Add profile image URL
-  settings?: { currency: string; timezone: string; }; // Add settings field
+  settings?: { currency?: string; timezone: string; baseChannelLabel?: string; }; // Add settings field
   keywords?: string[]; // Add keywords field
   // Add other top-level fields if the API for fetching a single convention returns more
 }

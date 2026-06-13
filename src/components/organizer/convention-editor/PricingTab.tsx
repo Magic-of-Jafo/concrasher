@@ -390,6 +390,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
               cutoffDate: dateToSendToDB, // Ensure this is the UTC midnight representation
               priceTierId: td.priceTierId,
               discountedAmount: amountNum,
+              channel: '', // Date-based discounts belong to the base channel
             });
           }
         });

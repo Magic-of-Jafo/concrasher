@@ -230,6 +230,9 @@ export const PriceDiscountSchema = z.object({
   discountedAmount: z.preprocess((val) => (typeof val === 'string' ? parseFloat(val) : val),
     z.number().min(0, 'Discounted amount must be non-negative')
   ),
+  // Pricing channel this alternate price belongs to (e.g. "Online").
+  // Empty string = the base/default channel (date-only discount).
+  channel: z.string().max(50).optional().default(''),
 });
 
 export const PricingTabSchema = z.object({
@@ -480,8 +483,11 @@ export type ConventionMediaTabData = z.infer<typeof ConventionMediaTabSchema>;
 // --- Convention Settings Schema ---
 
 export const ConventionSettingSchema = z.object({
-  currency: z.string().min(3, 'Currency must be at least 3 characters').max(3, 'Currency must be exactly 3 characters'),
+  currency: z.string().min(3, 'Currency must be at least 3 characters').max(3, 'Currency must be exactly 3 characters').optional(),
   timezone: z.string().min(1, 'Timezone is required').or(z.literal('')).optional().transform((val) => val || ''),
+  // Organizer label for the base pricing channel (the price stored on the
+  // tier itself), e.g. "At the Door". Shown on the pricing channel toggle.
+  baseChannelLabel: z.string().max(50).optional(),
 });
 
 export type ConventionSettingData = z.infer<typeof ConventionSettingSchema>; 

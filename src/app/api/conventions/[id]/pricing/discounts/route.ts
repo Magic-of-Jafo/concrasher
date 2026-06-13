@@ -20,6 +20,7 @@ const normalizePriceDiscountData = (discount: any, conventionId: string) => ({
   discountedAmount: Number(discount.discountedAmount), // Ensure amount is a number
   cutoffDate: new Date(discount.cutoffDate), // Ensure date is a Date object
   priceTierId: discount.priceTierId, // Assuming this is correctly provided
+  channel: discount.channel || '', // Pricing channel (empty = base channel)
   conventionId: conventionId,
 });
 
@@ -76,6 +77,7 @@ export async function PUT(
             cutoffDate: normalizedData.cutoffDate,
             discountedAmount: normalizedData.discountedAmount,
             priceTierId: normalizedData.priceTierId,
+            channel: normalizedData.channel,
             conventionId: conventionId,
           },
         });

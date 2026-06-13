@@ -2180,19 +2180,31 @@ export async function updateConventionSettings(
       console.log('[updateConventionSettings] Validated timezone:', timezone);
     }
 
-    // Update Convention with timezone foreign key
+    // Update Convention with timezone foreign key. Only touch the timezone
+    // when it was actually provided, so partial saves (e.g. the Pricing tab
+    // sending only baseChannelLabel) don't wipe it.
     console.log('[updateConventionSettings] Updating Convention with timezone foreign key');
     console.log('[updateConventionSettings] Data to save:', validatedData.data);
 
-    await db.convention.update({
-      where: { id: conventionId },
-      data: {
-        timezoneId: timezoneId || null,
-        updatedAt: new Date(),
-      },
-    });
+    if (settings.timezone !== undefined) {
+      await db.convention.update({
+        where: { id: conventionId },
+        data: {
+          timezoneId: timezoneId || null,
+          updatedAt: new Date(),
+        },
+      });
+      console.log('[updateConventionSettings] Convention timezone updated successfully');
+    }
 
-    console.log('[updateConventionSettings] Convention timezone updated successfully');
+    // Base pricing channel label (ConventionSetting).
+    if (validatedData.data.baseChannelLabel !== undefined) {
+      await db.conventionSetting.upsert({
+        where: { conventionId_key: { conventionId, key: 'baseChannelLabel' } },
+        update: { value: validatedData.data.baseChannelLabel, updatedAt: new Date() },
+        create: { conventionId, key: 'baseChannelLabel', value: validatedData.data.baseChannelLabel },
+      });
+    }
 
     // Also handle ConventionSetting for currency (if needed in the future)
     if (validatedData.data.currency) {
@@ -2278,9 +2290,15 @@ export async function getConventionSettings(
       select: { value: true }
     });
 
+    const baseChannelLabelSetting = await db.conventionSetting.findUnique({
+      where: { conventionId_key: { conventionId, key: 'baseChannelLabel' } },
+      select: { value: true }
+    });
+
     const settingsData: ConventionSettingData = {
       currency: currencySetting?.value || '',
       timezone: convention.timezoneId || '',
+      baseChannelLabel: baseChannelLabelSetting?.value || '',
     };
 
     console.log('[getConventionSettings] Loaded settings:', settingsData);
