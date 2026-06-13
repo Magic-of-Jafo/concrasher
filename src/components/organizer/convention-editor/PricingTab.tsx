@@ -510,6 +510,51 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
+  // Non-base tab prices are stored as discounts on a sentinel far-future
+  // cutoff so they sort as that tab's "regular" price.
+  const DOOR_SENTINEL = new Date('2099-12-31T00:00:00Z');
+  const isSentinel = (d: Date | string) => new Date(d).getTime() === DOOR_SENTINEL.getTime();
+
+  const getTabPrice = (channel: string, tierId: string): string => {
+    const d = value.priceDiscounts.find(
+      x => (x as any).channel === channel && x.priceTierId === tierId && isSentinel(x.cutoffDate)
+    );
+    return d ? String(d.discountedAmount) : '';
+  };
+
+  const setTabPrice = (channel: string, tierId: string, amount: string) => {
+    const num = parseFloat(amount);
+    const discounts = [...value.priceDiscounts];
+    const idx = discounts.findIndex(
+      x => (x as any).channel === channel && x.priceTierId === tierId && isSentinel(x.cutoffDate)
+    );
+    if (amount.trim() === '' || isNaN(num)) {
+      if (idx >= 0) discounts.splice(idx, 1);
+    } else if (idx >= 0) {
+      discounts[idx] = { ...discounts[idx], discountedAmount: num };
+    } else {
+      discounts.push({ cutoffDate: DOOR_SENTINEL, priceTierId: tierId, discountedAmount: num, channel } as any);
+    }
+    onChange({ ...value, priceDiscounts: discounts });
+  };
+
+  const handleAddTab = () => {
+    const name = window.prompt('New pricing tab name (e.g. Online, Daily):')?.trim();
+    if (!name) return;
+    if (name === baseTabLabel || additionalTabs.includes(name)) {
+      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
+      return;
+    }
+    const seed = value.priceTiers
+      .filter(t => t.id)
+      .map(t => ({ cutoffDate: DOOR_SENTINEL, priceTierId: t.id!, discountedAmount: 0, channel: name } as any));
+    onChange({ ...value, priceDiscounts: [...value.priceDiscounts, ...seed] });
+  };
+
+  const handleRemoveTab = (channel: string) => {
+    onChange({ ...value, priceDiscounts: value.priceDiscounts.filter(x => (x as any).channel !== channel) });
+  };
+
   return (
     <Box>
       <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
@@ -683,6 +728,63 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
             No discount dates added yet. Click "Add Discount Date" to create one.
           </Typography>
+        )}
+      </Box>
+
+      <Divider sx={{ my: 4 }} />
+
+      <Box>
+        <Typography variant="h6" gutterBottom>Additional Pricing Tabs</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Each additional tab holds an alternate price per category (e.g. an "Online" or "Daily" price).
+          Leave a category blank if it isn&apos;t offered in that tab.
+        </Typography>
+
+        {additionalTabs.map(tab => (
+          <Card key={tab} variant="outlined" sx={{ mb: 3, p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{tab}</Typography>
+              <Tooltip title="Remove this tab">
+                <span>
+                  <IconButton aria-label={`Remove ${tab} tab`} onClick={() => handleRemoveTab(tab)} disabled={disabled}>
+                    <DeleteIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
+            {value.priceTiers.filter(t => t.id).map(tier => (
+              <Box key={tier.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Typography sx={{ minWidth: 200, flexShrink: 0 }}>{tier.label}</Typography>
+                <TextField
+                  type="number"
+                  placeholder="Price"
+                  value={getTabPrice(tab, tier.id!)}
+                  onChange={e => setTabPrice(tab, tier.id!, e.target.value)}
+                  size="small"
+                  sx={{ width: 150 }}
+                  InputProps={{ startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box> }}
+                  disabled={disabled}
+                />
+              </Box>
+            ))}
+          </Card>
+        ))}
+
+        <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)} sx={{ mt: 1 }}>
+          Add Pricing Tab
+        </Button>
+        {!value.priceTiers.every(t => t.id) && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Save your price tiers first, then add pricing tabs.
+          </Typography>
+        )}
+
+        {additionalTabs.length > 0 && (
+          <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !conventionId}>
+              {isSavingDiscounts ? 'Saving...' : 'Save Tab Prices'}
+            </Button>
+          </Box>
         )}
       </Box>
     </Box>
