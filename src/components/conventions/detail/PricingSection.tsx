@@ -110,7 +110,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const officialPricingUrl = convention.registrationUrl || convention.websiteUrl || null;
 
     const registerButton = (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, pr: { xs: 1, md: 2 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
             <Box sx={{ minWidth: { xs: 'auto', md: 120 }, display: 'flex', justifyContent: 'center' }}>
                 {hasRegistrationUrl ? (
                     <Button
@@ -325,16 +325,22 @@ export default function PricingSection({ convention }: PricingSectionProps) {
 
             {registerButton}
 
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, fontStyle: 'italic' }}>
-                Prices are shown as a guide and may change. If anything here differs from the{' '}
-                {officialPricingUrl ? (
-                    <MuiLink href={officialPricingUrl} target="_blank" rel="noopener noreferrer">
-                        official event page
-                    </MuiLink>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mt: 1.5, mx: 'auto', maxWidth: 520, textAlign: 'center', fontStyle: 'italic' }}
+            >
+                {hasRegistrationUrl ? (
+                    'Click above to register or to see the most current event pricing. Prices here are a guide and may change — the official event page is always the final word.'
+                ) : officialPricingUrl ? (
+                    <>
+                        Prices here are a guide and may change. If anything differs from the{' '}
+                        <MuiLink href={officialPricingUrl} target="_blank" rel="noopener noreferrer">official event page</MuiLink>,
+                        the official page is correct.
+                    </>
                 ) : (
-                    'official event page'
+                    'Prices here are a guide and may change. If anything differs from the official event page, the official page is correct.'
                 )}
-                , the official page is correct.
             </Typography>
         </Box>
     );
