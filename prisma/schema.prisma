@@ -127,12 +127,16 @@ model PriceDiscount {
   cutoffDate       DateTime
   priceTierId      String
   discountedAmount Decimal
+  // Pricing channel this alternate price belongs to (e.g. "Online",
+  // "Affiliate"). Empty string = the base/default channel (price differs
+  // by date only). Lets channels and date discounts compose freely.
+  channel          String     @default("")
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   convention       Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
   priceTier        PriceTier  @relation(fields: [priceTierId], references: [id], onDelete: Cascade)
 
-  @@unique([conventionId, priceTierId, cutoffDate])
+  @@unique([conventionId, priceTierId, cutoffDate, channel])
 }
 
 model Convention {
