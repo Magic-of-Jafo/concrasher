@@ -185,6 +185,9 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   const [settingsData, setSettingsData] = useState<ConventionSettingData>(() => ({
     currency: initialConventionData?.settings?.currency || '',
     timezone: initialConventionData?.settings?.timezone || '',
+    baseChannelLabel: initialConventionData?.settings?.baseChannelLabel || '',
+    channelOrder: initialConventionData?.settings?.channelOrder || '',
+    channelsSameProduct: initialConventionData?.settings?.channelsSameProduct || '',
   }));
 
   const [keywords, setKeywords] = useState<string[]>(() =>
@@ -234,6 +237,9 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         setSettingsData({
           currency: settings?.currency || '',
           timezone: settings?.timezone || '',
+          baseChannelLabel: settings?.baseChannelLabel || '',
+          channelOrder: settings?.channelOrder || '',
+          channelsSameProduct: settings?.channelsSameProduct || '',
         });
         setKeywords(keywords || []);
         setVenueHotelData(venueHotel || defaultVenueHotelData);
@@ -368,6 +374,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           disabled={!isEditing}
           currency={currencySymbol}
           timezone={settingsData.timezone}
+          conventionStartDate={(basicInfoData as any)?.startDate || null}
+          tabSettings={{
+            baseChannelLabel: settingsData.baseChannelLabel || '',
+            channelOrder: settingsData.channelOrder || '',
+            channelsSameProduct: settingsData.channelsSameProduct || '',
+          }}
+          onTabSettingsChange={(next) => setSettingsData((prev) => ({ ...prev, ...next }))}
         />
       </TabPanel>
 

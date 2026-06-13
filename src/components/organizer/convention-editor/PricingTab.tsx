@@ -10,7 +10,7 @@
 
 // NOTE: Requires @hello-pangea/dnd to be installed for drag-and-drop functionality.
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Checkbox, FormControlLabel } from '@mui/material';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -21,6 +21,12 @@ import { z } from 'zod';
 import { useSnackbar } from 'notistack';
 import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 
+export interface TabSettings {
+  baseChannelLabel: string;
+  channelOrder: string;       // JSON array of tab labels
+  channelsSameProduct: string; // 'true' | ''
+}
+
 interface PricingTabProps {
   conventionId?: string;
   value: PricingTabData;
@@ -28,9 +34,12 @@ interface PricingTabProps {
   disabled?: boolean;
   currency: string; // e.g. '$', '€', etc.
   timezone?: string; // IANA timezone identifier for the convention
+  conventionStartDate?: string | Date | null; // anchors non-base tab "regular" prices
+  tabSettings?: TabSettings;
+  onTabSettingsChange?: (next: Partial<TabSettings>) => void;
 }
 
-export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency, timezone }) => {
+export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency, timezone, conventionStartDate, tabSettings, onTabSettingsChange }) => {
   // --- CONSOLE LOGS FOR DEBUGGING ---
   // console.log('[PricingTab] Render. conventionId:', conventionId); // Removed for brevity
   // console.log('[PricingTab] Render. value.priceTiers:', JSON.stringify(value.priceTiers)); // Removed for brevity
@@ -67,6 +76,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
     const groupedByDate: Record<string, PriceDiscount[]> = {};
     value.priceDiscounts.forEach(discount => {
+      // Only the base pricing tab's date discounts feed this date UI;
+      // other tabs' prices are managed in their own tab section.
+      if ((discount as any).channel) return;
       if (discount.cutoffDate) {
         const utcDateFromDB = new Date(discount.cutoffDate); // This is a UTC timestamp
         // Use UTC components to form the key, ensuring consistency
@@ -397,6 +409,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       }
     });
 
+    // The discounts PUT replaces ALL discounts, so carry over other tabs'
+    // (non-base channel) prices untouched — they're managed elsewhere.
+    value.priceDiscounts
+      .filter(d => (d as any).channel)
+      .forEach(d => discountsToSaveApi.push({
+        cutoffDate: new Date(d.cutoffDate),
+        priceTierId: d.priceTierId,
+        discountedAmount: Number(d.discountedAmount),
+        channel: (d as any).channel,
+      }));
+
     if (discountsToSaveApi.length === 0 && value.priceDiscounts.filter(d => discountDatePickers.flatMap(ddp => ddp.tierDiscounts).find(td => td.originalDiscountId === d.id)).length === 0) {
       if (value.priceDiscounts.length === 0) {
         console.log('No discounts to save or clear.');
@@ -462,8 +485,68 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
+  // Pricing tabs currently present in the data (base tab + any channels).
+  const baseTabLabel = tabSettings?.baseChannelLabel?.trim() || 'Standard';
+  const additionalTabs = Array.from(
+    new Set(value.priceDiscounts.map(d => (d as any).channel).filter((c: string) => c && c.length > 0))
+  ) as string[];
+
+  const handleSaveTabSettings = async () => {
+    if (!conventionId) return;
+    try {
+      const res = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseChannelLabel: tabSettings?.baseChannelLabel || '',
+          channelOrder: tabSettings?.channelOrder || '',
+          channelsSameProduct: tabSettings?.channelsSameProduct || '',
+        }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      enqueueSnackbar('Pricing tab settings saved.', { variant: 'success' });
+    } catch {
+      enqueueSnackbar('Failed to save pricing tab settings.', { variant: 'error' });
+    }
+  };
+
   return (
     <Box>
+      <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
+        <Typography variant="h6" gutterBottom>Pricing Tabs</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Pricing tabs let attendees switch between pricing views — e.g. <em>Online</em> vs <em>At the Door</em>,
+          or <em>Weekly</em> vs <em>Daily</em>. The base tab below holds each category&apos;s main price;
+          additional tabs (managed per-tab) hold alternate prices.
+        </Typography>
+        <TextField
+          label="Base tab name"
+          value={tabSettings?.baseChannelLabel || ''}
+          onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
+          placeholder="e.g. At the Door, Weekly, Standard"
+          disabled={disabled}
+          sx={{ minWidth: 280, mb: 2 }}
+          helperText="What to call the column holding each category's main price"
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={tabSettings?.channelsSameProduct === 'true'}
+              onChange={e => onTabSettingsChange?.({ channelsSameProduct: e.target.checked ? 'true' : '' })}
+              disabled={disabled}
+            />
+          }
+          label="These tabs are the same ticket sold different ways (show the dearer tab's price struck through)"
+          sx={{ display: 'block', mb: 1 }}
+        />
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          Current tabs: <strong>{[baseTabLabel, ...additionalTabs].join('  •  ')}</strong>
+        </Typography>
+        <Button variant="outlined" size="small" onClick={handleSaveTabSettings} disabled={disabled || !conventionId} sx={{ mt: 1 }}>
+          Save Pricing Tab Settings
+        </Button>
+      </Card>
+
       <Typography variant="h6" gutterBottom>Price Tiers</Typography>
       <DragDropContext onDragEnd={handleTierReorder}>
         <Droppable droppableId="tiers-droppable">
