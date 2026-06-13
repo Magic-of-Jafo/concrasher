@@ -13,6 +13,7 @@ import {
     TableRow,
     Stack,
     Button,
+    Link as MuiLink,
     ToggleButton,
     ToggleButtonGroup,
 } from '@mui/material';
@@ -104,6 +105,9 @@ export default function PricingSection({ convention }: PricingSectionProps) {
 
     const hasRegistrationUrl = convention.registrationUrl &&
         convention.status === ConventionStatus.PUBLISHED;
+
+    // Official page to defer to in the pricing-accuracy caveat.
+    const officialPricingUrl = convention.registrationUrl || convention.websiteUrl || null;
 
     const registerButton = (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, pr: { xs: 1, md: 2 } }}>
@@ -320,6 +324,18 @@ export default function PricingSection({ convention }: PricingSectionProps) {
             </TableContainer>
 
             {registerButton}
+
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, fontStyle: 'italic' }}>
+                Prices are shown as a guide and may change. If anything here differs from the{' '}
+                {officialPricingUrl ? (
+                    <MuiLink href={officialPricingUrl} target="_blank" rel="noopener noreferrer">
+                        official event page
+                    </MuiLink>
+                ) : (
+                    'official event page'
+                )}
+                , the official page is correct.
+            </Typography>
         </Box>
     );
 }
