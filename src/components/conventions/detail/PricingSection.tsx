@@ -255,7 +255,12 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                             const current = activeDated.length
                                 ? Math.min(...activeDated.map((e) => e.amount))
                                 : info.regular;
-                            const hasDiscount = current < info.regular;
+                            // Anchor against the highest "you'd otherwise pay" price — the
+                            // tier's base/full amount or this channel's own regular, whichever
+                            // is higher — so any saving (channel discount or early-bird) shows
+                            // the full price struck through. Sales price-anchoring.
+                            const fullPrice = Math.max(Number(tier.amount), info.regular);
+                            const hasDiscount = current < fullPrice;
 
                             return (
                                 <TableRow
@@ -299,7 +304,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                                         >
                                             {hasDiscount && (
                                                 <Typography variant="body2" sx={{ textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'medium', fontSize: '0.875rem' }}>
-                                                    {formatPrice(info.regular, currencySymbol, currencyCode)}
+                                                    {formatPrice(fullPrice, currencySymbol, currencyCode)}
                                                 </Typography>
                                             )}
                                             <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
