@@ -10,7 +10,7 @@
 
 // NOTE: Requires @hello-pangea/dnd to be installed for drag-and-drop functionality.
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Checkbox, FormControlLabel } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Checkbox, FormControlLabel, Tabs, Tab } from '@mui/material';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -51,6 +51,13 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
   const [tiersSaved, setTiersSaved] = useState(false);
   const [isSavingTiers, setIsSavingTiers] = useState(false);
   const [isSavingDiscounts, setIsSavingDiscounts] = useState(false);
+  // Which pricing tab the editor is currently editing ('' = the base tab).
+  const [editingTab, setEditingTab] = useState<string>('');
+
+  // Non-base tab prices live on this far-future sentinel cutoff so they sort
+  // as that tab's "regular" price (distinct from its dated discounts).
+  const DOOR_SENTINEL = new Date('2099-12-31T00:00:00Z');
+  const isSentinel = (d: Date | string) => new Date(d).getTime() === DOOR_SENTINEL.getTime();
 
   const [discountDatePickers, setDiscountDatePickers] = useState<
     Array<{
@@ -76,9 +83,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
     const groupedByDate: Record<string, PriceDiscount[]> = {};
     value.priceDiscounts.forEach(discount => {
-      // Only the base pricing tab's date discounts feed this date UI;
-      // other tabs' prices are managed in their own tab section.
-      if ((discount as any).channel) return;
+      // Only the currently-edited tab's dated discounts feed this date UI.
+      // Its sentinel entry is the tab's base price, not a date discount.
+      if (((discount as any).channel || '') !== editingTab) return;
+      if (isSentinel(discount.cutoffDate)) return;
       if (discount.cutoffDate) {
         const utcDateFromDB = new Date(discount.cutoffDate); // This is a UTC timestamp
         // Use UTC components to form the key, ensuring consistency
@@ -115,7 +123,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     });
 
     setDiscountDatePickers(newUIDiscountGroups);
-  }, [value.priceTiers, value.priceDiscounts]);
+  }, [value.priceTiers, value.priceDiscounts, editingTab]);
 
   useEffect(() => {
     if (value.priceTiers.length > 0 && value.priceTiers.every(tier => tier.id)) {
@@ -402,22 +410,23 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
               cutoffDate: dateToSendToDB, // Ensure this is the UTC midnight representation
               priceTierId: td.priceTierId,
               discountedAmount: amountNum,
-              channel: '', // Date-based discounts belong to the base channel
+              channel: editingTab, // dates belong to the tab being edited
             });
           }
         });
       }
     });
 
-    // The discounts PUT replaces ALL discounts, so carry over other tabs'
-    // (non-base channel) prices untouched — they're managed elsewhere.
+    // The discounts PUT replaces ALL discounts. The date groups above are the
+    // editing tab's dated discounts; carry over everything else untouched —
+    // other tabs entirely, plus every tab's base price (sentinel entries).
     value.priceDiscounts
-      .filter(d => (d as any).channel)
+      .filter(d => ((d as any).channel || '') !== editingTab || isSentinel(d.cutoffDate))
       .forEach(d => discountsToSaveApi.push({
         cutoffDate: new Date(d.cutoffDate),
         priceTierId: d.priceTierId,
         discountedAmount: Number(d.discountedAmount),
-        channel: (d as any).channel,
+        channel: (d as any).channel || '',
       }));
 
     if (discountsToSaveApi.length === 0 && value.priceDiscounts.filter(d => discountDatePickers.flatMap(ddp => ddp.tierDiscounts).find(td => td.originalDiscountId === d.id)).length === 0) {
@@ -510,11 +519,6 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
-  // Non-base tab prices are stored as discounts on a sentinel far-future
-  // cutoff so they sort as that tab's "regular" price.
-  const DOOR_SENTINEL = new Date('2099-12-31T00:00:00Z');
-  const isSentinel = (d: Date | string) => new Date(d).getTime() === DOOR_SENTINEL.getTime();
-
   const getTabPrice = (channel: string, tierId: string): string => {
     const d = value.priceDiscounts.find(
       x => (x as any).channel === channel && x.priceTierId === tierId && isSentinel(x.cutoffDate)
@@ -549,6 +553,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       .filter(t => t.id)
       .map(t => ({ cutoffDate: DOOR_SENTINEL, priceTierId: t.id!, discountedAmount: 0, channel: name } as any));
     onChange({ ...value, priceDiscounts: [...value.priceDiscounts, ...seed] });
+    setEditingTab(name);
   };
 
   const handleRemoveTab = (channel: string) => {
@@ -559,37 +564,76 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     <Box>
       <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
         <Typography variant="h6" gutterBottom>Pricing Tabs</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Pricing tabs let attendees switch between pricing views — e.g. <em>Online</em> vs <em>At the Door</em>,
-          or <em>Weekly</em> vs <em>Daily</em>. The base tab below holds each category&apos;s main price;
-          additional tabs (managed per-tab) hold alternate prices.
-        </Typography>
-        <TextField
-          label="Base tab name"
-          value={tabSettings?.baseChannelLabel || ''}
-          onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
-          placeholder="e.g. At the Door, Weekly, Standard"
-          disabled={disabled}
-          sx={{ minWidth: 280, mb: 2 }}
-          helperText="What to call the column holding each category's main price"
-        />
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={tabSettings?.channelsSameProduct === 'true'}
-              onChange={e => onTabSettingsChange?.({ channelsSameProduct: e.target.checked ? 'true' : '' })}
-              disabled={disabled}
+        {additionalTabs.length === 0 ? (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add a pricing tab only if attendees can pay different prices via different routes — e.g.{' '}
+              <em>Online</em> vs <em>At the Door</em>, or <em>Weekly</em> vs <em>Daily</em>. With a single
+              price you don&apos;t need tabs — just fill in the categories below.
+            </Typography>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)}>
+              Add Pricing Tab
+            </Button>
+            {!value.priceTiers.every(t => t.id) && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Save your categories first, then add tabs.
+              </Typography>
+            )}
+          </>
+        ) : (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Each tab is its own pricing table. Pick a tab to edit its prices and dates below.
+            </Typography>
+            <Tabs
+              value={editingTab}
+              onChange={(_, v) => setEditingTab(v)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab value="" label={baseTabLabel} />
+              {additionalTabs.map(t => <Tab key={t} value={t} label={t} />)}
+            </Tabs>
+            {editingTab === '' ? (
+              <TextField
+                label="Base tab name"
+                value={tabSettings?.baseChannelLabel || ''}
+                onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
+                placeholder="e.g. At the Door, Weekly, Standard"
+                disabled={disabled}
+                sx={{ minWidth: 280, mb: 2 }}
+                helperText="Name of the main / default tab"
+              />
+            ) : (
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Editing tab: {editingTab}</Typography>
+                <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => { handleRemoveTab(editingTab); setEditingTab(''); }} disabled={disabled}>
+                  Remove &quot;{editingTab}&quot; tab
+                </Button>
+              </Box>
+            )}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={tabSettings?.channelsSameProduct === 'true'}
+                  onChange={e => onTabSettingsChange?.({ channelsSameProduct: e.target.checked ? 'true' : '' })}
+                  disabled={disabled}
+                />
+              }
+              label="These tabs are the same ticket sold different ways (show the dearer tab's price struck through)"
+              sx={{ display: 'block', mb: 1 }}
             />
-          }
-          label="These tabs are the same ticket sold different ways (show the dearer tab's price struck through)"
-          sx={{ display: 'block', mb: 1 }}
-        />
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          Current tabs: <strong>{[baseTabLabel, ...additionalTabs].join('  •  ')}</strong>
-        </Typography>
-        <Button variant="outlined" size="small" onClick={handleSaveTabSettings} disabled={disabled || !conventionId} sx={{ mt: 1 }}>
-          Save Pricing Tab Settings
-        </Button>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+              <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)}>
+                Add Pricing Tab
+              </Button>
+              <Button variant="outlined" size="small" onClick={handleSaveTabSettings} disabled={disabled || !conventionId}>
+                Save Tab Settings
+              </Button>
+            </Box>
+          </>
+        )}
       </Card>
 
       <Typography variant="h6" gutterBottom>Price Tiers</Typography>
@@ -608,14 +652,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
                         <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} error={!!errors[`priceTiers.${idx}.label`]} helperText={errors[`priceTiers.${idx}.label`]} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }} />
                         <TextField
                           type="number"
-                          label="Amount"
-                          value={tier.amount}
-                          onChange={(e) => handleTierChange(idx, 'amount', parseFloat(e.target.value) || 0)}
+                          label={editingTab === '' ? 'Amount' : `${editingTab} price`}
+                          value={editingTab === '' ? tier.amount : getTabPrice(editingTab, tier.id || '')}
+                          onChange={(e) => {
+                            if (editingTab === '') handleTierChange(idx, 'amount', parseFloat(e.target.value) || 0);
+                            else if (tier.id) setTabPrice(editingTab, tier.id, e.target.value);
+                          }}
                           sx={{ width: '120px' }}
                           InputProps={{
                             startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box>,
                           }}
-                          disabled={disabled}
+                          disabled={disabled || (editingTab !== '' && !tier.id)}
                         />
                         <Tooltip title="Remove Tier">
                           <span>
@@ -717,74 +764,17 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
           Add Discount Date
         </Button>
 
-        {(discountDatePickers.length > 0 || value.priceDiscounts.length > 0) && (
+        {value.priceTiers.length > 0 && (
           <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !canSaveDiscounts || !conventionId}>
-              {isSavingDiscounts ? 'Saving Discounts...' : 'Save Price Discounts'}
+            <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !conventionId || !tiersSaved}>
+              {isSavingDiscounts ? 'Saving...' : (editingTab === '' ? 'Save Base Tab Prices & Dates' : `Save ${editingTab} Tab Prices & Dates`)}
             </Button>
           </Box>
         )}
         {discountDatePickers.length === 0 && value.priceTiers.length > 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-            No discount dates added yet. Click "Add Discount Date" to create one.
+            No discount dates for this tab yet. Click "Add Discount Date" to create one.
           </Typography>
-        )}
-      </Box>
-
-      <Divider sx={{ my: 4 }} />
-
-      <Box>
-        <Typography variant="h6" gutterBottom>Additional Pricing Tabs</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Each additional tab holds an alternate price per category (e.g. an "Online" or "Daily" price).
-          Leave a category blank if it isn&apos;t offered in that tab.
-        </Typography>
-
-        {additionalTabs.map(tab => (
-          <Card key={tab} variant="outlined" sx={{ mb: 3, p: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{tab}</Typography>
-              <Tooltip title="Remove this tab">
-                <span>
-                  <IconButton aria-label={`Remove ${tab} tab`} onClick={() => handleRemoveTab(tab)} disabled={disabled}>
-                    <DeleteIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Box>
-            {value.priceTiers.filter(t => t.id).map(tier => (
-              <Box key={tier.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                <Typography sx={{ minWidth: 200, flexShrink: 0 }}>{tier.label}</Typography>
-                <TextField
-                  type="number"
-                  placeholder="Price"
-                  value={getTabPrice(tab, tier.id!)}
-                  onChange={e => setTabPrice(tab, tier.id!, e.target.value)}
-                  size="small"
-                  sx={{ width: 150 }}
-                  InputProps={{ startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box> }}
-                  disabled={disabled}
-                />
-              </Box>
-            ))}
-          </Card>
-        ))}
-
-        <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)} sx={{ mt: 1 }}>
-          Add Pricing Tab
-        </Button>
-        {!value.priceTiers.every(t => t.id) && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Save your price tiers first, then add pricing tabs.
-          </Typography>
-        )}
-
-        {additionalTabs.length > 0 && (
-          <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !conventionId}>
-              {isSavingDiscounts ? 'Saving...' : 'Save Tab Prices'}
-            </Button>
-          </Box>
         )}
       </Box>
     </Box>
