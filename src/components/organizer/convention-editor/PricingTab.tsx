@@ -639,7 +639,18 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
                   sx={{ minWidth: 240 }}
                   helperText="Press tab or click away to apply"
                 />
-                <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => { handleRemoveTab(editingTab); setEditingTab(''); }} disabled={disabled}>
+                <Button
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => {
+                    if (window.confirm(`Remove the "${editingTab}" tab? All of its prices and discount dates will be permanently deleted when you save.`)) {
+                      handleRemoveTab(editingTab);
+                      setEditingTab('');
+                    }
+                  }}
+                  disabled={disabled}
+                >
                   Remove tab
                 </Button>
               </Box>
