@@ -86,17 +86,37 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         || legacyDoorLabel
         || 'Standard';
 
+    // When channels are the same product sold different ways (e.g. Online vs
+    // At-the-Door), a cheaper channel can be anchored against the dearer one's
+    // price. When they are different products (e.g. Weekly vs Daily), prices
+    // are only ever anchored within their own channel. Default: within-channel.
+    const channelsSameProduct =
+        convention.settings?.find((s: any) => s.key === 'channelsSameProduct')?.value === 'true';
+
     // Distinct non-base channels present in the discount data (first-seen order).
     const nonBaseChannels: string[] = [];
     for (const d of priceDiscounts) {
         const ch = d.channel || '';
         if (ch && !nonBaseChannels.includes(ch)) nonBaseChannels.push(ch);
     }
-    // Promoted (non-base) channels first, then the base channel last.
+    // Promoted (non-base) channels first, then the base channel last — unless
+    // the organizer set an explicit channelOrder (JSON array of channel labels,
+    // e.g. ["Weekly","Daily"]), which then drives toggle order and the default.
     const channels = [
         ...nonBaseChannels.map((c) => ({ key: c, label: c })),
         { key: '', label: baseChannelLabel },
     ];
+    const channelOrderRaw = convention.settings?.find((s: any) => s.key === 'channelOrder')?.value;
+    if (channelOrderRaw) {
+        try {
+            const order: string[] = JSON.parse(channelOrderRaw);
+            const rank = (label: string) => {
+                const i = order.indexOf(label);
+                return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+            };
+            channels.sort((a, b) => rank(a.label) - rank(b.label));
+        } catch { /* malformed — keep default order */ }
+    }
 
     const [selectedChannel, setSelectedChannel] = useState<string>(channels[0]?.key ?? '');
 
@@ -259,11 +279,13 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                             const current = activeDated.length
                                 ? Math.min(...activeDated.map((e) => e.amount))
                                 : info.regular;
-                            // Anchor against the highest "you'd otherwise pay" price — the
-                            // tier's base/full amount or this channel's own regular, whichever
-                            // is higher — so any saving (channel discount or early-bird) shows
-                            // the full price struck through. Sales price-anchoring.
-                            const fullPrice = Math.max(Number(tier.amount), info.regular);
+                            // Anchor (struck-through "full price"): this channel's own
+                            // regular price by default, so different-product channels (e.g.
+                            // Daily) never anchor against the base/Weekly price. When channels
+                            // are the same product, also anchor against the dearer channel.
+                            const fullPrice = channelsSameProduct
+                                ? Math.max(Number(tier.amount), info.regular)
+                                : info.regular;
                             const hasDiscount = current < fullPrice;
 
                             return (
