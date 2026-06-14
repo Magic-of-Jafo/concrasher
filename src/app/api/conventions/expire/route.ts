@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { Role, ConventionStatus } from '@prisma/client';
-import prisma from '@/lib/prisma';
+import { Role } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { expirePastConventions } from '@/lib/conventions/expire';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,23 +16,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Forbidden: User is not an admin.' }, { status: 403 });
         }
 
-        const now = new Date();
-
-        const result = await prisma.convention.updateMany({
-            where: {
-                status: ConventionStatus.PUBLISHED,
-                endDate: {
-                    lt: now,
-                },
-            },
-            data: {
-                status: ConventionStatus.PAST,
-            },
-        });
+        const count = await expirePastConventions();
 
         return NextResponse.json({
-            message: `${result.count} conventions successfully updated to PAST status.`,
-            count: result.count,
+            message: `${count} conventions successfully updated to PAST status.`,
+            count,
         });
     } catch (error) {
         console.error('Error updating expired conventions:', error);
