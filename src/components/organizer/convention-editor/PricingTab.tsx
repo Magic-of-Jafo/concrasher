@@ -1,30 +1,32 @@
-// DEVELOPER NOTE: PricingTab - Pricing & Discount Flow Guidance
+// PricingTab — per-tab pricing editor.
 //
-// - Organizer defines any number of Price Tiers (label, amount, order). Labels are freeform but common ones include: Regular, Spouse, Youth, Parent or Guardian of Youth. Tiers can be added, removed, edited, and reordered (drag-and-drop). Any tier can have any price.
-// - Tiers must be saved before discounts can be configured. Discounts are tied to the DB record of a specific Price Tier.
-// - Discounts are date-based (cutoff date). For each discount date, the Organizer can set discounted prices for any subset of tiers (no duplicate tier per date).
-// - The UI flow: After saving tiers, Organizer adds a Discount Date. For each date, a row for each tier appears. If a discount price is entered for a tier, that discount is active for that date/tier. Blank fields mean no discount for that tier/date.
-// - Organizer can add as many discount dates as desired. Each date creates a new set of rows for all tiers. Only filled-in discount fields are saved/applied.
-// - This note is a reference for all PricingTab logic and should be consulted for future changes.
+// Each pricing TAB is an independent table with its own categories (price
+// tiers). A tier belongs to exactly one tab via `tier.tab` ('' = the base
+// table). A tab may optionally carry a second price column (tier.amountSecondary)
+// for same-product channel pricing, e.g. "At the Door" vs "Online". Each tier
+// can also have date-based (early-bird) discounts.
 //
+// Saving: "Save Pricing Tiers" PUTs every tier across all tabs (so adds,
+// edits, removals and tab moves all persist together). "Save Prices & Dates"
+// PUTs every discount, replacing the editing tab's dated discounts while
+// carrying the other tabs' discounts through untouched.
 
-// NOTE: Requires @hello-pangea/dnd to be installed for drag-and-drop functionality.
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, IconButton, Button, Select, MenuItem, InputLabel, FormControl, FormHelperText, Card, CardContent, Divider, Tooltip, Tabs, Tab } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, Typography, TextField, IconButton, Button, FormHelperText, Card, CardContent, Divider, Tooltip, Tabs, Tab, FormControlLabel, Checkbox } from '@mui/material';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { PriceTier, PriceDiscount, PricingTabData, PriceTierSchema, PriceDiscountSchema, PricingTabSchema } from '@/lib/validators';
+import { PriceTier, PriceDiscount, PricingTabData, PricingTabSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { useSnackbar } from 'notistack';
-import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 
 export interface TabSettings {
   baseChannelLabel: string;
-  channelOrder: string;       // JSON array of tab labels
-  channelsSameProduct: string; // 'true' | ''
+  channelOrder: string;        // JSON array of tab labels
+  channelsSameProduct: string; // legacy, unused
+  secondaryChannelLabel: string;
 }
 
 interface PricingTabProps {
@@ -32,473 +34,189 @@ interface PricingTabProps {
   value: PricingTabData;
   onChange: (data: PricingTabData) => void;
   disabled?: boolean;
-  currency: string; // e.g. '$', '€', etc.
-  timezone?: string; // IANA timezone identifier for the convention
-  conventionStartDate?: string | Date | null; // anchors non-base tab "regular" prices
+  currency: string;
+  timezone?: string;
+  conventionStartDate?: string | Date | null;
   tabSettings?: TabSettings;
   onTabSettingsChange?: (next: Partial<TabSettings>) => void;
 }
 
-export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency, timezone, conventionStartDate, tabSettings, onTabSettingsChange }) => {
-  // --- CONSOLE LOGS FOR DEBUGGING ---
-  // console.log('[PricingTab] Render. conventionId:', conventionId); // Removed for brevity
-  // console.log('[PricingTab] Render. value.priceTiers:', JSON.stringify(value.priceTiers)); // Removed for brevity
-  // console.log('[PricingTab] Render. value.priceDiscounts:', JSON.stringify(value.priceDiscounts)); // Removed for brevity
-  // --- END CONSOLE LOGS ---
-
+export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onChange, disabled = false, currency, tabSettings, onTabSettingsChange }) => {
   const { enqueueSnackbar } = useSnackbar();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tiersSaved, setTiersSaved] = useState(false);
   const [isSavingTiers, setIsSavingTiers] = useState(false);
   const [isSavingDiscounts, setIsSavingDiscounts] = useState(false);
-  // Which pricing tab the editor is currently editing ('' = the base tab).
   const [editingTab, setEditingTab] = useState<string>('');
 
-  // Non-base tab prices live on this far-future sentinel cutoff so they sort
-  // as that tab's "regular" price (distinct from its dated discounts).
-  const DOOR_SENTINEL = new Date('2099-12-31T00:00:00Z');
-  const isSentinel = (d: Date | string) => new Date(d).getTime() === DOOR_SENTINEL.getTime();
+  const baseTabLabel = tabSettings?.baseChannelLabel?.trim() || 'Standard';
+  const secondaryLabel = tabSettings?.secondaryChannelLabel?.trim() || 'Online';
+  const tabLabel = (t: string) => (t === '' ? baseTabLabel : t);
 
+  // Distinct tabs present in the tier data, ordered by the channelOrder setting
+  // when available, else first-seen. Always at least the base ('') tab.
+  const tabValues = useMemo(() => {
+    const vals: string[] = [];
+    for (const t of value.priceTiers) {
+      const tab = (t as any).tab || '';
+      if (!vals.includes(tab)) vals.push(tab);
+    }
+    if (vals.length === 0) vals.push('');
+    try {
+      const order: string[] = JSON.parse(tabSettings?.channelOrder || '[]');
+      if (Array.isArray(order) && order.length) {
+        const rank = (t: string) => {
+          const i = order.indexOf(tabLabel(t));
+          return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+        };
+        vals.sort((a, b) => rank(a) - rank(b));
+      }
+    } catch { /* keep first-seen */ }
+    return vals;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.priceTiers, tabSettings?.channelOrder, baseTabLabel]);
+
+  // Keep editingTab valid as tabs change.
+  useEffect(() => {
+    if (!tabValues.includes(editingTab)) setEditingTab(tabValues[0] ?? '');
+  }, [tabValues, editingTab]);
+
+  // The tiers belonging to the currently-edited tab, in order.
+  const tabTiers = useMemo(
+    () => value.priceTiers
+      .filter(t => ((t as any).tab || '') === editingTab)
+      .sort((a, b) => a.order - b.order),
+    [value.priceTiers, editingTab]
+  );
+  const isTwoColumn = tabTiers.some(t => (t as any).amountSecondary !== null && (t as any).amountSecondary !== undefined);
+  const editingTabTierIds = tabTiers.map(t => t.id).filter(Boolean) as string[];
+
+  // Replace the editing tab's tiers within the full list, re-indexing their order.
+  const commitTabTiers = (nextTabTiers: PriceTier[]) => {
+    const others = value.priceTiers.filter(t => ((t as any).tab || '') !== editingTab);
+    const reindexed = nextTabTiers.map((t, i) => ({ ...t, order: i, tab: editingTab } as PriceTier));
+    onChange({ ...value, priceTiers: [...others, ...reindexed] });
+  };
+
+  // --- Date discount UI state (scoped to the editing tab's tiers) ---
   const [discountDatePickers, setDiscountDatePickers] = useState<
-    Array<{
-      date: Date | null;
-      tempId: string; // For React key
-      tierDiscounts: Array<{
-        priceTierId: string; // ID of the PriceTier this discount applies to
-        label: string; // Label of the PriceTier (for display)
-        amount: string; // The discounted amount as a string from input
-        originalDiscountId?: string; // ID of existing PriceDiscount if this is loaded data
-      }>
-    }>
+    Array<{ date: Date | null; tempId: string; tierDiscounts: Array<{ priceTierId: string; label: string; amount: string; originalDiscountId?: string }> }>
   >([]);
 
   useEffect(() => {
-    console.log('[PricingTab] useEffect for discountDatePickers triggered.');
-    console.log('[PricingTab] useEffect - using value.priceDiscounts:', JSON.stringify(value.priceDiscounts));
-
-    if (value.priceTiers.length === 0) {
-      setDiscountDatePickers([]);
-      return;
-    }
+    const savedTabTiers = tabTiers.filter(t => t.id);
+    if (savedTabTiers.length === 0) { setDiscountDatePickers([]); return; }
+    const tierIdSet = new Set(savedTabTiers.map(t => t.id));
 
     const groupedByDate: Record<string, PriceDiscount[]> = {};
-    value.priceDiscounts.forEach(discount => {
-      // Only the currently-edited tab's dated discounts feed this date UI.
-      // Its sentinel entry is the tab's base price, not a date discount.
-      if (((discount as any).channel || '') !== editingTab) return;
-      if (isSentinel(discount.cutoffDate)) return;
-      if (discount.cutoffDate) {
-        const utcDateFromDB = new Date(discount.cutoffDate); // This is a UTC timestamp
-        // Use UTC components to form the key, ensuring consistency
-        const dateKey = `${utcDateFromDB.getUTCFullYear()}-${String(utcDateFromDB.getUTCMonth() + 1).padStart(2, '0')}-${String(utcDateFromDB.getUTCDate()).padStart(2, '0')}`;
-
-        if (!groupedByDate[dateKey]) {
-          groupedByDate[dateKey] = [];
-        }
-        groupedByDate[dateKey].push(discount);
-      }
+    value.priceDiscounts.forEach(d => {
+      if (!tierIdSet.has(d.priceTierId)) return; // only this tab's discounts
+      if (!d.cutoffDate) return;
+      const dt = new Date(d.cutoffDate);
+      const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+      (groupedByDate[key] = groupedByDate[key] || []).push(d);
     });
 
-    const newUIDiscountGroups = Object.entries(groupedByDate).map(([dateStrKey_YYYY_MM_DD_UTC, discountsOnDate], index) => {
-      const [year, month_1_indexed, day] = dateStrKey_YYYY_MM_DD_UTC.split('-').map(Number);
-
-      // Create a Date object that represents the correct date regardless of timezone
-      // The key is to create a Date object that when displayed will show the correct date
-      // We create it at noon UTC to avoid timezone boundary issues
-      const dateForPicker = new Date(Date.UTC(year, month_1_indexed - 1, day, 12, 0, 0, 0));
-
+    const groups = Object.entries(groupedByDate).map(([key, discountsOnDate], index) => {
+      const [y, m, day] = key.split('-').map(Number);
       return {
-        date: dateForPicker, // DatePicker receives a date object representing the correct day
-        tempId: `loaded-dategroup-${dateStrKey_YYYY_MM_DD_UTC}-${index}`,
-        tierDiscounts: value.priceTiers.filter(t => t.id).map(tier => {
-          const existingDiscount = discountsOnDate.find(d => d.priceTierId === tier.id);
-          return {
-            priceTierId: tier.id!,
-            label: tier.label,
-            amount: existingDiscount ? String(existingDiscount.discountedAmount) : '',
-            originalDiscountId: existingDiscount?.id,
-          };
+        date: new Date(Date.UTC(y, m - 1, day, 12, 0, 0, 0)),
+        tempId: `loaded-${key}-${index}`,
+        tierDiscounts: savedTabTiers.map(tier => {
+          const existing = discountsOnDate.find(d => d.priceTierId === tier.id);
+          return { priceTierId: tier.id!, label: tier.label, amount: existing ? String(existing.discountedAmount) : '', originalDiscountId: existing?.id };
         }),
       };
     });
-
-    setDiscountDatePickers(newUIDiscountGroups);
+    setDiscountDatePickers(groups);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.priceTiers, value.priceDiscounts, editingTab]);
 
   useEffect(() => {
-    if (value.priceTiers.length > 0 && value.priceTiers.every(tier => tier.id)) {
-      setTiersSaved(true);
-    } else {
-      setTiersSaved(false); // Reset if tiers are removed or not saved
-    }
+    setTiersSaved(value.priceTiers.length > 0 && value.priceTiers.every(t => t.id));
   }, [value.priceTiers]);
 
+  // --- Tier editing (scoped to editing tab) ---
   const handleAddTier = () => {
-    const newTier: PriceTier = {
-      label: '',
-      amount: 0,
-      order: value.priceTiers.length,
-    };
-    onChange({ ...value, priceTiers: [...value.priceTiers, newTier] });
+    const newTier: PriceTier = { label: '', amount: 0, order: tabTiers.length, tab: editingTab } as PriceTier;
+    if (isTwoColumn) (newTier as any).amountSecondary = 0;
+    commitTabTiers([...tabTiers, newTier]);
   };
 
   const handleRemoveTier = (idx: number) => {
-    const removedTierId = value.priceTiers[idx]?.id;
-    const newTiers = value.priceTiers.filter((_, i) => i !== idx).map((tier, i) => ({ ...tier, order: i }));
-    let newMasterDiscounts = value.priceDiscounts;
-    if (removedTierId) {
-      newMasterDiscounts = value.priceDiscounts.filter(d => d.priceTierId !== removedTierId);
-    }
-    onChange({ ...value, priceTiers: newTiers, priceDiscounts: newMasterDiscounts });
+    const removedId = tabTiers[idx]?.id;
+    const next = tabTiers.filter((_, i) => i !== idx);
+    let discounts = value.priceDiscounts;
+    if (removedId) discounts = value.priceDiscounts.filter(d => d.priceTierId !== removedId);
+    const others = value.priceTiers.filter(t => ((t as any).tab || '') !== editingTab);
+    onChange({ ...value, priceTiers: [...others, ...next.map((t, i) => ({ ...t, order: i, tab: editingTab }))], priceDiscounts: discounts });
   };
 
-  const handleTierChange = (idx: number, field: keyof PriceTier, val: any) => {
-    const newTiers = value.priceTiers.map((tier, i) => i === idx ? { ...tier, [field]: val } : tier);
-    onChange({ ...value, priceTiers: newTiers });
+  const handleTierChange = (idx: number, field: keyof PriceTier | 'amountSecondary', val: any) => {
+    const next = tabTiers.map((t, i) => (i === idx ? { ...t, [field]: val } : t));
+    commitTabTiers(next as PriceTier[]);
   };
 
   const handleTierReorder = (result: DropResult) => {
     if (!result.destination) return;
-    const tiers = Array.from(value.priceTiers);
-    const [removed] = tiers.splice(result.source.index, 1);
-    tiers.splice(result.destination.index, 0, removed);
-    const reordered = tiers.map((tier, i) => ({ ...tier, order: i }));
-    onChange({ ...value, priceTiers: reordered });
+    const arr = Array.from(tabTiers);
+    const [moved] = arr.splice(result.source.index, 1);
+    arr.splice(result.destination.index, 0, moved);
+    commitTabTiers(arr);
   };
 
-  const handleAddDiscountDateGroup = () => {
-    if (!value.priceTiers.every(t => t.id)) {
-      setErrors(prev => ({ ...prev, global: "All tiers must be saved before adding discount dates." }));
-      return;
-    }
-    setDiscountDatePickers(prev => [
-      ...prev,
-      {
-        date: null,
-        tempId: `new-dategroup-${Date.now()}`,
-        tierDiscounts: value.priceTiers.filter(t => t.id).map(tier => ({ // Only for saved tiers
-          priceTierId: tier.id!,
-          label: tier.label,
-          amount: '',
-        })),
-      },
-    ]);
+  const toggleTwoColumn = (on: boolean) => {
+    const next = tabTiers.map(t => ({ ...t, amountSecondary: on ? ((t as any).amountSecondary ?? Number(t.amount)) : null }));
+    commitTabTiers(next as PriceTier[]);
   };
 
-  const handleRemoveDiscountDateGroup = async (groupIndex: number) => {
-    const groupToRemove = discountDatePickers[groupIndex];
-    console.log(`[PricingTab] TRASH ICON CLICKED for discount date groupIndex: ${groupIndex}`, groupToRemove ? { date: groupToRemove.date, tempId: groupToRemove.tempId, tierDiscountCount: groupToRemove.tierDiscounts.length } : 'GROUP NOT FOUND');
-    if (!groupToRemove) {
-      console.warn('[PricingTab] handleRemoveDiscountDateGroup: No group found for index.');
-      return;
-    }
-
-    if (groupToRemove.date && conventionId) {
-      // groupToRemove.date is now a Date object representing midnight UTC of the selected day
-      const dateForAPI = groupToRemove.date;
-
-      const year = dateForAPI.getUTCFullYear();
-      const month = (dateForAPI.getUTCMonth() + 1).toString().padStart(2, '0');
-      const day = dateForAPI.getUTCDate().toString().padStart(2, '0');
-      const cutoffDateStringForAPI = `${year}-${month}-${day}`;
-
-      console.log(`[PricingTab] API CALL to delete discounts for conventionId: ${conventionId}, cutoffDateString (UTC for API): ${cutoffDateStringForAPI}`);
-      // console.log(`[PricingTab] Original local date: ${localDate.toLocaleString()}, UTC date: ${utcDate.toISOString()}`); // No longer have a distinct localDate here if dateForAPI is UTC
-      console.log(`[PricingTab] groupToRemove.date (should be UTC midnight): ${groupToRemove.date.toISOString()}`);
-
-      const wasSaving = isSavingDiscounts;
-      setIsSavingDiscounts(true);
-
-      try {
-        const response = await fetch(`/api/conventions/${conventionId}/pricing/discounts-by-date?cutoffDate=${cutoffDateStringForAPI}`, {
-          method: 'DELETE',
-        });
-        console.log('[PricingTab] API response status:', response.status);
-        const responseData = await response.json();
-        console.log('[PricingTab] API response data:', responseData);
-
-        if (!response.ok) {
-          enqueueSnackbar(responseData.message || 'Failed to delete discount date group.', { variant: 'error' });
-          throw new Error(responseData.message || 'Failed to delete discount date group');
-        }
-
-        enqueueSnackbar(responseData.message || 'Discount date group cleared.', { variant: 'success' });
-
-        console.log('[PricingTab] BEFORE filtering value.priceDiscounts:', JSON.stringify(value.priceDiscounts));
-        const updatedPriceDiscounts = value.priceDiscounts.filter(discount => {
-          if (!discount.cutoffDate) return true;
-
-          const dbDateUTC = new Date(discount.cutoffDate);
-          const dbYear = dbDateUTC.getUTCFullYear();
-          const dbMonth = (dbDateUTC.getUTCMonth() + 1).toString().padStart(2, '0');
-          const dbDay = dbDateUTC.getUTCDate().toString().padStart(2, '0');
-          const dbDateStringToCompare = `${dbYear}-${dbMonth}-${dbDay}`;
-
-          console.log(`[PricingTab] Comparing dates - Target for API: ${cutoffDateStringForAPI}, DB Date for comparison: ${dbDateStringToCompare}`);
-          const shouldKeep = dbDateStringToCompare !== cutoffDateStringForAPI;
-          return shouldKeep;
-        });
-        console.log('[PricingTab] AFTER filtering, updatedPriceDiscounts:', JSON.stringify(updatedPriceDiscounts));
-        onChange({ ...value, priceDiscounts: updatedPriceDiscounts });
-        console.log('[PricingTab] onChange called with updated discounts.');
-
-      } catch (error) {
-        if (!(error instanceof Error && error.message.includes('Failed to delete'))) {
-          console.error('Error in handleRemoveDiscountDateGroup:', error);
-          enqueueSnackbar('An unexpected error occurred.', { variant: 'error' });
-        }
-      } finally {
-        setIsSavingDiscounts(wasSaving);
-      }
-    } else {
-      // If there's no date or no conventionId, just remove locally from UI state (if it was a purely new, unsaved group)
-      // This path might be less common now if we expect a date to be set to enable deletion.
-      // For consistency, this local-only removal should also be handled by the useEffect if possible,
-      // but a new, empty group with no date wouldn't have discounts in value.priceDiscounts to filter out.
-      // So, if it's a purely UI-only new group (no date set), direct removal from discountDatePickers is fine.
-      if (!groupToRemove.date) {
-        setDiscountDatePickers(prev => prev.filter((_, idx) => idx !== groupIndex));
-        enqueueSnackbar('New discount date entry removed locally.', { variant: 'info' });
-        console.log('[PricingTab] Removed new, date-less group locally.');
-      } else {
-        // This case (groupToRemove.date exists but no conventionId) should ideally not happen for a delete action.
-        // If it does, a local removal might be okay, but it implies an inconsistent state.
-        enqueueSnackbar('Cannot delete from server: Convention ID missing. Group removed locally.', { variant: 'warning' });
-        setDiscountDatePickers(prev => prev.filter((_, idx) => idx !== groupIndex));
-        console.warn('[PricingTab] Group had a date but no conventionId for API call. Removed locally.');
-      }
-    }
+  // --- Tab management ---
+  const recomputeChannelOrder = (vals: string[]) => {
+    onTabSettingsChange?.({ channelOrder: JSON.stringify(vals.map(tabLabel)) });
   };
 
-  const handleDiscountDateChange = (groupIndex: number, newDate: Date | null) => {
-    setDiscountDatePickers(prev =>
-      prev.map((group, idx) =>
-        idx === groupIndex ? { ...group, date: newDate } : group
-      )
-    );
+  const handleAddTab = () => {
+    const name = window.prompt('New pricing tab name (e.g. Online, Daily, Weekend):')?.trim();
+    if (!name) return;
+    if (name === baseTabLabel || tabValues.includes(name)) {
+      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
+      return;
+    }
+    // Seed the new tab with copies of the first tab's category names (editable,
+    // not persisted until saved). Prices start at 0.
+    const seedFrom = value.priceTiers
+      .filter(t => ((t as any).tab || '') === (tabValues[0] ?? ''))
+      .sort((a, b) => a.order - b.order);
+    const seeded: PriceTier[] = seedFrom.map((t, i) => ({ label: t.label, amount: 0, order: i, tab: name } as PriceTier));
+    onChange({ ...value, priceTiers: [...value.priceTiers, ...seeded] });
+    recomputeChannelOrder([...tabValues, name]);
+    setEditingTab(name);
+    enqueueSnackbar(`Added "${name}" tab. Adjust the categories and prices, then Save Pricing Tiers.`, { variant: 'info' });
   };
 
-  const handleDiscountAmountChange = (groupIndex: number, tierDiscountIndex: number, amount: string) => {
-    setDiscountDatePickers(prev =>
-      prev.map((group, gIdx) =>
-        gIdx === groupIndex
-          ? {
-            ...group,
-            tierDiscounts: group.tierDiscounts.map((td, tdIdx) =>
-              tdIdx === tierDiscountIndex ? { ...td, amount } : td
-            ),
-          }
-          : group
-      )
-    );
+  const handleRemoveTab = (tab: string) => {
+    const removedIds = value.priceTiers.filter(t => ((t as any).tab || '') === tab).map(t => t.id).filter(Boolean) as string[];
+    const remainingTiers = value.priceTiers.filter(t => ((t as any).tab || '') !== tab);
+    const remainingDiscounts = value.priceDiscounts.filter(d => !removedIds.includes(d.priceTierId));
+    onChange({ ...value, priceTiers: remainingTiers, priceDiscounts: remainingDiscounts });
+    recomputeChannelOrder(tabValues.filter(t => t !== tab));
+    setEditingTab(tabValues.filter(t => t !== tab)[0] ?? '');
   };
 
-  const handleDeleteIndividualDiscount = async (originalDiscountId: string) => {
-    if (!conventionId) {
-      enqueueSnackbar('Convention ID is missing. Cannot delete discount.', { variant: 'error' });
+  const handleRenameTab = (oldName: string, rawNew: string) => {
+    const newName = rawNew.trim();
+    if (!newName || newName === oldName) return;
+    if (newName === baseTabLabel || tabValues.includes(newName)) {
+      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
       return;
     }
-    if (!originalDiscountId) {
-      enqueueSnackbar('Discount ID is missing. Cannot delete discount.', { variant: 'error' });
-      return;
-    }
-
-    setIsSavingDiscounts(true);
-    try {
-      const response = await fetch(`/api/conventions/${conventionId}/pricing/discounts/${originalDiscountId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        let errorData = { message: 'Failed to delete discount. Unknown error.' };
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          // Ignore if response is not json
-        }
-        enqueueSnackbar(errorData.message || 'Failed to delete discount.', { variant: 'error' });
-        throw new Error(errorData.message || 'Failed to delete discount');
-      }
-
-      enqueueSnackbar('Discount deleted successfully.', { variant: 'success' });
-
-      const updatedPriceDiscounts = value.priceDiscounts.filter(d => d.id !== originalDiscountId);
-      onChange({ ...value, priceDiscounts: updatedPriceDiscounts });
-
-    } catch (error) {
-      // Error already enqueued if it's an API error parsed above
-      if (!(error instanceof Error && error.message.includes('Failed to delete discount'))) {
-        console.error('Error in handleDeleteIndividualDiscount:', error); // Log other errors
-        enqueueSnackbar('An unexpected error occurred while deleting the discount.', { variant: 'error' });
-      }
-    } finally {
-      setIsSavingDiscounts(false);
-    }
-  };
-
-  const isTierValid = (tier: PriceTier) => tier.label.trim().length > 0;
-  const canSaveTiers = value.priceTiers.some(isTierValid);
-  console.log('[PricingTab] Render. canSaveTiers:', canSaveTiers);
-
-  const handleSaveTiers = async () => {
-    if (!conventionId) {
-      console.error('Convention ID is missing, cannot save tiers.');
-      setErrors(prev => ({ ...prev, global: 'Convention ID is missing. Cannot save pricing tiers.' }));
-      return;
-    }
-    if (!canSaveTiers) return;
-
-    setIsSavingTiers(true);
-    setErrors(prev => { const { global, ...rest } = prev; return rest; });
-
-    try {
-      const tiersToSave = value.priceTiers.filter(isTierValid).map(tier => ({ ...tier, amount: Number(tier.amount) }));
-      const response = await fetch(`/api/conventions/${conventionId}/pricing/tiers`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceTiers: tiersToSave }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Failed to save price tiers:', errorData);
-        setErrors(prev => ({ ...prev, global: errorData.message || 'An error occurred while saving tiers.' }));
-        throw new Error(errorData.message || 'Failed to save price tiers');
-      }
-      const savedTiersWithIds: PriceTier[] = await response.json();
-      onChange({
-        ...value,
-        priceTiers: savedTiersWithIds.map((tier, index) => ({ ...tier, order: tier.order ?? index }))
-      });
-      setTiersSaved(true);
-      console.log('Price tiers saved successfully:', savedTiersWithIds);
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes('Failed to save'))) {
-        console.error('Error in handleSaveTiers:', error);
-        setErrors(prev => ({ ...prev, global: 'An unexpected network error occurred.' }));
-      }
-    } finally {
-      setIsSavingTiers(false);
-    }
-  };
-
-  const handleSaveDiscounts = async () => {
-    if (!conventionId) {
-      console.error('Convention ID is missing, cannot save discounts.');
-      setErrors(prev => ({ ...prev, global: 'Convention ID is missing for discounts.' }));
-      return;
-    }
-    if (!tiersSaved) {
-      console.warn('Tiers must be saved before saving discounts.');
-      setErrors(prev => ({ ...prev, global: 'Please save Price Tiers before saving discounts.' }));
-      return;
-    }
-
-    const discountsToSaveApi: Omit<PriceDiscount, 'id' | 'conventionId'>[] = [];
-    discountDatePickers.forEach(group => {
-      if (group.date) {
-        // group.date from DatePicker. If DatePicker value was set as UTC midnight,
-        // and user selects a day, DatePicker might return a Date object representing that day in local time.
-        // We must convert this to UTC midnight for storage.
-        const localDateFromPicker = new Date(group.date);
-        const dateToSendToDB = new Date(Date.UTC(localDateFromPicker.getFullYear(), localDateFromPicker.getMonth(), localDateFromPicker.getDate()));
-
-        group.tierDiscounts.forEach(td => {
-          const amountNum = parseFloat(td.amount);
-          if (td.amount.trim() !== '' && !isNaN(amountNum) && amountNum >= 0 && td.priceTierId) {
-            discountsToSaveApi.push({
-              cutoffDate: dateToSendToDB, // Ensure this is the UTC midnight representation
-              priceTierId: td.priceTierId,
-              discountedAmount: amountNum,
-              channel: editingTab, // dates belong to the tab being edited
-            });
-          }
-        });
-      }
+    onChange({
+      ...value,
+      priceTiers: value.priceTiers.map(t => (((t as any).tab || '') === oldName ? { ...t, tab: newName } : t)),
     });
-
-    // The discounts PUT replaces ALL discounts. The date groups above are the
-    // editing tab's dated discounts; carry over everything else untouched —
-    // other tabs entirely, plus every tab's base price (sentinel entries).
-    value.priceDiscounts
-      .filter(d => ((d as any).channel || '') !== editingTab || isSentinel(d.cutoffDate))
-      .forEach(d => discountsToSaveApi.push({
-        cutoffDate: new Date(d.cutoffDate),
-        priceTierId: d.priceTierId,
-        discountedAmount: Number(d.discountedAmount),
-        channel: (d as any).channel || '',
-      }));
-
-    if (discountsToSaveApi.length === 0 && value.priceDiscounts.filter(d => discountDatePickers.flatMap(ddp => ddp.tierDiscounts).find(td => td.originalDiscountId === d.id)).length === 0) {
-      if (value.priceDiscounts.length === 0) {
-        console.log('No discounts to save or clear.');
-        return;
-      }
-    }
-
-    setIsSavingDiscounts(true);
-    setErrors(prev => { const { global, ...rest } = prev; return rest; });
-
-    console.log('[PricingTab] handleSaveDiscounts - Convention ID:', conventionId);
-    console.log('[PricingTab] handleSaveDiscounts - Tiers Saved:', tiersSaved);
-    console.log('[PricingTab] handleSaveDiscounts - Discounts to send to API (discountsToSaveApi):', JSON.stringify(discountsToSaveApi, null, 2));
-
-    try {
-      const response = await fetch(`/api/conventions/${conventionId}/pricing/discounts`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceDiscounts: discountsToSaveApi }),
-      });
-
-      const responseData = await response.json();
-      console.log('[PricingTab] handleSaveDiscounts - API Response Status:', response.status);
-      console.log('[PricingTab] handleSaveDiscounts - API Response Data:', responseData);
-
-      if (!response.ok) {
-        console.error('Failed to save price discounts (client-side check):', responseData);
-        setErrors(prev => ({ ...prev, global: responseData.message || responseData.error || 'An error occurred while saving discounts.' }));
-        throw new Error(responseData.message || responseData.error || 'Failed to save price discounts');
-      }
-      onChange({ ...value, priceDiscounts: responseData });
-      console.log('Price discounts saved successfully (client-side):', responseData);
-    } catch (error: any) {
-      if (!(error instanceof Error && error.message.includes('Failed to save'))) {
-        console.error('Error in handleSaveDiscounts:', error);
-        setErrors(prev => ({ ...prev, global: 'An unexpected network error occurred while saving discounts.' }));
-      }
-    } finally {
-      setIsSavingDiscounts(false);
-    }
+    recomputeChannelOrder(tabValues.map(t => (t === oldName ? newName : t)));
+    setEditingTab(newName);
   };
-
-  const canSaveDiscounts = discountDatePickers.some(group =>
-    group.date && group.tierDiscounts.some(td => td.amount.trim() !== '' && !isNaN(parseFloat(td.amount)))
-  ) || (discountDatePickers.length > 0 && value.priceDiscounts.length > 0 && !discountDatePickers.some(group => group.date && group.tierDiscounts.some(td => td.amount.trim() !== '' && !isNaN(parseFloat(td.amount))))); // True if there are entered discounts OR if there are saved discounts and UI implies clearing them
-
-  const validate = () => {
-    try {
-      PricingTabSchema.parse(value);
-      setErrors({});
-      return true;
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        e.errors.forEach(err => {
-          if (err.path.length > 0) {
-            fieldErrors[err.path.join('.')] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-      }
-      return false;
-    }
-  };
-
-  // Pricing tabs currently present in the data (base tab + any channels).
-  const baseTabLabel = tabSettings?.baseChannelLabel?.trim() || 'Standard';
-  const additionalTabs = Array.from(
-    new Set(value.priceDiscounts.map(d => (d as any).channel).filter((c: string) => c && c.length > 0))
-  ) as string[];
 
   const handleSaveTabSettings = async () => {
     if (!conventionId) return;
@@ -509,7 +227,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         body: JSON.stringify({
           baseChannelLabel: tabSettings?.baseChannelLabel || '',
           channelOrder: tabSettings?.channelOrder || '',
-          channelsSameProduct: tabSettings?.channelsSameProduct || '',
+          secondaryChannelLabel: tabSettings?.secondaryChannelLabel || '',
         }),
       });
       if (!res.ok) throw new Error('save failed');
@@ -519,185 +237,272 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
-  const getTabPrice = (channel: string, tierId: string): string => {
-    const d = value.priceDiscounts.find(
-      x => (x as any).channel === channel && x.priceTierId === tierId && isSentinel(x.cutoffDate)
-    );
-    return d ? String(d.discountedAmount) : '';
-  };
+  // --- Saving tiers / discounts ---
+  const isTierValid = (tier: PriceTier) => tier.label.trim().length > 0;
+  const canSaveTiers = value.priceTiers.some(isTierValid);
 
-  const setTabPrice = (channel: string, tierId: string, amount: string) => {
-    const num = parseFloat(amount);
-    const discounts = [...value.priceDiscounts];
-    const idx = discounts.findIndex(
-      x => (x as any).channel === channel && x.priceTierId === tierId && isSentinel(x.cutoffDate)
-    );
-    if (amount.trim() === '' || isNaN(num)) {
-      if (idx >= 0) discounts.splice(idx, 1);
-    } else if (idx >= 0) {
-      discounts[idx] = { ...discounts[idx], discountedAmount: num };
-    } else {
-      discounts.push({ cutoffDate: DOOR_SENTINEL, priceTierId: tierId, discountedAmount: num, channel } as any);
-    }
-    onChange({ ...value, priceDiscounts: discounts });
-  };
-
-  const handleAddTab = () => {
-    const name = window.prompt('New pricing tab name (e.g. Online, Daily):')?.trim();
-    if (!name) return;
-    if (name === baseTabLabel || additionalTabs.includes(name)) {
-      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
-      return;
-    }
-    const seed = value.priceTiers
-      .filter(t => t.id)
-      .map(t => ({ cutoffDate: DOOR_SENTINEL, priceTierId: t.id!, discountedAmount: 0, channel: name } as any));
-    onChange({ ...value, priceDiscounts: [...value.priceDiscounts, ...seed] });
-    setEditingTab(name);
-  };
-
-  const handleRemoveTab = (channel: string) => {
-    onChange({ ...value, priceDiscounts: value.priceDiscounts.filter(x => (x as any).channel !== channel) });
-  };
-
-  const handleRenameTab = (oldName: string, rawNew: string) => {
-    const newName = rawNew.trim();
-    if (!newName || newName === oldName) return;
-    if (newName === baseTabLabel || additionalTabs.includes(newName)) {
-      enqueueSnackbar('That tab name is already in use.', { variant: 'warning' });
-      return;
-    }
-    onChange({
-      ...value,
-      priceDiscounts: value.priceDiscounts.map(d =>
-        (d as any).channel === oldName ? { ...d, channel: newName } : d
-      ),
-    });
-    // Keep tab order in sync if it referenced the old name.
+  const handleSaveTiers = async () => {
+    if (!conventionId) { setErrors(p => ({ ...p, global: 'Convention ID is missing.' })); return; }
+    if (!canSaveTiers) return;
+    setIsSavingTiers(true);
+    setErrors(p => { const { global, ...rest } = p; return rest; });
     try {
-      const order: string[] = JSON.parse(tabSettings?.channelOrder || '[]');
-      if (order.includes(oldName)) {
-        onTabSettingsChange?.({ channelOrder: JSON.stringify(order.map(o => (o === oldName ? newName : o))) });
+      const tiersToSave = value.priceTiers.filter(isTierValid).map(t => ({
+        ...t,
+        amount: Number(t.amount),
+        tab: (t as any).tab || '',
+        amountSecondary: (t as any).amountSecondary == null ? null : Number((t as any).amountSecondary),
+      }));
+      const response = await fetch(`/api/conventions/${conventionId}/pricing/tiers`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceTiers: tiersToSave }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        setErrors(p => ({ ...p, global: err.message || 'An error occurred while saving tiers.' }));
+        throw new Error(err.message || 'Failed to save price tiers');
       }
-    } catch { /* ignore */ }
-    setEditingTab(newName);
+      const saved: PriceTier[] = await response.json();
+      onChange({ ...value, priceTiers: saved.map((t, i) => ({ ...t, order: t.order ?? i })) });
+      setTiersSaved(true);
+      enqueueSnackbar('Pricing tiers saved.', { variant: 'success' });
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes('Failed to save'))) {
+        setErrors(p => ({ ...p, global: 'An unexpected network error occurred.' }));
+      }
+    } finally {
+      setIsSavingTiers(false);
+    }
   };
+
+  const handleSaveDiscounts = async () => {
+    if (!conventionId) { setErrors(p => ({ ...p, global: 'Convention ID is missing for discounts.' })); return; }
+    if (!tiersSaved) { setErrors(p => ({ ...p, global: 'Please save Price Tiers before saving discounts.' })); return; }
+
+    const discountsToSaveApi: Omit<PriceDiscount, 'id' | 'conventionId'>[] = [];
+    // The editing tab's dated discounts (from the pickers).
+    discountDatePickers.forEach(group => {
+      if (!group.date) return;
+      const d = new Date(group.date);
+      const cutoff = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      group.tierDiscounts.forEach(td => {
+        const amt = parseFloat(td.amount);
+        if (td.amount.trim() !== '' && !isNaN(amt) && amt >= 0 && td.priceTierId) {
+          discountsToSaveApi.push({ cutoffDate: cutoff, priceTierId: td.priceTierId, discountedAmount: amt, channel: '' });
+        }
+      });
+    });
+    // Carry over every other tab's discounts untouched.
+    const editingSet = new Set(editingTabTierIds);
+    value.priceDiscounts
+      .filter(d => !editingSet.has(d.priceTierId))
+      .forEach(d => discountsToSaveApi.push({ cutoffDate: new Date(d.cutoffDate), priceTierId: d.priceTierId, discountedAmount: Number(d.discountedAmount), channel: '' }));
+
+    setIsSavingDiscounts(true);
+    setErrors(p => { const { global, ...rest } = p; return rest; });
+    try {
+      const response = await fetch(`/api/conventions/${conventionId}/pricing/discounts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceDiscounts: discountsToSaveApi }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setErrors(p => ({ ...p, global: data.message || data.error || 'An error occurred while saving discounts.' }));
+        throw new Error(data.message || data.error || 'Failed to save price discounts');
+      }
+      onChange({ ...value, priceDiscounts: data });
+      enqueueSnackbar('Prices & dates saved.', { variant: 'success' });
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes('Failed to save'))) {
+        setErrors(p => ({ ...p, global: 'An unexpected network error occurred while saving discounts.' }));
+      }
+    } finally {
+      setIsSavingDiscounts(false);
+    }
+  };
+
+  const handleAddDiscountDateGroup = () => {
+    const savedTabTiers = tabTiers.filter(t => t.id);
+    if (savedTabTiers.length === 0) {
+      setErrors(p => ({ ...p, global: 'Save this tab’s categories before adding discount dates.' }));
+      return;
+    }
+    setDiscountDatePickers(prev => [...prev, {
+      date: null,
+      tempId: `new-${Date.now()}`,
+      tierDiscounts: savedTabTiers.map(t => ({ priceTierId: t.id!, label: t.label, amount: '' })),
+    }]);
+  };
+
+  const handleRemoveDiscountDateGroup = (groupIndex: number) => {
+    const group = discountDatePickers[groupIndex];
+    // Drop the group from the UI; the actual delete persists on Save (the group's
+    // dates simply won't be included in the replace-all payload).
+    setDiscountDatePickers(prev => prev.filter((_, i) => i !== groupIndex));
+    if (group?.date) enqueueSnackbar('Discount date removed — click Save Prices & Dates to apply.', { variant: 'info' });
+  };
+
+  const handleDiscountDateChange = (groupIndex: number, newDate: Date | null) => {
+    setDiscountDatePickers(prev => prev.map((g, i) => (i === groupIndex ? { ...g, date: newDate } : g)));
+  };
+
+  const handleDiscountAmountChange = (groupIndex: number, tdIndex: number, amount: string) => {
+    setDiscountDatePickers(prev => prev.map((g, gi) => (gi === groupIndex ? { ...g, tierDiscounts: g.tierDiscounts.map((td, ti) => (ti === tdIndex ? { ...td, amount } : td)) } : g)));
+  };
+
+  const validate = () => {
+    try { PricingTabSchema.parse(value); setErrors({}); return true; }
+    catch (e) {
+      if (e instanceof z.ZodError) {
+        const fe: Record<string, string> = {};
+        e.errors.forEach(err => { if (err.path.length) fe[err.path.join('.')] = err.message; });
+        setErrors(fe);
+      }
+      return false;
+    }
+  };
+
+  const allTiersSaved = value.priceTiers.length > 0 && value.priceTiers.every(t => t.id);
 
   return (
     <Box>
+      {/* Pricing tables (tabs) manager */}
       <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
-        <Typography variant="h6" gutterBottom>Pricing Tabs</Typography>
-        {additionalTabs.length === 0 ? (
-          <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Add a pricing tab only if attendees can pay different prices via different routes — e.g.{' '}
-              <em>Online</em> vs <em>At the Door</em>, or <em>Weekly</em> vs <em>Daily</em>. With a single
-              price you don&apos;t need tabs — just fill in the categories below.
-            </Typography>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)}>
-              Add Pricing Tab
-            </Button>
-            {!value.priceTiers.every(t => t.id) && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Save your categories first, then add tabs.
-              </Typography>
-            )}
-          </>
+        <Typography variant="h6" gutterBottom>Pricing Tables</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Each tab is its own table with its own categories. Add a tab when attendees pick between
+          genuinely different ticket sets (e.g. <em>Weekly</em> vs <em>Daily</em>). For the same ticket at a
+          different price by route (e.g. <em>Online</em> vs <em>At the Door</em>), turn on the second price column below.
+        </Typography>
+
+        {tabValues.length > 1 && (
+          <Tabs value={editingTab} onChange={(_, v) => setEditingTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+            {tabValues.map(t => <Tab key={t || 'base'} value={t} label={tabLabel(t)} />)}
+          </Tabs>
+        )}
+
+        {editingTab === '' ? (
+          <TextField
+            label="Table name"
+            value={tabSettings?.baseChannelLabel || ''}
+            onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
+            placeholder="e.g. At the Door, Weekly, Standard"
+            disabled={disabled}
+            sx={{ minWidth: 280, mb: 2 }}
+            helperText="Name of the main / default table"
+          />
         ) : (
-          <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Each tab is its own pricing table. Pick a tab to edit its prices and dates below.
-            </Typography>
-            <Tabs
-              value={editingTab}
-              onChange={(_, v) => setEditingTab(v)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+            <TextField
+              key={editingTab}
+              label="Tab name"
+              defaultValue={editingTab}
+              onBlur={e => handleRenameTab(editingTab, e.target.value)}
+              disabled={disabled}
+              sx={{ minWidth: 240 }}
+              helperText="Press tab or click away to apply"
+            />
+            <Button
+              color="error"
+              size="small"
+              startIcon={<DeleteIcon />}
+              onClick={() => {
+                if (window.confirm(`Remove the "${editingTab}" tab? All of its categories, prices and discount dates will be permanently deleted when you save.`)) {
+                  handleRemoveTab(editingTab);
+                }
+              }}
+              disabled={disabled}
             >
-              <Tab value="" label={baseTabLabel} />
-              {additionalTabs.map(t => <Tab key={t} value={t} label={t} />)}
-            </Tabs>
-            {editingTab === '' ? (
-              <TextField
-                label="Base tab name"
-                value={tabSettings?.baseChannelLabel || ''}
-                onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
-                placeholder="e.g. At the Door, Weekly, Standard"
-                disabled={disabled}
-                sx={{ minWidth: 280, mb: 2 }}
-                helperText="Name of the main / default tab"
-              />
-            ) : (
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-                <TextField
-                  key={editingTab}
-                  label="Tab name"
-                  defaultValue={editingTab}
-                  onBlur={e => handleRenameTab(editingTab, e.target.value)}
-                  disabled={disabled}
-                  sx={{ minWidth: 240 }}
-                  helperText="Press tab or click away to apply"
-                />
-                <Button
-                  color="error"
-                  size="small"
-                  startIcon={<DeleteIcon />}
-                  onClick={() => {
-                    if (window.confirm(`Remove the "${editingTab}" tab? All of its prices and discount dates will be permanently deleted when you save.`)) {
-                      handleRemoveTab(editingTab);
-                      setEditingTab('');
-                    }
-                  }}
-                  disabled={disabled}
-                >
-                  Remove tab
-                </Button>
-              </Box>
-            )}
-            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-              <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !value.priceTiers.every(t => t.id)}>
-                Add Pricing Tab
-              </Button>
-              <Button variant="outlined" size="small" onClick={handleSaveTabSettings} disabled={disabled || !conventionId}>
-                Save Tab Settings
-              </Button>
-            </Box>
-          </>
+              Remove tab
+            </Button>
+          </Box>
+        )}
+
+        <FormControlLabel
+          control={<Checkbox checked={isTwoColumn} onChange={e => toggleTwoColumn(e.target.checked)} disabled={disabled} />}
+          label="This table has a second price column (e.g. Online vs At the Door)"
+          sx={{ display: 'block', mb: isTwoColumn ? 1 : 0 }}
+        />
+        {isTwoColumn && (
+          <Box sx={{ display: 'flex', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+            <TextField
+              label="First column label"
+              value={tabSettings?.baseChannelLabel || ''}
+              onChange={e => onTabSettingsChange?.({ baseChannelLabel: e.target.value })}
+              placeholder="At the Door"
+              disabled={disabled}
+              size="small"
+              sx={{ minWidth: 220 }}
+            />
+            <TextField
+              label="Second column label"
+              value={tabSettings?.secondaryChannelLabel || ''}
+              onChange={e => onTabSettingsChange?.({ secondaryChannelLabel: e.target.value })}
+              placeholder="Online"
+              disabled={disabled}
+              size="small"
+              sx={{ minWidth: 220 }}
+            />
+          </Box>
+        )}
+
+        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+          <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddTab} disabled={disabled || !allTiersSaved}>
+            Add Pricing Tab
+          </Button>
+          <Button variant="outlined" size="small" onClick={handleSaveTabSettings} disabled={disabled || !conventionId}>
+            Save Tab Settings
+          </Button>
+        </Box>
+        {!allTiersSaved && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Save your categories first, then add tabs.
+          </Typography>
         )}
       </Card>
 
-      <Typography variant="h6" gutterBottom>Price Tiers</Typography>
+      {/* Categories for the editing tab */}
+      <Typography variant="h6" gutterBottom>
+        {tabValues.length > 1 ? `${tabLabel(editingTab)} — Categories` : 'Price Categories'}
+      </Typography>
       <DragDropContext onDragEnd={handleTierReorder}>
         <Droppable droppableId="tiers-droppable">
           {(provided: DroppableProvided) => (
             <div ref={provided.innerRef} {...provided.droppableProps}>
-              {value.priceTiers.map((tier, idx) => (
-                <Draggable key={tier.id || `new-tier-${idx}`} draggableId={tier.id || `new-tier-${idx}`} index={idx}>
+              {tabTiers.map((tier, idx) => (
+                <Draggable key={tier.id || `new-tier-${editingTab}-${idx}`} draggableId={tier.id || `new-tier-${editingTab}-${idx}`} index={idx}>
                   {(dragProvided: DraggableProvided) => (
                     <Card ref={dragProvided.innerRef} {...dragProvided.draggableProps} sx={{ mb: 2, opacity: disabled ? 0.7 : 1 }}>
                       <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <span {...dragProvided.dragHandleProps} aria-label="Drag to reorder" style={{ cursor: 'grab' }}>
                           <DragIndicatorIcon />
                         </span>
-                        <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} error={!!errors[`priceTiers.${idx}.label`]} helperText={errors[`priceTiers.${idx}.label`]} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }} />
+                        <TextField label="Label" value={tier.label} onChange={e => handleTierChange(idx, 'label', e.target.value)} disabled={disabled} sx={{ flexGrow: 1, minWidth: 120 }} inputProps={{ 'aria-label': `Tier label ${idx + 1}` }} />
                         <TextField
                           type="number"
-                          label={editingTab === '' ? 'Amount' : `${editingTab} price`}
-                          value={editingTab === '' ? tier.amount : getTabPrice(editingTab, tier.id || '')}
-                          onChange={(e) => {
-                            if (editingTab === '') handleTierChange(idx, 'amount', parseFloat(e.target.value) || 0);
-                            else if (tier.id) setTabPrice(editingTab, tier.id, e.target.value);
-                          }}
+                          label={isTwoColumn ? (tabSettings?.baseChannelLabel || 'Price') : 'Amount'}
+                          value={tier.amount}
+                          onChange={e => handleTierChange(idx, 'amount', parseFloat(e.target.value) || 0)}
                           sx={{ width: '120px' }}
-                          InputProps={{
-                            startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box>,
-                          }}
-                          disabled={disabled || (editingTab !== '' && !tier.id)}
+                          InputProps={{ startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box> }}
+                          disabled={disabled}
                         />
-                        <Tooltip title="Remove Tier">
+                        {isTwoColumn && (
+                          <TextField
+                            type="number"
+                            label={secondaryLabel}
+                            value={(tier as any).amountSecondary ?? ''}
+                            onChange={e => handleTierChange(idx, 'amountSecondary', e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0))}
+                            sx={{ width: '120px' }}
+                            InputProps={{ startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box> }}
+                            disabled={disabled}
+                          />
+                        )}
+                        <Tooltip title="Remove Category">
                           <span>
-                            <IconButton aria-label="Remove tier" onClick={() => handleRemoveTier(idx)} disabled={disabled || value.priceTiers.length === 0}>
+                            <IconButton aria-label="Remove tier" onClick={() => handleRemoveTier(idx)} disabled={disabled}>
                               <DeleteIcon />
                             </IconButton>
                           </span>
@@ -712,8 +517,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
           )}
         </Droppable>
       </DragDropContext>
-      <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTier} disabled={disabled} sx={{ mt: 1 }}>Add Tier</Button>
-      {errors['priceTiers'] && <FormHelperText error>{errors['priceTiers']}</FormHelperText>}
+      <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTier} disabled={disabled} sx={{ mt: 1 }}>Add Category</Button>
       {errors.global && <FormHelperText error sx={{ mt: 1, textAlign: 'center' }}>{errors.global}</FormHelperText>}
 
       <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -724,27 +528,19 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
       <Divider sx={{ my: 4 }} />
 
+      {/* Discount dates for the editing tab */}
       <Box>
-        <Typography variant="h6" gutterBottom>Discount Dates</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Set cutoff dates for special pricing. For example, an "Early Bird" discount could end on a specific date. All discounts apply up to 11:59 PM on the selected day in the convention's timezone.
+        <Typography variant="h6" gutterBottom>
+          {tabValues.length > 1 ? `${tabLabel(editingTab)} — Discount Dates` : 'Discount Dates'}
         </Typography>
-        {tiersSaved && discountDatePickers.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
-            No active discount periods available.
-          </Typography>
-        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Set cutoff dates for special pricing (e.g. an &quot;Early Bird&quot; rate). Discounts apply up to 11:59 PM on the selected day in the convention&apos;s timezone.
+        </Typography>
 
         {discountDatePickers.map((group, groupIndex) => (
           <Card key={group.tempId} variant="outlined" sx={{ mb: 3, p: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <DatePicker
-                label="Discount Cutoff Date"
-                value={group.date}
-                onChange={date => handleDiscountDateChange(groupIndex, date)}
-                disabled={disabled}
-                slotProps={{ textField: { error: false, helperText: null } }}
-              />
+              <DatePicker label="Discount Cutoff Date" value={group.date} onChange={date => handleDiscountDateChange(groupIndex, date)} disabled={disabled} slotProps={{ textField: { error: false, helperText: null } }} />
               <Tooltip title="Remove Discount Date Group">
                 <IconButton aria-label="Remove discount date group" onClick={() => handleRemoveDiscountDateGroup(groupIndex)} disabled={disabled}>
                   <DeleteIcon />
@@ -753,31 +549,21 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
             </Box>
             {group.date && (
               <Box sx={{ mt: 2 }}>
-                {group.tierDiscounts.map((tierDiscount, tierDiscountIndex) => (
-                  <Box key={tierDiscount.priceTierId} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                {group.tierDiscounts.map((td, tdIndex) => (
+                  <Box key={td.priceTierId} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                     <Typography sx={{ width: 240, flexShrink: 0 }}>
-                      {tierDiscount.label} ({currency}{value.priceTiers.find(t => t.id === tierDiscount.priceTierId)?.amount || 0})
+                      {td.label} ({currency}{value.priceTiers.find(t => t.id === td.priceTierId)?.amount ?? 0})
                     </Typography>
                     <TextField
                       type="number"
                       placeholder="Discount Amount"
-                      value={tierDiscount.amount}
-                      onChange={(e) => handleDiscountAmountChange(groupIndex, tierDiscountIndex, e.target.value)}
+                      value={td.amount}
+                      onChange={e => handleDiscountAmountChange(groupIndex, tdIndex, e.target.value)}
                       size="small"
                       sx={{ width: '150px' }}
-                      InputProps={{
-                        startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box>,
-                      }}
+                      InputProps={{ startAdornment: <Box component="span" sx={{ mr: 1 }}>{currency}</Box> }}
                       disabled={disabled}
-                      onClick={(e) => e.stopPropagation()} // Prevent card click
                     />
-                    {tierDiscount.originalDiscountId && (
-                      <Tooltip title="Clear this specific discount" placement="top">
-                        <IconButton aria-label="Clear specific discount" onClick={() => handleDeleteIndividualDiscount(tierDiscount.originalDiscountId!)} disabled={disabled} size="small" sx={{ ml: 1 }}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
                   </Box>
                 ))}
               </Box>
@@ -785,29 +571,23 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
           </Card>
         ))}
 
-        <Button
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={handleAddDiscountDateGroup}
-          disabled={disabled || !value.priceTiers.every(t => t.id)}
-          sx={{ mt: 1 }}
-        >
+        <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddDiscountDateGroup} disabled={disabled || tabTiers.filter(t => t.id).length === 0} sx={{ mt: 1 }}>
           Add Discount Date
         </Button>
 
         {value.priceTiers.length > 0 && (
           <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="contained" color="secondary" onClick={handleSaveDiscounts} disabled={isSavingDiscounts || !conventionId || !tiersSaved}>
-              {isSavingDiscounts ? 'Saving...' : (editingTab === '' ? 'Save Base Tab Prices & Dates' : `Save ${editingTab} Tab Prices & Dates`)}
+              {isSavingDiscounts ? 'Saving...' : (tabValues.length > 1 ? `Save ${tabLabel(editingTab)} Prices & Dates` : 'Save Prices & Dates')}
             </Button>
           </Box>
         )}
-        {discountDatePickers.length === 0 && value.priceTiers.length > 0 && (
+        {discountDatePickers.length === 0 && tabTiers.filter(t => t.id).length > 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-            No discount dates for this tab yet. Click "Add Discount Date" to create one.
+            No discount dates for this tab yet. Click &quot;Add Discount Date&quot; to create one.
           </Typography>
         )}
       </Box>
     </Box>
   );
-}; 
+};

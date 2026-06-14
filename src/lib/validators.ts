@@ -220,6 +220,13 @@ export const PriceTierSchema = z.object({
     z.number().min(0, 'Amount must be non-negative')
   ),
   order: z.number().int().min(0),
+  // Which pricing table (tab) this category belongs to. '' = the base/single table.
+  tab: z.string().max(50).optional().default(''),
+  // Optional second price column (same-product channel, e.g. Online vs At the Door).
+  amountSecondary: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : (typeof val === 'string' ? parseFloat(val) : val)),
+    z.number().min(0, 'Amount must be non-negative').nullable()
+  ).optional(),
 });
 
 export const PriceDiscountSchema = z.object({
@@ -492,8 +499,11 @@ export const ConventionSettingSchema = z.object({
   // which tab is the default.
   channelOrder: z.string().max(500).optional(),
   // 'true' when the pricing tabs are the same ticket sold different ways
-  // (enables cross-tab price anchoring).
+  // (legacy; no longer used by the redesigned per-tab model).
   channelsSameProduct: z.string().max(10).optional(),
+  // Label for the optional second price column on a two-column table
+  // (e.g. "Online" alongside the base "At the Door" amount).
+  secondaryChannelLabel: z.string().max(50).optional(),
 });
 
 export type ConventionSettingData = z.infer<typeof ConventionSettingSchema>; 

@@ -2202,6 +2202,7 @@ export async function updateConventionSettings(
       ['baseChannelLabel', validatedData.data.baseChannelLabel],
       ['channelOrder', validatedData.data.channelOrder],
       ['channelsSameProduct', validatedData.data.channelsSameProduct],
+      ['secondaryChannelLabel', validatedData.data.secondaryChannelLabel],
     ];
     for (const [key, value] of tabSettings) {
       if (value === undefined) continue;
@@ -2297,7 +2298,7 @@ export async function getConventionSettings(
     });
 
     const tabSettingRows = await db.conventionSetting.findMany({
-      where: { conventionId, key: { in: ['baseChannelLabel', 'channelOrder', 'channelsSameProduct'] } },
+      where: { conventionId, key: { in: ['baseChannelLabel', 'channelOrder', 'channelsSameProduct', 'secondaryChannelLabel'] } },
       select: { key: true, value: true },
     });
     const tabSettings = Object.fromEntries(tabSettingRows.map((r) => [r.key, r.value]));
@@ -2308,6 +2309,7 @@ export async function getConventionSettings(
       baseChannelLabel: tabSettings.baseChannelLabel || '',
       channelOrder: tabSettings.channelOrder || '',
       channelsSameProduct: tabSettings.channelsSameProduct || '',
+      secondaryChannelLabel: tabSettings.secondaryChannelLabel || '',
     };
 
     console.log('[getConventionSettings] Loaded settings:', settingsData);

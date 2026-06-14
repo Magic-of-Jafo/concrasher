@@ -21,6 +21,8 @@ const normalizePriceTierData = (tier: z.infer<typeof PriceTierUpsertSchema>, con
   label: tier.label.trim(),
   amount: Number(tier.amount),
   order: tier.order,
+  tab: tier.tab ?? '',
+  amountSecondary: tier.amountSecondary == null ? null : Number(tier.amountSecondary),
   conventionId: conventionId,
 });
 
@@ -90,6 +92,8 @@ export async function PUT(
             label: normalizedData.label,
             amount: normalizedData.amount,
             order: normalizedData.order,
+            tab: normalizedData.tab,
+            amountSecondary: normalizedData.amountSecondary,
             // conventionId should not change for an existing tier being updated
           },
           create: { // Fields to use if creating a new tier
@@ -97,6 +101,8 @@ export async function PUT(
             label: normalizedData.label,
             amount: normalizedData.amount,
             order: normalizedData.order,
+            tab: normalizedData.tab,
+            amountSecondary: normalizedData.amountSecondary,
             conventionId: normalizedData.conventionId, // Set for new tiers
           },
         });

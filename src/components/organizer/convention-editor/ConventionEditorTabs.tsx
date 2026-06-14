@@ -188,6 +188,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     baseChannelLabel: initialConventionData?.settings?.baseChannelLabel || '',
     channelOrder: initialConventionData?.settings?.channelOrder || '',
     channelsSameProduct: initialConventionData?.settings?.channelsSameProduct || '',
+    secondaryChannelLabel: initialConventionData?.settings?.secondaryChannelLabel || '',
   }));
 
   const [keywords, setKeywords] = useState<string[]>(() =>
@@ -240,6 +241,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           baseChannelLabel: settings?.baseChannelLabel || '',
           channelOrder: settings?.channelOrder || '',
           channelsSameProduct: settings?.channelsSameProduct || '',
+          secondaryChannelLabel: settings?.secondaryChannelLabel || '',
         });
         setKeywords(keywords || []);
         setVenueHotelData(venueHotel || defaultVenueHotelData);
@@ -379,6 +381,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
             baseChannelLabel: settingsData.baseChannelLabel || '',
             channelOrder: settingsData.channelOrder || '',
             channelsSameProduct: settingsData.channelsSameProduct || '',
+            secondaryChannelLabel: settingsData.secondaryChannelLabel || '',
           }}
           onTabSettingsChange={(next) => setSettingsData((prev) => ({ ...prev, ...next }))}
         />

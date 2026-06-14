@@ -125,6 +125,7 @@ export async function GET(
       priceTiers: convention.priceTiers?.map((tier: any) => ({
         ...tier,
         amount: tier.amount.toNumber(), // Convert Decimal to number
+        amountSecondary: tier.amountSecondary != null ? tier.amountSecondary.toNumber() : null,
       })),
       priceDiscounts: convention.priceDiscounts?.map((discount: any) => ({
         ...discount,
