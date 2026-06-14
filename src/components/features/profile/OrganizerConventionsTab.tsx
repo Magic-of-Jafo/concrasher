@@ -100,18 +100,27 @@ export default function OrganizerConventionsTab() {
   });
 
   const displayedConventions = useMemo(() => {
-    if (viewMode === 'active') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return allConventions
-        .filter(c => c.deletedAt === null && (!c.endDate || new Date(c.endDate) >= today))
-        .sort((a, b) => {
-          const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
-          const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
-          return aDate - bDate;
-        });
+    if (viewMode === 'deleted') {
+      return allConventions.filter(c => c.deletedAt !== null);
     }
-    return allConventions.filter(c => c.deletedAt !== null);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return allConventions
+      .filter(c => {
+        if (c.deletedAt !== null) return false;
+        // "Expired" = its end date (or start date if there's no end) is before
+        // today. Conventions with no dates yet (TBD) are kept — they can't be
+        // expired — but they sort to the bottom below.
+        const end = c.endDate ?? c.startDate;
+        if (!end) return true;
+        return new Date(end) >= today;
+      })
+      .sort((a, b) => {
+        // Soonest upcoming first, furthest away last; undated (TBD) sink to the end.
+        const aDate = a.startDate ? new Date(a.startDate).getTime() : Infinity;
+        const bDate = b.startDate ? new Date(b.startDate).getTime() : Infinity;
+        return aDate - bDate;
+      });
   }, [allConventions, viewMode]);
 
   const handleViewModeChange = (
