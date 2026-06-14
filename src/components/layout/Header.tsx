@@ -21,8 +21,7 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
 
 // Lazy load heavy components that are only used when menus are opened
-const LazyMenu = lazy(() => import('./HeaderMenu'));
-const LazyMyStuffMenu = lazy(() => import('./HeaderMyStuffMenu'));
+const LazyAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const LazyMobileDrawer = lazy(() => import('./HeaderMobileDrawer'));
 
 export default function Header() {
@@ -31,8 +30,7 @@ export default function Header() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [imageUrl, setImageUrl] = useState<string | null | undefined>();
-  const [manageMenuAnchor, setManageMenuAnchor] = useState<null | HTMLElement>(null);
-  const [myStuffMenuAnchor, setMyStuffMenuAnchor] = useState<null | HTMLElement>(null);
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [talentProfileActive, setTalentProfileActive] = useState(session?.user?.talentProfile?.isActive ?? false);
 
@@ -41,11 +39,9 @@ export default function Header() {
 
   const isOrganizer = isAuthenticated && userRoles.includes(Role.ORGANIZER);
   const isBrandCreator = isAuthenticated && userRoles.includes(Role.BRAND_CREATOR);
+  const isAdmin = isAuthenticated && userRoles.includes(Role.ADMIN);
   const hasTalentProfile = isAuthenticated && userRoles.includes(Role.TALENT);
   const hasActiveTalentProfile = isAuthenticated && talentProfileActive;
-
-  // Show manage menu if user has organizer role or talent profile
-  const showManageMenu = isOrganizer || hasTalentProfile;
 
   useEffect(() => {
     if (session?.user?.image !== undefined) {
@@ -143,48 +139,35 @@ export default function Header() {
                 Advanced Search
               </Button>
 
-              {/* Manage Menu - Lazy Loaded */}
-              {showManageMenu && (
-                <Suspense fallback={<Button color="inherit">Manage</Button>}>
-                  <LazyMenu
-                    anchorEl={manageMenuAnchor}
-                    onClose={handleMenuClose(setManageMenuAnchor)}
-                    onOpen={handleMenuOpen(setManageMenuAnchor)}
-                    isOrganizer={isOrganizer}
-                    isBrandCreator={isBrandCreator}
-                    hasTalentProfile={hasTalentProfile}
-                    session={session}
-                  />
-                </Suspense>
-              )}
-
-              {/* My Stuff Menu - Lazy Loaded */}
-              {isAuthenticated && (
-                <Suspense fallback={<Button color="inherit">My Stuff</Button>}>
-                  <LazyMyStuffMenu
-                    anchorEl={myStuffMenuAnchor}
-                    onClose={handleMenuClose(setMyStuffMenuAnchor)}
-                    onOpen={handleMenuOpen(setMyStuffMenuAnchor)}
-                    session={session}
-                    hasActiveTalentProfile={hasActiveTalentProfile}
-                  />
-                </Suspense>
-              )}
-
               {/* Auth Actions */}
               {isAuthenticated ? (
                 <>
-                  <Button color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
-                    Sign Out
-                  </Button>
-
-                  <IconButton component={Link} href={`/u/${session?.user?.id}`} sx={{ p: 0, ml: 1 }}>
+                  <IconButton
+                    onClick={handleMenuOpen(setAccountMenuAnchor)}
+                    sx={{ p: 0, ml: 1 }}
+                    aria-label="Open account menu"
+                    aria-haspopup="true"
+                    aria-expanded={Boolean(accountMenuAnchor)}
+                  >
                     {imageUrl ? (
                       <Avatar alt="Profile" src={getS3ImageUrl(imageUrl)} />
                     ) : (
                       <AccountCircle sx={{ color: 'white', fontSize: 40 }} />
                     )}
                   </IconButton>
+
+                  <Suspense fallback={null}>
+                    <LazyAccountMenu
+                      anchorEl={accountMenuAnchor}
+                      onClose={handleMenuClose(setAccountMenuAnchor)}
+                      session={session}
+                      isOrganizer={isOrganizer}
+                      isAdmin={isAdmin}
+                      isBrandCreator={isBrandCreator}
+                      hasActiveTalentProfile={hasActiveTalentProfile}
+                      onLogout={handleLogout}
+                    />
+                  </Suspense>
                 </>
               ) : (
                 <>
@@ -207,10 +190,9 @@ export default function Header() {
           isAuthenticated={isAuthenticated}
           session={session}
           imageUrl={imageUrl}
-          showManageMenu={showManageMenu}
           isOrganizer={isOrganizer}
+          isAdmin={isAdmin}
           isBrandCreator={isBrandCreator}
-          hasTalentProfile={hasTalentProfile}
           hasActiveTalentProfile={hasActiveTalentProfile}
           onLogout={handleLogout}
         />

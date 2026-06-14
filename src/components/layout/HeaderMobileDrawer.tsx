@@ -22,10 +22,9 @@ interface HeaderMobileDrawerProps {
   isAuthenticated: boolean;
   session: any;
   imageUrl: string | null | undefined;
-  showManageMenu: boolean;
   isOrganizer: boolean;
+  isAdmin: boolean;
   isBrandCreator: boolean;
-  hasTalentProfile: boolean;
   hasActiveTalentProfile: boolean;
   onLogout: () => void;
 }
@@ -36,13 +35,14 @@ export default function HeaderMobileDrawer({
   isAuthenticated,
   session,
   imageUrl,
-  showManageMenu,
   isOrganizer,
+  isAdmin,
   isBrandCreator,
-  hasTalentProfile,
   hasActiveTalentProfile,
   onLogout,
 }: HeaderMobileDrawerProps) {
+  const userId = session?.user?.id;
+
   return (
     <Drawer
       anchor="right"
@@ -83,55 +83,61 @@ export default function HeaderMobileDrawer({
 
           {isAuthenticated ? (
             <>
-              {showManageMenu && (
-                <>
-                  <Divider sx={{ my: 1 }} />
-                  <ListItem disablePadding>
-                    <ListItemText primary="Manage" sx={{ px: 2, py: 1, fontWeight: 'medium', fontSize: '0.875rem', color: 'text.secondary' }} />
-                  </ListItem>
-                  {isOrganizer && (
-                    <ListItem disablePadding>
-                      <ListItemButton component={Link} href="/organizer/conventions" onClick={onClose} sx={{ pl: 4 }}>
-                        <ListItemText primary="Conventions" />
-                      </ListItemButton>
-                    </ListItem>
-                  )}
-                  {isBrandCreator && (
-                    <ListItem disablePadding>
-                      <ListItemButton component={Link} href="/brands/new" onClick={onClose} sx={{ pl: 4 }}>
-                        <ListItemText primary="Brand" />
-                      </ListItemButton>
-                    </ListItem>
-                  )}
-                  {hasTalentProfile && (
-                    <ListItem disablePadding>
-                      <ListItemButton component={Link} href="/profile?tab=talent" onClick={onClose} sx={{ pl: 4 }}>
-                        <ListItemText primary="Talent Profile" />
-                      </ListItemButton>
-                    </ListItem>
-                  )}
-                </>
+              <Divider sx={{ my: 1 }} />
+              <ListItem disablePadding>
+                <ListItemText primary="Account" sx={{ px: 2, py: 1, fontWeight: 'medium', fontSize: '0.875rem', color: 'text.secondary' }} />
+              </ListItem>
+
+              <ListItem disablePadding>
+                <ListItemButton component={Link} href="/profile" onClick={onClose} sx={{ pl: 4 }}>
+                  <ListItemText primary="Profile" />
+                </ListItemButton>
+              </ListItem>
+
+              {isOrganizer && (
+                <ListItem disablePadding>
+                  <ListItemButton component={Link} href="/profile?tab=organizer" onClick={onClose} sx={{ pl: 4 }}>
+                    <ListItemText primary="My Conventions" />
+                  </ListItemButton>
+                </ListItem>
+              )}
+
+              {hasActiveTalentProfile && (
+                <ListItem disablePadding>
+                  <ListItemButton component={Link} href="/profile?tab=talent" onClick={onClose} sx={{ pl: 4 }}>
+                    <ListItemText primary="Talent Profile" />
+                  </ListItemButton>
+                </ListItem>
+              )}
+
+              {isBrandCreator && (
+                <ListItem disablePadding>
+                  <ListItemButton component={Link} href="/profile?tab=brands" onClick={onClose} sx={{ pl: 4 }}>
+                    <ListItemText primary="My Brands" />
+                  </ListItemButton>
+                </ListItem>
+              )}
+
+              {isAdmin && (
+                <ListItem disablePadding>
+                  <ListItemButton component={Link} href="/profile?tab=admin" onClick={onClose} sx={{ pl: 4 }}>
+                    <ListItemText primary="Admin Panel" />
+                  </ListItemButton>
+                </ListItem>
               )}
 
               <Divider sx={{ my: 1 }} />
-              <ListItem disablePadding>
-                <ListItemText primary="My Stuff" sx={{ px: 2, py: 1, fontWeight: 'medium', fontSize: '0.875rem', color: 'text.secondary' }} />
-              </ListItem>
-              <ListItem disablePadding>
-                <ListItemButton component={Link} href={`/u/${session?.user?.id}`} onClick={onClose} sx={{ pl: 4 }}>
-                  <ListItemText primary="My Profile" />
-                </ListItemButton>
-              </ListItem>
-              {hasActiveTalentProfile && (
+
+              {userId && (
                 <ListItem disablePadding>
-                  <ListItemButton component={Link} href={`/t/${session?.user?.talentProfile?.id}`} onClick={onClose} sx={{ pl: 4 }}>
-                    <ListItemText primary="My Talent Profile" />
+                  <ListItemButton component={Link} href={`/u/${userId}`} onClick={onClose} sx={{ pl: 4 }}>
+                    <ListItemText primary="View Public Profile" />
                   </ListItemButton>
                 </ListItem>
               )}
               <ListItem disablePadding>
-                <ListItemButton component={Link} href="/profile" onClick={onClose} sx={{ pl: 4 }}>
-                  <ListItemText primary="Settings" />
+                <ListItemButton component={Link} href="/profile?tab=settings" onClick={onClose} sx={{ pl: 4 }}>
+                  <ListItemText primary="Account Settings" />
                 </ListItemButton>
               </ListItem>
 
@@ -153,4 +159,4 @@ export default function HeaderMobileDrawer({
       </Box>
     </Drawer>
   );
-} 
+}

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab, Box, Paper } from '@mui/material';
 import SettingsTab from './profile/SettingsTab';
-import { User, Role, RoleApplication, Brand } from '@prisma/client';
+import { Role } from '@prisma/client';
 import BasicInfoDisplay from './profile/BasicInfoDisplay';
 import AdminSettingsTab from './profile/AdminSettingsTab';
 import TalentProfileTab from './profile/TalentProfileTab';
 import BrandsTab from './profile/BrandsTab';
-import React from 'react'; // Added for useEffect
+import OrganizerConventionsTab from './profile/OrganizerConventionsTab';
+import React from 'react';
 
 interface ProfileTabsProps {
     user: any; // Using 'any' for now to match fetched data structure
@@ -63,13 +64,9 @@ export default function ProfileTabs({
     pendingApplications,
     onApplicationProcessed
 }: ProfileTabsProps) {
-    const [value, setValue] = useState(0); // Will be updated after indices are calculated
+    const searchParams = useSearchParams();
     const [talentProfileActive, setTalentProfileActive] = useState(user?.talentProfile?.isActive ?? false);
     const [hasTalentProfile, setHasTalentProfile] = useState(!!user?.talentProfile);
-
-    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
-        setValue(newValue);
-    };
 
     // Listen for talent profile activation changes
     React.useEffect(() => {
@@ -100,23 +97,100 @@ export default function ProfileTabs({
         };
     }, [user.id]);
 
-    const hasTalentRole = user?.roles?.includes(Role.TALENT);
+    const isOrganizer = user?.roles?.includes(Role.ORGANIZER);
     const showTalentTab = hasTalentProfile && talentProfileActive; // Show tab only if profile exists and is active
     const isAdmin = user?.roles?.includes(Role.ADMIN);
     const hasBrandCreatorRole = user?.roles?.includes(Role.BRAND_CREATOR);
 
-    // Calculate tab indices dynamically
-    let currentIndex = 2; // Start after Basic Info (0) and Account Settings (1)
-    const brandsTabIndex = hasBrandCreatorRole ? currentIndex++ : -1;
-    const talentTabIndex = showTalentTab ? currentIndex++ : -1;
-    const adminTabIndex = isAdmin ? currentIndex : -1;
+    // Build the tab list dynamically. Each role-gated capability lives here so the
+    // profile page is the single place users manage everything they have access to.
+    const tabDefs = useMemo(() => {
+        const defs: { key: string; label: string; render: () => React.ReactNode }[] = [
+            {
+                key: 'basic',
+                label: 'Basic Info',
+                render: () => (
+                    <Paper sx={{ p: { xs: 0, md: 2 }, boxShadow: 'none', border: 'none' }}>
+                        <BasicInfoDisplay
+                            user={user}
+                            currentImageUrl={currentImageUrl}
+                            onImageUpdate={onImageUpdate}
+                        />
+                    </Paper>
+                ),
+            },
+        ];
 
-    // Default to Basic Info tab (index 0)
+        if (isOrganizer) {
+            defs.push({
+                key: 'organizer',
+                label: 'My Conventions',
+                render: () => <OrganizerConventionsTab />,
+            });
+        }
+
+        if (showTalentTab) {
+            defs.push({
+                key: 'talent',
+                label: 'Talent Profile',
+                render: () => <TalentProfileTab userId={user.id} user={user} />,
+            });
+        }
+
+        if (hasBrandCreatorRole) {
+            defs.push({
+                key: 'brands',
+                label: 'My Brands',
+                render: () => <BrandsTab userId={user.id} user={user} />,
+            });
+        }
+
+        defs.push({
+            key: 'settings',
+            label: 'Account Settings',
+            render: () => (
+                <Paper sx={{ p: { xs: 0, md: 2 }, boxShadow: 'none', border: 'none' }}>
+                    <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
+                </Paper>
+            ),
+        });
+
+        if (isAdmin) {
+            defs.push({
+                key: 'admin',
+                label: 'Admin Panel',
+                render: () => (
+                    <AdminSettingsTab
+                        applications={pendingApplications}
+                        onApplicationProcessed={onApplicationProcessed}
+                    />
+                ),
+            });
+        }
+
+        return defs;
+    }, [user, currentImageUrl, onImageUpdate, isOrganizer, showTalentTab, hasBrandCreatorRole, isAdmin, roleApplications, ownedBrands, pendingApplications, onApplicationProcessed]);
+
+    // Honor ?tab=<key> deep links (used by the header/account menu); fall back to first tab.
+    const requestedTab = searchParams?.get('tab');
+    const requestedIndex = requestedTab ? tabDefs.findIndex(t => t.key === requestedTab) : -1;
+    const [value, setValue] = useState(requestedIndex >= 0 ? requestedIndex : 0);
+
+    // If the deep link changes (or tabs become available after load), follow it.
     React.useEffect(() => {
-        setValue(0);
-    }, []);
+        const idx = requestedTab ? tabDefs.findIndex(t => t.key === requestedTab) : -1;
+        if (idx >= 0 && idx !== value) {
+            setValue(idx);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [requestedTab, tabDefs.length]);
 
-    const isMobile = window.innerWidth <= 600;
+    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+        setValue(newValue);
+    };
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
+    const safeValue = value < tabDefs.length ? value : 0;
 
     return (
         <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -124,7 +198,7 @@ export default function ProfileTabs({
             <Tabs
                 orientation={isMobile ? 'horizontal' : 'vertical'}
                 variant="scrollable"
-                value={value}
+                value={safeValue}
                 onChange={handleChange}
                 aria-label="Profile Settings Tabs"
                 sx={{
@@ -139,53 +213,18 @@ export default function ProfileTabs({
                     }
                 }}
             >
-                <Tab label="Basic Info" {...a11yProps(0)} />
-                <Tab label="Account Settings" {...a11yProps(1)} />
-                {hasBrandCreatorRole && <Tab label="My Brands" {...a11yProps(brandsTabIndex)} />}
-                {showTalentTab && <Tab label="Talent Profile" {...a11yProps(talentTabIndex)} />}
-                {isAdmin && <Tab label="Admin Panel" {...a11yProps(adminTabIndex)} />}
+                {tabDefs.map((t, i) => (
+                    <Tab key={t.key} label={t.label} {...a11yProps(i)} />
+                ))}
             </Tabs>
 
             <Box sx={{ flexGrow: 1 }}>
-                <CustomTabPanel value={value} index={0}>
-                    <Paper sx={{ p: isMobile ? 0 : 2, boxShadow: 'none', border: 'none' }}>
-                        <BasicInfoDisplay
-                            user={user}
-                            currentImageUrl={currentImageUrl}
-                            onImageUpdate={onImageUpdate}
-                        />
-                    </Paper>
-                </CustomTabPanel>
-                <CustomTabPanel value={value} index={1}>
-                    <Paper sx={{ p: isMobile ? 0 : 2, boxShadow: 'none', border: 'none' }}>
-                        <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
-                    </Paper>
-                </CustomTabPanel>
-                {hasBrandCreatorRole && (
-                    <CustomTabPanel value={value} index={brandsTabIndex}>
-                        <BrandsTab
-                            userId={user.id}
-                            user={user}
-                        />
+                {tabDefs.map((t, i) => (
+                    <CustomTabPanel key={t.key} value={safeValue} index={i}>
+                        {t.render()}
                     </CustomTabPanel>
-                )}
-                {showTalentTab && (
-                    <CustomTabPanel value={value} index={talentTabIndex}>
-                        <TalentProfileTab
-                            userId={user.id}
-                            user={user}
-                        />
-                    </CustomTabPanel>
-                )}
-                {isAdmin && (
-                    <CustomTabPanel value={value} index={adminTabIndex}>
-                        <AdminSettingsTab
-                            applications={pendingApplications}
-                            onApplicationProcessed={onApplicationProcessed}
-                        />
-                    </CustomTabPanel>
-                )}
+                ))}
             </Box>
         </Box>
     );
-} 
+}
