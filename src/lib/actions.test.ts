@@ -83,7 +83,7 @@ describe('updateUserProfile Server Action', () => {
 
   it('should return validation error for invalid data', async () => {
     mockGetServerSession.mockResolvedValue(mockSession as any);
-    const invalidData = { firstName: '' }; // firstName is required
+    const invalidData = { firstName: 'a'.repeat(51) }; // exceeds the 50-char max
     const result = await updateUserProfile(invalidData);
 
     expect(result.success).toBe(false);
@@ -395,7 +395,9 @@ describe('getPendingOrganizerApplicationsAction', () => {
         user: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
+            stageName: true,
             email: true,
           },
         },

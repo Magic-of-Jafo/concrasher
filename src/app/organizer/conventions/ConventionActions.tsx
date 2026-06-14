@@ -114,6 +114,7 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
       setSnackbar({ open: true, message: data.message || "Convention deleted.", severity: "success" });
       queryClient.invalidateQueries({ queryKey: ["organizer-conventions"] });
       queryClient.invalidateQueries({ queryKey: ["conventions"] });
+      onConventionUpdated();
     },
     onError: (error: Error) => {
       setSnackbar({ open: true, message: error.message, severity: "error" });
