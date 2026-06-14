@@ -89,45 +89,48 @@ const EXTRACTION_SCHEMA = {
                 additionalProperties: false,
                 properties: {
                     currency: { type: ['string', 'null'], description: 'ISO 4217' },
-                    pricingMode: {
-                        type: ['string', 'null'],
-                        enum: ['date_tiers', 'online_door', null],
-                        description: 'online_door when prices differ by purchase channel (online vs at the door/gate); date_tiers for true early-bird deadlines where the price rises after a calendar date regardless of channel; null if unclear',
-                    },
-                    channelLabels: {
-                        type: ['object', 'null'],
-                        additionalProperties: false,
-                        description: 'For online_door mode only: the organizer\'s own words for each channel. online = the discounted column (e.g. "Online", "Advance"), door = the higher column (e.g. "At the Door", "At the Gate", "On Site"). Use null when the site uses ordinary "online" / "at the door" wording.',
-                        properties: {
-                            online: { type: ['string', 'null'] },
-                            door: { type: ['string', 'null'] },
-                        },
-                        required: ['online', 'door'],
-                    },
-                    priceTiers: {
+                    pricingTables: {
                         type: 'array',
-                        items: {
-                            type: 'object',
-                            additionalProperties: false,
-                            properties: { label: { type: 'string' }, amount: { type: 'number' } },
-                            required: ['label', 'amount'],
-                        },
-                    },
-                    priceDiscounts: {
-                        type: 'array',
+                        description: 'One independent table per pricing tab. Use multiple tables ONLY when the event sells genuinely different ticket sets (e.g. a full-week "All Access" set AND a separate "Daily" set with different categories). Use a SINGLE table when the same tickets are simply sold at two prices by channel (online vs at the door) — put both prices on each row via amount + amountSecondary.',
                         items: {
                             type: 'object',
                             additionalProperties: false,
                             properties: {
-                                tierLabel: { type: 'string' },
-                                cutoffDate: { type: ['string', 'null'], description: 'YYYY-MM-DD' },
-                                discountedAmount: { type: 'number' },
+                                name: { type: ['string', 'null'], description: 'Tab name when there are multiple tables (e.g. "Weekly", "Daily", "All Access"). Use null/empty for a single table.' },
+                                primaryLabel: { type: ['string', 'null'], description: 'Label for the main price column. For a two-column table this is the dearer channel, e.g. "At the Door". Null for a plain single-price table.' },
+                                secondaryLabel: { type: ['string', 'null'], description: 'Label for the second price column when the same ticket has a cheaper channel, e.g. "Online" / "Advance". Null when there is only one price column.' },
+                                tiers: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        additionalProperties: false,
+                                        properties: {
+                                            label: { type: 'string' },
+                                            amount: { type: 'number', description: 'Primary price (the dearer / at-the-door price when there is a second column)' },
+                                            amountSecondary: { type: ['number', 'null'], description: 'Second-column price (e.g. Online); null when the table has one price column' },
+                                            earlyBird: {
+                                                type: 'array',
+                                                description: 'Date-based discounts where the price rises after a calendar deadline. Empty when none.',
+                                                items: {
+                                                    type: 'object',
+                                                    additionalProperties: false,
+                                                    properties: {
+                                                        cutoffDate: { type: ['string', 'null'], description: 'YYYY-MM-DD: price applies through this date' },
+                                                        price: { type: 'number' },
+                                                    },
+                                                    required: ['cutoffDate', 'price'],
+                                                },
+                                            },
+                                        },
+                                        required: ['label', 'amount', 'amountSecondary', 'earlyBird'],
+                                    },
+                                },
                             },
-                            required: ['tierLabel', 'cutoffDate', 'discountedAmount'],
+                            required: ['name', 'primaryLabel', 'secondaryLabel', 'tiers'],
                         },
                     },
                 },
-                required: ['currency', 'pricingMode', 'channelLabels', 'priceTiers', 'priceDiscounts'],
+                required: ['currency', 'pricingTables'],
             },
             meta: {
                 type: 'object',
@@ -349,10 +352,12 @@ async function extract(convention) {
                 'Rules:',
                 '- Only report facts stated on the provided pages. Use null for anything not found. Never guess.',
                 '- Dates must be YYYY-MM-DD. If only a month is given, use null and explain in notes.',
-                '- Prices: list every registration tier you find. Classify the pricing pattern in pricingMode:',
-                '  * online_door: prices differ by purchase channel ("increases at the door", online vs door/gate pricing). Tier amount = at-the-door price; the online price goes in priceDiscounts (cutoffDate = the stated online sales end date, or null if not stated).',
-                '  * date_tiers: true early-bird calendar deadlines ("$300 until June 30, then $400") regardless of channel. Tier amount = final/regular price; earlier prices go in priceDiscounts with their cutoff dates.',
-                '  * null when there is only one price per tier or the pattern is unclear.',
+                '- Prices: model the pricing as one or more independent tables (pricingTables). Decide the structure:',
+                '  * ONE table, single price column: every ticket has one price. Leave secondaryLabel null, amountSecondary null.',
+                '  * ONE table, TWO price columns: the SAME tickets are sold at two prices by channel (e.g. cheaper online, more at the door). Put the dearer price in amount and the cheaper in amountSecondary; set primaryLabel (e.g. "At the Door") and secondaryLabel (e.g. "Online"). Do NOT make two tables for this.',
+                '  * MULTIPLE tables: the event sells genuinely different ticket SETS with different categories (e.g. a full-week "All Access" set and a separate "Daily"/"One Day" set). One table per set, each with its own name and its own tiers.',
+                '  * earlyBird: when a price rises after a calendar deadline ("$300 until June 30, then $400"), put amount = the final/regular price and add earlyBird entries { cutoffDate, price } for the earlier prices. Otherwise leave earlyBird empty.',
+                '  * Two-column channel pricing and earlyBird can combine, but most events use just one. Use nulls/empty when unsure rather than guessing.',
                 '- descriptionShort: neutral, factual, no marketing superlatives.',
                 '- CRITICAL: if the site shows a DIFFERENT year/edition than the one asked about, set ALL confidence to low, use nulls, and explain in notes.',
                 '- For US locations, stateOrRegion must be the two-letter abbreviation.',

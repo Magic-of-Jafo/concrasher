@@ -27,19 +27,22 @@ const EnrichmentSchema = z.object({
     }).optional(),
     tier2: z.object({
         currency: z.string().max(10).nullable().optional(),
-        pricingMode: z.enum(['date_tiers', 'online_door']).nullable().optional(),
-        channelLabels: z.object({
-            online: z.string().max(50).nullable().optional(),
-            door: z.string().max(50).nullable().optional(),
-        }).nullable().optional(),
-        priceTiers: z.array(z.object({
-            label: z.string().max(100),
-            amount: z.number().nonnegative(),
-        })).optional(),
-        priceDiscounts: z.array(z.object({
-            tierLabel: z.string().max(100),
-            cutoffDate: z.coerce.date().nullable(),
-            discountedAmount: z.number().nonnegative(),
+        // One independent pricing table per tab. A table with a secondaryLabel
+        // has a two-column (same-product channel) price, e.g. At the Door /
+        // Online. earlyBird holds date-based discounts for a tier.
+        pricingTables: z.array(z.object({
+            name: z.string().max(50).nullable().optional(),          // tab name; null/'' = single table
+            primaryLabel: z.string().max(50).nullable().optional(),  // main price column label (e.g. "At the Door")
+            secondaryLabel: z.string().max(50).nullable().optional(),// 2nd column label (e.g. "Online"); null = single column
+            tiers: z.array(z.object({
+                label: z.string().max(100),
+                amount: z.number().nonnegative(),
+                amountSecondary: z.number().nonnegative().nullable().optional(),
+                earlyBird: z.array(z.object({
+                    cutoffDate: z.coerce.date().nullable(),
+                    price: z.number().nonnegative(),
+                })).optional(),
+            })),
         })).optional(),
     }).optional(),
     tier3: z.object({
@@ -198,17 +201,17 @@ export async function PATCH(
             }
         }
 
-        // Pricing is all-or-nothing: only create tiers when none exist, so an
-        // organizer's pricing table is never mixed with agent output.
+        // Pricing is all-or-nothing: only create tables when none exist, so an
+        // organizer's pricing is never mixed with agent output.
         let pricingCreated = 0;
-        const tierCreates: { label: string; amount: number; order: number }[] = [];
-        if (tier2?.priceTiers?.length) {
+        let createPricing = false;
+        if (tier2?.pricingTables?.length) {
             if (convention.priceTiers.length > 0) {
-                skipped.push('priceTiers (convention already has pricing)');
+                skipped.push('pricing (convention already has pricing)');
             } else if (meta.fieldConfidence.pricing === 'low' || meta.fieldConfidence.pricing === 'not_found') {
-                skipped.push(`priceTiers (confidence ${meta.fieldConfidence.pricing})`);
+                skipped.push(`pricing (confidence ${meta.fieldConfidence.pricing})`);
             } else {
-                tier2.priceTiers.forEach((t, i) => tierCreates.push({ label: t.label, amount: t.amount, order: i }));
+                createPricing = true;
             }
         }
 
@@ -299,37 +302,71 @@ export async function PATCH(
                 }
             }
 
-            for (const t of tierCreates) {
-                const created = await tx.priceTier.create({
-                    data: { conventionId: convention.id, ...t },
-                });
-                pricingCreated++;
-                // The DB allows one discount per (tier, cutoff date); if the
-                // extraction lists several, keep the first. In online/door
-                // pricing the online price may have no stated end date — the
-                // schema requires one, so default to the convention start
-                // (online sales effectively end when the event begins).
-                const defaultCutoff =
-                    tier2?.pricingMode === 'online_door'
-                        ? ((update.startDate as Date | undefined) ?? convention.startDate)
-                        : null;
-                const seenCutoffs = new Set<number>();
-                for (const rawDiscount of tier2?.priceDiscounts ?? []) {
-                    const d = { ...rawDiscount, cutoffDate: rawDiscount.cutoffDate ?? defaultCutoff };
-                    if (d.cutoffDate && seenCutoffs.has(d.cutoffDate.getTime())) continue;
-                    if (d.tierLabel === t.label && d.cutoffDate) {
-                        seenCutoffs.add(d.cutoffDate.getTime());
-                        await tx.priceDiscount.create({
+            if (createPricing && tier2?.pricingTables) {
+                const tables = tier2.pricingTables;
+                const multi = tables.length > 1;
+                const tabNameFor = (t: { name?: string | null }, i: number) => {
+                    const n = (t.name ?? '').trim();
+                    if (n) return n;
+                    return multi ? `Table ${i + 1}` : '';
+                };
+                const setSetting = (key: string, value: string) =>
+                    tx.conventionSetting.upsert({
+                        where: { conventionId_key: { conventionId: convention.id, key } },
+                        update: { value },
+                        create: { conventionId: convention.id, key, value },
+                    });
+
+                for (let ti = 0; ti < tables.length; ti++) {
+                    const table = tables[ti];
+                    const tab = tabNameFor(table, ti);
+                    for (let oi = 0; oi < table.tiers.length; oi++) {
+                        const tier = table.tiers[oi];
+                        const createdTier = await tx.priceTier.create({
                             data: {
                                 conventionId: convention.id,
-                                priceTierId: created.id,
-                                cutoffDate: d.cutoffDate,
-                                discountedAmount: d.discountedAmount,
+                                label: tier.label,
+                                amount: tier.amount,
+                                amountSecondary: tier.amountSecondary ?? null,
+                                tab,
+                                order: oi,
                             },
                         });
                         pricingCreated++;
+                        // Early-bird date discounts — one per cutoff date per tier
+                        // (the DB enforces a single discount per tier+cutoff).
+                        const seen = new Set<number>();
+                        for (const eb of tier.earlyBird ?? []) {
+                            if (!eb.cutoffDate) continue;
+                            const key = eb.cutoffDate.getTime();
+                            if (seen.has(key)) continue;
+                            seen.add(key);
+                            await tx.priceDiscount.create({
+                                data: {
+                                    conventionId: convention.id,
+                                    priceTierId: createdTier.id,
+                                    cutoffDate: eb.cutoffDate,
+                                    discountedAmount: eb.price,
+                                },
+                            });
+                            pricingCreated++;
+                        }
                     }
                 }
+
+                // Tab/channel settings derived from the tables.
+                if (multi) {
+                    const names = tables.map((t, i) => tabNameFor(t, i));
+                    await setSetting('baseChannelLabel', names[0]);
+                    await setSetting('channelOrder', JSON.stringify(names));
+                } else {
+                    const primary = (tables[0].primaryLabel ?? '').trim();
+                    if (primary) await setSetting('baseChannelLabel', primary);
+                }
+                const secondary = tables.map(t => (t.secondaryLabel ?? '').trim()).find(Boolean);
+                if (secondary) await setSetting('secondaryChannelLabel', secondary);
+
+                changes.push({ field: 'pricing', from: null, to: `${pricingCreated} records`, reason: 'tier2' });
             }
 
             if (tier2?.currency) {
@@ -337,28 +374,6 @@ export async function PATCH(
                     where: { conventionId_key: { conventionId: convention.id, key: 'currency' } },
                     update: { value: tier2.currency },
                     create: { conventionId: convention.id, key: 'currency', value: tier2.currency },
-                });
-            }
-
-            if (tier2?.pricingMode) {
-                await tx.conventionSetting.upsert({
-                    where: { conventionId_key: { conventionId: convention.id, key: 'pricingMode' } },
-                    update: { value: tier2.pricingMode },
-                    create: { conventionId: convention.id, key: 'pricingMode', value: tier2.pricingMode },
-                });
-            }
-
-            // Organizer-customizable channel column names (online_door mode).
-            // Only persist labels the extraction actually supplied.
-            if (tier2?.channelLabels && (tier2.channelLabels.online || tier2.channelLabels.door)) {
-                const labels = JSON.stringify({
-                    online: tier2.channelLabels.online ?? 'Online',
-                    door: tier2.channelLabels.door ?? 'At the Door',
-                });
-                await tx.conventionSetting.upsert({
-                    where: { conventionId_key: { conventionId: convention.id, key: 'pricingChannelLabels' } },
-                    update: { value: labels },
-                    create: { conventionId: convention.id, key: 'pricingChannelLabels', value: labels },
                 });
             }
 
