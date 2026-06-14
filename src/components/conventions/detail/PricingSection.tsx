@@ -12,6 +12,7 @@ import {
     TableHead,
     TableRow,
     Stack,
+    Chip,
     Button,
     Link as MuiLink,
     Tab,
@@ -65,7 +66,31 @@ function formatDiscountDate(date: Date, timezone?: string): string {
     return format(displayDate, 'MMM dd');
 }
 
-const strikeStyle = { textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'medium' } as const;
+// Compact money for the badge — drops the ".00" on whole amounts ("Save $30").
+function formatSave(amount: number, currencySymbol: string, currencyCode: string): string {
+    try {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currencyCode,
+            minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+        }).format(amount);
+    } catch {
+        return `${currencySymbol}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+    }
+}
+
+// Green "Save $X" badge — the single, consistent way we signal any discount
+// (a cheaper channel like Online, or an early-bird date price).
+function SaveBadge({ amount, currencySymbol, currencyCode }: { amount: number; currencySymbol: string; currencyCode: string }) {
+    if (!(amount > 0)) return null;
+    return (
+        <Chip
+            size="small"
+            label={`Save ${formatSave(amount, currencySymbol, currencyCode)}`}
+            sx={{ bgcolor: '#E1F5EE', color: '#0F6E56', fontWeight: 600, height: 22, '& .MuiChip-label': { px: 1 } }}
+        />
+    );
+}
 
 interface TabTableProps {
     tiers: any[];
@@ -109,32 +134,32 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                             const primary = Number(tier.amount);
                             const hasSecondary = tier.amountSecondary !== null && tier.amountSecondary !== undefined;
                             const secondary = hasSecondary ? Number(tier.amountSecondary) : null;
-                            // Strike the dearer of the two so the cheaper one reads as the deal.
-                            const primaryIsDearer = secondary !== null && primary > secondary;
-                            const secondaryIsDearer = secondary !== null && secondary > primary;
+                            // Each column shows its own price; the cheaper one carries a green
+                            // "Save $X" badge so the saving is explicit (no struck-out column).
+                            const renderChannelCell = (val: number, other: number | null) => {
+                                const isDeal = other !== null && val < other;
+                                return (
+                                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ flexWrap: 'wrap' }}>
+                                        <Typography sx={{ fontWeight: isDeal ? 'bold' : 500, fontSize: isDeal ? '1.25rem' : '1.1rem' }}>
+                                            {formatPrice(val, currencySymbol, currencyCode)}
+                                        </Typography>
+                                        {isDeal && other !== null && <SaveBadge amount={other - val} currencySymbol={currencySymbol} currencyCode={currencyCode} />}
+                                    </Stack>
+                                );
+                            };
                             return (
                                 <TableRow key={tier.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }, '&:hover': { backgroundColor: 'action.selected' } }}>
                                     <TableCell sx={{ py: 2.5, px: 3 }}>
                                         <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>{tier.label}</Typography>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
-                                        <Typography
-                                            variant={primaryIsDearer ? 'body2' : 'h6'}
-                                            sx={primaryIsDearer ? { ...strikeStyle, fontSize: '0.95rem' } : { fontWeight: 'bold', fontSize: '1.25rem' }}
-                                        >
-                                            {formatPrice(primary, currencySymbol, currencyCode)}
-                                        </Typography>
+                                        {renderChannelCell(primary, secondary)}
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
                                         {secondary === null ? (
                                             <Typography variant="body1" sx={{ color: 'text.disabled' }}>—</Typography>
                                         ) : (
-                                            <Typography
-                                                variant={secondaryIsDearer ? 'body2' : 'h6'}
-                                                sx={secondaryIsDearer ? { ...strikeStyle, fontSize: '0.95rem' } : { fontWeight: 'bold', fontSize: '1.25rem' }}
-                                            >
-                                                {formatPrice(secondary, currencySymbol, currencyCode)}
-                                            </Typography>
+                                            renderChannelCell(secondary, primary)
                                         )}
                                     </TableCell>
                                 </TableRow>
@@ -218,15 +243,11 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                     );
                                 })}
                                 <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
-                                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 0, md: 1 }} justifyContent="center" alignItems="center">
-                                        {hasDiscount && (
-                                            <Typography variant="body2" sx={{ ...strikeStyle, fontSize: '0.875rem' }}>
-                                                {formatPrice(fullPrice, currencySymbol, currencyCode)}
-                                            </Typography>
-                                        )}
+                                    <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ flexWrap: 'wrap' }}>
                                         <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
                                             {formatPrice(current, currencySymbol, currencyCode)}
                                         </Typography>
+                                        {hasDiscount && <SaveBadge amount={fullPrice - current} currencySymbol={currencySymbol} currencyCode={currencyCode} />}
                                     </Stack>
                                 </TableCell>
                             </TableRow>
