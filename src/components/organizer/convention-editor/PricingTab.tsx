@@ -17,6 +17,8 @@ import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, D
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { PriceTier, PriceDiscount, PricingTabData, PricingTabSchema } from '@/lib/validators';
 import { z } from 'zod';
@@ -173,6 +175,37 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
   // --- Tab management ---
   const recomputeChannelOrder = (vals: string[]) => {
     onTabSettingsChange?.({ channelOrder: JSON.stringify(vals.map(tabLabel)) });
+  };
+
+  // Persist a new tab order immediately so the public page reflects it without
+  // a separate save click.
+  const persistTabOrder = async (orderedLabels: string[]) => {
+    onTabSettingsChange?.({ channelOrder: JSON.stringify(orderedLabels) });
+    if (!conventionId) return;
+    try {
+      const res = await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseChannelLabel: tabSettings?.baseChannelLabel || '',
+          secondaryChannelLabel: tabSettings?.secondaryChannelLabel || '',
+          channelOrder: JSON.stringify(orderedLabels),
+        }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      enqueueSnackbar('Tab order saved.', { variant: 'success' });
+    } catch {
+      enqueueSnackbar('Failed to save tab order.', { variant: 'error' });
+    }
+  };
+
+  const moveTab = (dir: -1 | 1) => {
+    const idx = tabValues.indexOf(editingTab);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= tabValues.length) return;
+    const next = [...tabValues];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    persistTabOrder(next.map(tabLabel));
   };
 
   const handleAddTab = () => {
@@ -378,9 +411,21 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
         </Typography>
 
         {tabValues.length > 1 && (
-          <Tabs value={editingTab} onChange={(_, v) => setEditingTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-            {tabValues.map(t => <Tab key={t || 'base'} value={t} label={tabLabel(t)} />)}
-          </Tabs>
+          <>
+            <Tabs value={editingTab} onChange={(_, v) => setEditingTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 1, borderBottom: 1, borderColor: 'divider' }}>
+              {tabValues.map(t => <Tab key={t || 'base'} value={t} label={tabLabel(t)} />)}
+            </Tabs>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">Tab order:</Typography>
+              <Button size="small" startIcon={<KeyboardArrowLeftIcon />} onClick={() => moveTab(-1)} disabled={disabled || tabValues.indexOf(editingTab) <= 0}>
+                Move left
+              </Button>
+              <Button size="small" endIcon={<KeyboardArrowRightIcon />} onClick={() => moveTab(1)} disabled={disabled || tabValues.indexOf(editingTab) >= tabValues.length - 1}>
+                Move right
+              </Button>
+              <Typography variant="caption" color="text.secondary">(applies to the front page immediately)</Typography>
+            </Box>
+          </>
         )}
 
         {editingTab === '' ? (
