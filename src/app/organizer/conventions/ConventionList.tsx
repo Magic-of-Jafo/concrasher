@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
   DataGrid,
   GridColDef,
@@ -73,11 +73,11 @@ const formatDateToDDMonYY_UTC = (date: Date | string | null): string => {
 interface ConventionListProps {
   conventions: Convention[];
   isAdmin: boolean;
-  viewMode?: "active" | "deleted";
+  viewMode?: "active" | "expired" | "deleted";
   onActionComplete: () => void;
 }
 
-const getColumns = (viewMode?: "active" | "deleted", onActionComplete?: () => void): GridColDef[] => [
+const getColumns = (viewMode?: "active" | "expired" | "deleted", onActionComplete?: () => void): GridColDef[] => [
   {
     field: "name",
     headerName: "Name",
@@ -143,11 +143,6 @@ const getColumns = (viewMode?: "active" | "deleted", onActionComplete?: () => vo
 ];
 
 export default function ConventionList({ conventions, isAdmin, viewMode = "active", onActionComplete }: ConventionListProps) {
-  const [paginationModel, setPaginationModel] = useState({
-    pageSize: 10,
-    page: 0,
-  });
-
   const gridRows = useMemo(() => conventions.map(c => ({ ...c, id: String(c.id) })), [conventions]);
 
   // Memoize columns to ensure stability
@@ -155,19 +150,15 @@ export default function ConventionList({ conventions, isAdmin, viewMode = "activ
 
   return (
     <Box>
-      {/* {viewMode === "active" && (  
-        <BulkActions
-          selectedIds={selectedIds as string[]} 
-          onActionComplete={() => setSelectedIds([])}
-        />
-      )} */}
-      <Box sx={{ height: 600, width: "100%" }}>
+      {/* Show the whole list in one go — there aren't enough conventions to
+          warrant paging, so the grid auto-sizes to fit every row. */}
+      <Box sx={{ width: "100%" }}>
         <DataGrid
           rows={gridRows}
           columns={columns}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
+          autoHeight
+          hideFooter
+          paginationModel={{ pageSize: Math.max(gridRows.length, 1), page: 0 }}
           getRowId={(row) => row.id}
         />
       </Box>

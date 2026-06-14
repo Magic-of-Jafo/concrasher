@@ -83,7 +83,7 @@ export default function OrganizerConventionsTab() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
-  const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
+  const [viewMode, setViewMode] = useState<'active' | 'expired' | 'deleted'>('active');
 
   const userRoles = (session?.user as { roles?: Role[] })?.roles || [];
   const isAdmin = userRoles.includes(Role.ADMIN);
@@ -105,14 +105,31 @@ export default function OrganizerConventionsTab() {
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // A convention is over once its end date (or start date, if there's no
+    // end) is before today. Undated (TBD) conventions can never be expired.
+    const endOf = (c: Convention) => c.endDate ?? c.startDate;
+
+    if (viewMode === 'expired') {
+      return allConventions
+        .filter(c => {
+          if (c.deletedAt !== null) return false;
+          const end = endOf(c);
+          return !!end && new Date(end) < today;
+        })
+        .sort((a, b) => {
+          // Most recently ended first.
+          const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
+          return bDate - aDate;
+        });
+    }
+
+    // active
     return allConventions
       .filter(c => {
         if (c.deletedAt !== null) return false;
-        // "Expired" = its end date (or start date if there's no end) is before
-        // today. Conventions with no dates yet (TBD) are kept — they can't be
-        // expired — but they sort to the bottom below.
-        const end = c.endDate ?? c.startDate;
-        if (!end) return true;
+        const end = endOf(c);
+        if (!end) return true; // TBD kept here — not expired
         return new Date(end) >= today;
       })
       .sort((a, b) => {
@@ -125,7 +142,7 @@ export default function OrganizerConventionsTab() {
 
   const handleViewModeChange = (
     event: React.MouseEvent<HTMLElement>,
-    newViewMode: 'active' | 'deleted' | null,
+    newViewMode: 'active' | 'expired' | 'deleted' | null,
   ) => {
     if (newViewMode !== null) {
       setViewMode(newViewMode);
@@ -155,6 +172,9 @@ export default function OrganizerConventionsTab() {
           >
             <ToggleButton value="active" aria-label="active conventions">
               Active
+            </ToggleButton>
+            <ToggleButton value="expired" aria-label="expired conventions">
+              Expired
             </ToggleButton>
             <ToggleButton value="deleted" aria-label="deleted conventions">
               Deleted
