@@ -33,6 +33,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import HotelIcon from '@mui/icons-material/Hotel';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
+import EditIcon from '@mui/icons-material/Edit';
 import { getProfileImageUrl, getS3ImageUrl } from '@/lib/defaults';
 import BasicInfoSection from '@/components/conventions/detail/BasicInfoSection';
 import PricingSection from '@/components/conventions/detail/PricingSection';
@@ -70,6 +71,7 @@ interface NavigationItem {
 
 interface ConventionDetailClientProps {
     convention: any;
+    canEdit?: boolean;
 }
 
 // Helper function to format price
@@ -478,7 +480,7 @@ function PlaceholderView({ title }: { title: string }) {
     );
 }
 
-export default function ConventionDetailClient({ convention }: ConventionDetailClientProps) {
+export default function ConventionDetailClient({ convention, canEdit = false }: ConventionDetailClientProps) {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -589,6 +591,18 @@ export default function ConventionDetailClient({ convention }: ConventionDetailC
 
     return (
         <Container id="main-content" maxWidth="lg" sx={{ py: 4 }}>
+            {canEdit && (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                    <Button
+                        component={Link}
+                        href={`/organizer/conventions/${convention.id}/edit`}
+                        variant="contained"
+                        startIcon={<EditIcon />}
+                    >
+                        Edit Convention
+                    </Button>
+                </Box>
+            )}
             {isMobile ? (
                 <>
                     {/* Mobile: Horizontal Scrollable Tabs */}

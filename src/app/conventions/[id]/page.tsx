@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { getServerSession } from 'next-auth';
 import ConventionDetailClient from './ConventionDetailClient';
 import { getConventionDetailsByIdWithRelations, db } from '@/lib/db';
+import { authOptions } from '@/lib/auth';
 import { Metadata } from 'next';
 import { ConventionStatus } from '@prisma/client';
 
@@ -156,6 +158,16 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
         : `${baseUrl}${convention.coverImageUrl}`
       : null;
 
+    // An Edit button shows for the convention's owning organizer or any admin.
+    const session = await getServerSession(authOptions);
+    const roles: string[] = (session?.user as any)?.roles || [];
+    const isAdmin = roles.includes('ADMIN');
+    const isOwner =
+      roles.includes('ORGANIZER') &&
+      !!session?.user?.id &&
+      convention.series?.organizerUserId === session.user.id;
+    const canEdit = isAdmin || isOwner;
+
     // Get primary venue for location details
     const primaryVenue = convention.venues?.find(v => v.isPrimaryVenue) || convention.venues?.[0];
 
@@ -224,7 +236,7 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd, null, 2) }}
         />
-        <ConventionDetailClient convention={serializedConvention} />
+        <ConventionDetailClient convention={serializedConvention} canEdit={canEdit} />
       </>
     );
   } catch (error) {
