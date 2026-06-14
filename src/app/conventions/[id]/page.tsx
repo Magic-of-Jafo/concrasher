@@ -143,6 +143,7 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
       priceTiers: populatedConvention.priceTiers?.map((tier: any) => ({
         ...tier,
         amount: tier.amount.toNumber(), // Convert Decimal to number
+        amountSecondary: tier.amountSecondary != null ? tier.amountSecondary.toNumber() : null,
       })),
       priceDiscounts: populatedConvention.priceDiscounts?.map((discount: any) => ({
         ...discount,

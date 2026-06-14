@@ -65,6 +65,179 @@ function formatDiscountDate(date: Date, timezone?: string): string {
     return format(displayDate, 'MMM dd');
 }
 
+const strikeStyle = { textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'medium' } as const;
+
+interface TabTableProps {
+    tiers: any[];
+    discounts: any[];
+    currencySymbol: string;
+    currencyCode: string;
+    timezone?: string;
+    primaryLabel: string;
+    secondaryLabel: string;
+    now: Date;
+}
+
+// Renders a single pricing table (one tab). A tab is either:
+//  - two-channel: rows carry a primary (amount) and secondary (amountSecondary)
+//    price, shown as two columns with the dearer one struck through, or
+//  - single-channel: one price column plus optional early-bird date columns
+//    driven by the tiers' date discounts.
+function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timezone, primaryLabel, secondaryLabel, now }: TabTableProps) {
+    const sortedTiers = [...tiers].sort((a, b) => a.order - b.order);
+    const isTwoChannel = sortedTiers.some((t) => t.amountSecondary !== null && t.amountSecondary !== undefined);
+
+    if (isTwoChannel) {
+        return (
+            <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 3 }}>
+                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>Attendee Category</Typography>
+                            </TableCell>
+                            <TableCell align="center" sx={{ backgroundColor: 'grey.300', color: 'text.primary', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>{primaryLabel}</Typography>
+                            </TableCell>
+                            <TableCell align="center" sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>{secondaryLabel}</Typography>
+                            </TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {sortedTiers.map((tier) => {
+                            const primary = Number(tier.amount);
+                            const hasSecondary = tier.amountSecondary !== null && tier.amountSecondary !== undefined;
+                            const secondary = hasSecondary ? Number(tier.amountSecondary) : null;
+                            // Strike the dearer of the two so the cheaper one reads as the deal.
+                            const primaryIsDearer = secondary !== null && primary > secondary;
+                            const secondaryIsDearer = secondary !== null && secondary > primary;
+                            return (
+                                <TableRow key={tier.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }, '&:hover': { backgroundColor: 'action.selected' } }}>
+                                    <TableCell sx={{ py: 2.5, px: 3 }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>{tier.label}</Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                        <Typography
+                                            variant={primaryIsDearer ? 'body2' : 'h6'}
+                                            sx={primaryIsDearer ? { ...strikeStyle, fontSize: '0.95rem' } : { fontWeight: 'bold', fontSize: '1.25rem' }}
+                                        >
+                                            {formatPrice(primary, currencySymbol, currencyCode)}
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                        {secondary === null ? (
+                                            <Typography variant="body1" sx={{ color: 'text.disabled' }}>—</Typography>
+                                        ) : (
+                                            <Typography
+                                                variant={secondaryIsDearer ? 'body2' : 'h6'}
+                                                sx={secondaryIsDearer ? { ...strikeStyle, fontSize: '0.95rem' } : { fontWeight: 'bold', fontSize: '1.25rem' }}
+                                            >
+                                                {formatPrice(secondary, currencySymbol, currencyCode)}
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        );
+    }
+
+    // Single-channel: regular price (tier.amount) + optional early-bird date columns.
+    const perTier = new Map<string, { regular: number; dated: { cutoff: Date; amount: number }[] }>();
+    for (const tier of sortedTiers) {
+        const entries = discounts
+            .filter((d: any) => d.priceTierId === tier.id)
+            .map((d: any) => ({ cutoff: new Date(d.cutoffDate), amount: Number(d.discountedAmount) }));
+        perTier.set(tier.id, { regular: Number(tier.amount), dated: entries });
+    }
+
+    const allCutoffs: Date[] = [];
+    perTier.forEach((info) => {
+        info.dated.forEach((e) => { if (e.cutoff > now) allCutoffs.push(e.cutoff); });
+    });
+    allCutoffs.sort((a, b) => a.getTime() - b.getTime());
+    const uniqueCutoffDates = allCutoffs.filter((d, i) => i === 0 || d.getTime() !== allCutoffs[i - 1].getTime());
+
+    return (
+        <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+            <Table>
+                <TableHead>
+                    {uniqueCutoffDates.length > 0 && (
+                        <TableRow>
+                            <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
+                            <TableCell align="center" colSpan={uniqueCutoffDates.length} sx={{ borderBottom: 'none', backgroundColor: '#f5f5f5', color: 'text.primary', py: 2 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>Price good through</Typography>
+                            </TableCell>
+                            <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
+                        </TableRow>
+                    )}
+                    <TableRow>
+                        <TableCell sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 3 }}>
+                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>Attendee Category</Typography>
+                        </TableCell>
+                        {uniqueCutoffDates.map((date, index) => (
+                            <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.300', color: 'text.primary', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>{formatDiscountDate(date, timezone)}</Typography>
+                            </TableCell>
+                        ))}
+                        <TableCell align="center" sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2, minWidth: 120 }}>
+                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>{uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}</Typography>
+                        </TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {sortedTiers.map((tier) => {
+                        const info = perTier.get(tier.id)!;
+                        const activeDated = info.dated.filter((e) => e.cutoff > now);
+                        const current = activeDated.length ? Math.min(...activeDated.map((e) => e.amount)) : info.regular;
+                        const fullPrice = info.regular;
+                        const hasDiscount = current < fullPrice;
+                        return (
+                            <TableRow key={tier.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }, '&:hover': { backgroundColor: 'action.selected' } }}>
+                                <TableCell sx={{ py: 2.5, px: 3 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>{tier.label}</Typography>
+                                </TableCell>
+                                {uniqueCutoffDates.map((cutoffDate, index) => {
+                                    let cellPrice: number | null = null;
+                                    if (info.dated.length > 0) {
+                                        const applicable = info.dated
+                                            .filter((e) => e.cutoff.getTime() >= cutoffDate.getTime())
+                                            .sort((a, b) => a.cutoff.getTime() - b.cutoff.getTime())[0];
+                                        cellPrice = applicable ? applicable.amount : info.regular;
+                                    }
+                                    return (
+                                        <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.50', py: 2.5, px: 2 }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'text.disabled' : 'inherit' }}>
+                                                {cellPrice === null ? '—' : formatPrice(cellPrice, currencySymbol, currencyCode)}
+                                            </Typography>
+                                        </TableCell>
+                                    );
+                                })}
+                                <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
+                                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 0, md: 1 }} justifyContent="center" alignItems="center">
+                                        {hasDiscount && (
+                                            <Typography variant="body2" sx={{ ...strikeStyle, fontSize: '0.875rem' }}>
+                                                {formatPrice(fullPrice, currencySymbol, currencyCode)}
+                                            </Typography>
+                                        )}
+                                        <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
+                                            {formatPrice(current, currencySymbol, currencyCode)}
+                                        </Typography>
+                                    </Stack>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
+}
+
 export default function PricingSection({ convention }: PricingSectionProps) {
     const priceTiers = convention.priceTiers || [];
     const priceDiscounts = convention.priceDiscounts || [];
@@ -74,8 +247,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const currencySymbol = currencySetting?.currency?.symbol || '$';
     const currencyCode = currencySetting?.currency?.code || 'USD';
 
-    // Label for the base channel (the price stored on the tier itself).
-    // Falls back to the legacy online_door "door" label, then a neutral word.
+    // Primary/secondary column labels for two-channel tables (e.g. At the Door / Online).
     let legacyDoorLabel: string | undefined;
     const legacyLabelsSetting = convention.settings?.find((s: any) => s.key === 'pricingChannelLabels')?.value;
     if (legacyLabelsSetting) {
@@ -85,42 +257,36 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         convention.settings?.find((s: any) => s.key === 'baseChannelLabel')?.value
         || legacyDoorLabel
         || 'Standard';
+    const secondaryChannelLabel =
+        convention.settings?.find((s: any) => s.key === 'secondaryChannelLabel')?.value || 'Online';
 
+    const h1Styles = { fontSize: { xs: '2rem', md: '3rem' }, lineHeight: { xs: 1.2, md: 1.167 } };
 
-    // Distinct non-base channels present in the discount data (first-seen order).
-    const nonBaseChannels: string[] = [];
-    for (const d of priceDiscounts) {
-        const ch = d.channel || '';
-        if (ch && !nonBaseChannels.includes(ch)) nonBaseChannels.push(ch);
+    // Group tiers into tabs (independent tables). Empty tab = the single/base table.
+    const tabValues: string[] = [];
+    for (const tier of priceTiers) {
+        const t = tier.tab || '';
+        if (!tabValues.includes(t)) tabValues.push(t);
     }
-    // Promoted (non-base) channels first, then the base channel last — unless
-    // the organizer set an explicit channelOrder (JSON array of channel labels,
-    // e.g. ["Weekly","Daily"]), which then drives toggle order and the default.
-    const channels = [
-        ...nonBaseChannels.map((c) => ({ key: c, label: c })),
-        { key: '', label: baseChannelLabel },
-    ];
+    const tabLabel = (t: string) => (t === '' ? baseChannelLabel : t);
+
+    // Optional explicit tab order (JSON array of tab labels, e.g. ["Weekly","Daily"]).
     const channelOrderRaw = convention.settings?.find((s: any) => s.key === 'channelOrder')?.value;
     if (channelOrderRaw) {
         try {
             const order: string[] = JSON.parse(channelOrderRaw);
-            const rank = (label: string) => {
-                const i = order.indexOf(label);
+            const rank = (t: string) => {
+                const i = order.indexOf(tabLabel(t));
                 return i === -1 ? Number.MAX_SAFE_INTEGER : i;
             };
-            channels.sort((a, b) => rank(a.label) - rank(b.label));
-        } catch { /* malformed — keep default order */ }
+            tabValues.sort((a, b) => rank(a) - rank(b));
+        } catch { /* malformed — keep first-seen order */ }
     }
 
-    const [selectedChannel, setSelectedChannel] = useState<string>(channels[0]?.key ?? '');
+    const [selectedTab, setSelectedTab] = useState<string>(tabValues[0] ?? '');
+    const activeTab = tabValues.includes(selectedTab) ? selectedTab : (tabValues[0] ?? '');
 
-    const h1Styles = { fontSize: { xs: '2rem', md: '3rem' }, lineHeight: { xs: 1.2, md: 1.167 } };
-    const sortedTiers = [...priceTiers].sort((a: any, b: any) => a.order - b.order);
-
-    const hasRegistrationUrl = convention.registrationUrl &&
-        convention.status === ConventionStatus.PUBLISHED;
-
-    // Official page to defer to in the pricing-accuracy caveat.
+    const hasRegistrationUrl = convention.registrationUrl && convention.status === ConventionStatus.PUBLISHED;
     const officialPricingUrl = convention.registrationUrl || convention.websiteUrl || null;
 
     const registerButton = (
@@ -151,9 +317,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     if (priceTiers.length === 0) {
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h4" component="h1" gutterBottom color="text.primary">
-                    Pricing
-                </Typography>
+                <Typography variant="h4" component="h1" gutterBottom color="text.primary">Pricing</Typography>
                 <Typography variant="body1" color="text.secondary">
                     Pricing information is not yet available for this convention.
                 </Typography>
@@ -162,42 +326,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     }
 
     const now = new Date();
-    const activeChannel = channels.some((c) => c.key === selectedChannel) ? selectedChannel : (channels[0]?.key ?? '');
-
-    // For the active channel, resolve each tier's "regular" price and its
-    // date-based discounts. A tier with no channel-specific price falls back
-    // to its base amount, so flat-priced tiers show in every channel view.
-    const perTier = new Map<string, { regular: number; dated: { cutoff: Date; amount: number }[] }>();
-    for (const tier of sortedTiers) {
-        const entries = priceDiscounts.filter(
-            (d: any) => d.priceTierId === tier.id && (d.channel || '') === activeChannel
-        );
-        if (activeChannel === '') {
-            perTier.set(tier.id, {
-                regular: Number(tier.amount),
-                dated: entries.map((d: any) => ({ cutoff: new Date(d.cutoffDate), amount: Number(d.discountedAmount) })),
-            });
-        } else if (entries.length === 0) {
-            perTier.set(tier.id, { regular: Number(tier.amount), dated: [] });
-        } else {
-            const sorted = [...entries].sort(
-                (a: any, b: any) => new Date(a.cutoffDate).getTime() - new Date(b.cutoffDate).getTime()
-            );
-            const last = sorted[sorted.length - 1];
-            perTier.set(tier.id, {
-                regular: Number(last.discountedAmount),
-                dated: sorted.slice(0, -1).map((d: any) => ({ cutoff: new Date(d.cutoffDate), amount: Number(d.discountedAmount) })),
-            });
-        }
-    }
-
-    // Future cutoff dates among the active channel's dated discounts.
-    const allCutoffs: Date[] = [];
-    perTier.forEach((info) => {
-        info.dated.forEach((e) => { if (e.cutoff > now) allCutoffs.push(e.cutoff); });
-    });
-    allCutoffs.sort((a, b) => a.getTime() - b.getTime());
-    const uniqueCutoffDates = allCutoffs.filter((d, i) => i === 0 || d.getTime() !== allCutoffs[i - 1].getTime());
+    const activeTabTiers = priceTiers.filter((t: any) => (t.tab || '') === activeTab);
 
     return (
         <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
@@ -205,142 +334,31 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                 {convention.name} Pricing
             </Typography>
 
-            {channels.length > 1 && (
+            {tabValues.length > 1 && (
                 <Tabs
-                    value={activeChannel}
-                    onChange={(_, val) => setSelectedChannel(val)}
+                    value={activeTab}
+                    onChange={(_, val) => setSelectedTab(val)}
                     variant="scrollable"
                     scrollButtons="auto"
                     sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { fontWeight: 600, fontSize: '1rem', textTransform: 'none' } }}
                     aria-label="Pricing tabs"
                 >
-                    {channels.map((c) => (
-                        <Tab key={c.key || 'base'} value={c.key} label={c.label} />
+                    {tabValues.map((t) => (
+                        <Tab key={t || 'base'} value={t} label={tabLabel(t)} />
                     ))}
                 </Tabs>
             )}
 
-            <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
-                <Table>
-                    <TableHead>
-                        {uniqueCutoffDates.length > 0 && (
-                            <TableRow>
-                                <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
-                                <TableCell
-                                    align="center"
-                                    colSpan={uniqueCutoffDates.length}
-                                    sx={{ borderBottom: 'none', backgroundColor: '#f5f5f5', color: 'text.primary', py: 2 }}
-                                >
-                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                        Price good through
-                                    </Typography>
-                                </TableCell>
-                                <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
-                            </TableRow>
-                        )}
-                        <TableRow>
-                            <TableCell sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 3 }}>
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                                    Attendee Category
-                                </Typography>
-                            </TableCell>
-                            {uniqueCutoffDates.map((date: Date, index: number) => (
-                                <TableCell
-                                    key={index}
-                                    align="center"
-                                    sx={{ backgroundColor: 'grey.300', color: 'text.primary', py: 2.5, px: 2, minWidth: 120 }}
-                                >
-                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                        {formatDiscountDate(date, conventionTimezone)}
-                                    </Typography>
-                                </TableCell>
-                            ))}
-                            <TableCell
-                                align="center"
-                                sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2, minWidth: 120 }}
-                            >
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                                    {uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}
-                                </Typography>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {sortedTiers.map((tier: any) => {
-                            const info = perTier.get(tier.id)!;
-                            const activeDated = info.dated.filter((e) => e.cutoff > now);
-                            const current = activeDated.length
-                                ? Math.min(...activeDated.map((e) => e.amount))
-                                : info.regular;
-                            // Anchor (struck-through "full price") = this tab's own regular
-                            // price. A non-base tab with no date-based pricing of its own is an
-                            // alternate channel of the same ticket (e.g. Online vs At the Door),
-                            // so it anchors against the base tab's full price instead — that way
-                            // a discounted price always shows the dearer price struck through.
-                            // Tabs with their own dated pricing (a distinct product, e.g. Daily)
-                            // stay anchored within themselves.
-                            let fullPrice = info.regular;
-                            if (activeChannel !== '' && info.dated.length === 0 && Number(tier.amount) > info.regular) {
-                                fullPrice = Number(tier.amount);
-                            }
-                            const hasDiscount = current < fullPrice;
-
-                            return (
-                                <TableRow
-                                    key={tier.id}
-                                    sx={{
-                                        '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
-                                        '&:hover': { backgroundColor: 'action.selected' },
-                                    }}
-                                >
-                                    <TableCell sx={{ py: 2.5, px: 3 }}>
-                                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>
-                                            {tier.label}
-                                        </Typography>
-                                    </TableCell>
-                                    {uniqueCutoffDates.map((cutoffDate: Date, index: number) => {
-                                        // Price in effect when registering by this column's date:
-                                        // the tier's discount with the earliest cutoff on/after the
-                                        // column date, falling back to the regular price. Tiers with
-                                        // no date-based pricing in this channel show a dash.
-                                        let cellPrice: number | null = null;
-                                        if (info.dated.length > 0) {
-                                            const applicable = info.dated
-                                                .filter((e) => e.cutoff.getTime() >= cutoffDate.getTime())
-                                                .sort((a, b) => a.cutoff.getTime() - b.cutoff.getTime())[0];
-                                            cellPrice = applicable ? applicable.amount : info.regular;
-                                        }
-                                        return (
-                                            <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.50', py: 2.5, px: 2 }}>
-                                                <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'text.disabled' : 'inherit' }}>
-                                                    {cellPrice === null ? '—' : formatPrice(cellPrice, currencySymbol, currencyCode)}
-                                                </Typography>
-                                            </TableCell>
-                                        );
-                                    })}
-                                    <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
-                                        <Stack
-                                            direction={{ xs: 'column', md: 'row' }}
-                                            spacing={{ xs: 0, md: 1 }}
-                                            justifyContent="center"
-                                            alignItems="center"
-                                        >
-                                            {hasDiscount && (
-                                                <Typography variant="body2" sx={{ textDecoration: 'line-through', color: '#D32F2F', fontWeight: 'medium', fontSize: '0.875rem' }}>
-                                                    {formatPrice(fullPrice, currencySymbol, currencyCode)}
-                                                </Typography>
-                                            )}
-                                            <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
-                                                {formatPrice(current, currencySymbol, currencyCode)}
-                                            </Typography>
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <TabPricingTable
+                tiers={activeTabTiers}
+                discounts={priceDiscounts}
+                currencySymbol={currencySymbol}
+                currencyCode={currencyCode}
+                timezone={conventionTimezone}
+                primaryLabel={baseChannelLabel}
+                secondaryLabel={secondaryChannelLabel}
+                now={now}
+            />
 
             {registerButton}
 
