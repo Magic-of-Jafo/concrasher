@@ -564,12 +564,8 @@ function ConventionEditPage() { // Remove params from props
       // e.g., using a toast notification library
       console.log('Convention saved successfully!');
 
-      // Redirect based on user role
-      if (session?.user?.roles?.includes('ADMIN')) {
-        router.push('/admin/conventions');
-      } else {
-        router.push('/organizer/conventions'); // Default for Organizers
-      }
+      // Everyone manages conventions from the profile hub now.
+      router.push('/profile?tab=organizer');
 
     } catch (err: any) {
       console.error('Save failed:', err);

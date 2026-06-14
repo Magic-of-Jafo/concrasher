@@ -1125,7 +1125,7 @@ export async function reviewOrganizerApplication(
           data: { status: ApplicationStatus.APPROVED },
         });
       });
-      revalidatePath('/admin/dashboard'); // Or specific applications page
+      revalidatePath('/profile'); // Admin panel lives at /profile?tab=admin
       revalidatePath('/admin/applications'); // Or specific applications page
       return { success: true, message: 'Application approved successfully.' };
     } else if (newStatus === ApplicationStatus.REJECTED) {
@@ -1133,7 +1133,7 @@ export async function reviewOrganizerApplication(
         where: { id: applicationId },
         data: { status: ApplicationStatus.REJECTED },
       });
-      revalidatePath('/admin/dashboard'); // Or specific applications page
+      revalidatePath('/profile'); // Admin panel lives at /profile?tab=admin
       revalidatePath('/admin/applications'); // Or specific applications page
       return { success: true, message: 'Application rejected successfully.' };
     } else {
@@ -2362,7 +2362,7 @@ export async function deleteConvention(conventionId: string): Promise<{
       where: { id: conventionId },
     });
 
-    revalidatePath('/organizer/conventions');
+    revalidatePath('/profile');
     revalidatePath('/conventions'); // Revalidate public listing
     revalidatePath('/'); // Revalidate front page
 

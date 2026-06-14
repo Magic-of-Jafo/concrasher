@@ -148,7 +148,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             queryClient.invalidateQueries({ queryKey: ["organizer-conventions"] });
             queryClient.invalidateQueries({ queryKey: ["conventions"] });
             // Redirect to the organizer's dashboard after successful deletion
-            router.push('/organizer/conventions');
+            router.push('/profile?tab=organizer');
         },
         onError: (error: Error) => {
             enqueueSnackbar(error.message, { variant: 'error' });

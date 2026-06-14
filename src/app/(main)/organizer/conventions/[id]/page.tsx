@@ -95,7 +95,7 @@ export default function ConventionFormPage({ params }: { params: { id: string } 
         const result = await response.json();
         router.push(`/organizer/conventions/${result.convention.id}`);
       } else {
-        router.push('/organizer/conventions');
+        router.push('/profile?tab=organizer');
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} convention`);
@@ -124,7 +124,7 @@ export default function ConventionFormPage({ params }: { params: { id: string } 
         <ConventionForm
           convention={convention}
           onSubmit={handleSubmit}
-          onCancel={() => router.push('/organizer/conventions')}
+          onCancel={() => router.push('/profile?tab=organizer')}
           isSubmitting={isSaving}
           error={error}
           mode={isEditMode ? 'edit' : 'create'}

@@ -12,7 +12,7 @@ interface OrganizerApplicationApprovedProps {
 const OrganizerApplicationApproved = ({
     userName = 'there',
     userEmail = 'organizer@example.com',
-    organizerDashboardUrl = 'https://conventioncrasher.com/organizer/conventions',
+    organizerDashboardUrl = 'https://conventioncrasher.com/profile?tab=organizer',
 }: OrganizerApplicationApprovedProps) => {
     return (
         <EmailLayout previewText="Welcome to Convention Crasher - You're approved!">

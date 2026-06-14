@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import BulkActions from "../../../organizer/conventions/BulkActions";
+import BulkActions from "../BulkActions";
 
 // Mock the fetch function
 global.fetch = jest.fn();
@@ -173,4 +173,4 @@ describe("BulkActions", () => {
       expect(mockProps.onActionComplete).toHaveBeenCalled();
     });
   });
-}); 
+});

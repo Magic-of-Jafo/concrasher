@@ -239,7 +239,7 @@ describe('reviewOrganizerApplication', () => {
       where: { id: sampleApplicationId },
       data: { status: ApplicationStatus.APPROVED },
     });
-    expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/dashboard');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/applications');
   });
 
@@ -258,7 +258,7 @@ describe('reviewOrganizerApplication', () => {
       where: { id: sampleApplicationId },
       data: { status: ApplicationStatus.REJECTED },
     });
-    expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/dashboard');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/applications');
   });
 
@@ -471,7 +471,7 @@ describe('deleteConvention Server Action', () => {
     expect(result.success).toBe(true);
     expect(result.message).toBe('Convention has been permanently deleted.');
     expect(mockConventionDelete).toHaveBeenCalledWith({ where: { id: conventionId } });
-    expect(mockRevalidatePath).toHaveBeenCalledWith('/organizer/conventions');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/profile');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/conventions');
   });
 

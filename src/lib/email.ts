@@ -93,7 +93,7 @@ export const sendPasswordChangedEmail = async (email: string, userName?: string)
 
 export const sendOrganizerApplicationApprovedEmail = async (email: string, userName?: string) => {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
-  const organizerDashboardUrl = `${appUrl}/organizer/conventions`;
+  const organizerDashboardUrl = `${appUrl}/profile?tab=organizer`;
 
   return sendEmail({
     to: email,

@@ -125,7 +125,7 @@ export default function NewConventionPage() {
         throw new Error(errorData.error || 'Failed to create convention');
       }
       const newConvention = await response.json();
-      router.push('/organizer/conventions');
+      router.push('/profile?tab=organizer');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
