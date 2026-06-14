@@ -115,6 +115,13 @@ model PriceTier {
   label          String
   amount         Decimal
   order          Int
+  // Which pricing table (tab) this category belongs to. Each tab is an
+  // independent table with its own categories. Empty = the single/base table.
+  tab            String          @default("")
+  // Optional second price column for same-product channel pricing on one table
+  // (e.g. an "Online" price alongside the "At the Door" amount). Null = single
+  // price column.
+  amountSecondary Decimal?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   priceDiscounts PriceDiscount[]
