@@ -17,7 +17,7 @@ interface ContactTabProps {
         websiteUrl: string | null;
         user: {
             id: string;
-        };
+        } | null;
     };
 }
 
@@ -30,7 +30,8 @@ const ContactTab: React.FC<ContactTabProps> = ({ talentProfile }) => {
                 Contact & Booking Information
             </Typography>
 
-            {/* User Profile Link */}
+            {/* User Profile Link (claimed profiles only) */}
+            {talentProfile.user && (
             <Box sx={{ mb: 3 }}>
                 <Card variant="outlined" sx={{ borderRadius: 2, backgroundColor: 'rgba(102, 126, 234, 0.05)' }}>
                     <CardContent sx={{ p: 3 }}>
@@ -62,6 +63,7 @@ const ContactTab: React.FC<ContactTabProps> = ({ talentProfile }) => {
                     </CardContent>
                 </Card>
             </Box>
+            )}
 
             {hasContactInfo ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

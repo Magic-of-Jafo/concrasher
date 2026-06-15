@@ -118,8 +118,9 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
         notFound();
     }
 
-    // If talent profile is inactive, show the inactive page
-    if (!talentProfile.isActive) {
+    // If a claimed talent profile is inactive, show the inactive page.
+    // (Unclaimed profiles have no user and default to active.)
+    if (!talentProfile.isActive && talentProfile.user) {
         return <InactiveTalentProfile user={talentProfile.user} />;
     }
 

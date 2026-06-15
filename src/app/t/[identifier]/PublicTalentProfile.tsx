@@ -34,7 +34,7 @@ import ContactTab from './components/ContactTab';
 
 interface TalentProfileData {
     id: string;
-    userId: string;
+    userId: string | null;
     displayName: string;
     tagline: string | null;
     bio: string | null;
@@ -50,7 +50,7 @@ interface TalentProfileData {
         lastName: string | null;
         roles: Role[];
         createdAt: Date;
-    };
+    } | null;
     media: Array<{
         id: string;
         url: string;
@@ -137,22 +137,24 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                             fontSize: '0.75rem',
                         }}
                     />
-                    <Typography
-                        component="a"
-                        href={`/u/${talentProfile.user.id}`}
-                        variant="body2"
-                        sx={{
-                            color: 'primary.main',
-                            textDecoration: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            '&:hover': {
-                                textDecoration: 'underline',
-                            },
-                        }}
-                    >
-                        View User Profile →
-                    </Typography>
+                    {talentProfile.user && (
+                        <Typography
+                            component="a"
+                            href={`/u/${talentProfile.user.id}`}
+                            variant="body2"
+                            sx={{
+                                color: 'primary.main',
+                                textDecoration: 'none',
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                '&:hover': {
+                                    textDecoration: 'underline',
+                                },
+                            }}
+                        >
+                            View User Profile →
+                        </Typography>
+                    )}
                 </Box>
 
                 {/* Profile Header */}
@@ -249,7 +251,7 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
 
                     {/* Role Badges */}
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center', mb: 2 }}>
-                        {talentProfile.user.roles.filter(role => role !== Role.USER).map((role) => (
+                        {(talentProfile.user?.roles ?? []).filter(role => role !== Role.USER).map((role) => (
                             <Chip
                                 key={role}
                                 label={formatRoleLabel(role)}
