@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { setEventTalent } from '@/lib/talent';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string; itemId: string } }) {
   const session = await getServerSession(authOptions);
@@ -108,6 +109,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { id: itemId, conventionId }, // Ensure conventionId is part of where for security/scoping
       data: prismaUpdateData,
     });
+    if (Array.isArray(requestBody.talent)) {
+      await setEventTalent(itemId, conventionId, requestBody.talent);
+    }
     return NextResponse.json({ success: true, item });
   } catch (error: any) {
     console.error("Prisma PATCH error:", error); // Log the full error server-side

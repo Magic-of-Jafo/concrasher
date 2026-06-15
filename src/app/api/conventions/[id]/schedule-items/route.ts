@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { setEventTalent } from '@/lib/talent';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const item = await prisma.conventionScheduleItem.create({
       data: scheduleData,
     });
+    if (Array.isArray(data.talent)) {
+      await setEventTalent(item.id, conventionId, data.talent);
+    }
     return NextResponse.json({ success: true, item });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to create schedule item' }, { status: 500 });
@@ -50,7 +54,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     console.log('Fetching schedule items for convention:', conventionId);
     const items = await prisma.conventionScheduleItem.findMany({
       where: { conventionId },
-      include: { feeTiers: true },
+      include: {
+        feeTiers: true,
+        talentLinks: {
+          include: { talentProfile: { select: { id: true, displayName: true, userId: true } } },
+          orderBy: { order: 'asc' },
+        },
+      },
       orderBy: [
         { dayOffset: 'asc' },
         { startTimeMinutes: 'asc' }

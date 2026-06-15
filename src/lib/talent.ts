@@ -130,6 +130,44 @@ export async function findClaimCandidates(name: string, limit = 5): Promise<Clai
     });
 }
 
+export interface EventPerformerInput {
+    talentId?: string;   // existing talent picked from search
+    name: string;        // display name (used to create/match when no talentId)
+    role?: string | null;
+}
+
+/**
+ * Replace an event's talent links with the given performers. New names are
+ * matched/created as unclaimed talent; each linked person is also associated
+ * with the convention. Used by the schedule-item save path and the agent.
+ */
+export async function setEventTalent(
+    scheduleItemId: string,
+    conventionId: string,
+    performers: EventPerformerInput[],
+): Promise<void> {
+    await prisma.scheduleEventTalentLink.deleteMany({ where: { scheduleItemId } });
+    let order = 0;
+    for (const pf of performers) {
+        const name = (pf.name || '').trim();
+        let talentId = pf.talentId;
+        if (!talentId) {
+            if (!name) continue;
+            const t = await findOrCreateUnclaimedTalent(name);
+            if (!t) continue;
+            talentId = t.id;
+        }
+        await prisma.scheduleEventTalentLink.create({
+            data: { scheduleItemId, talentProfileId: talentId, role: pf.role || null, order: order++, nameAsListed: name || null },
+        });
+        await prisma.conventionTalent.upsert({
+            where: { conventionId_talentProfileId: { conventionId, talentProfileId: talentId } },
+            create: { conventionId, talentProfileId: talentId },
+            update: {},
+        });
+    }
+}
+
 /**
  * Claim an unclaimed profile for a user. Guards: the user can't already own a
  * profile, and the target must still be unclaimed.
