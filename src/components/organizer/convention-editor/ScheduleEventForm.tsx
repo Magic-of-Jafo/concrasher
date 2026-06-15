@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EventIcon from '@mui/icons-material/Event';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { EVENT_TYPES, getEventTypeColor, isCanonicalEventType } from '@/lib/eventTypes';
 
 // Roles a performer can have on an event. Free text also allowed via the form.
@@ -85,6 +86,10 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
   const [talentLoading, setTalentLoading] = useState(false);
   // Auto-detected existing talent found in the title/description.
   const [detected, setDetected] = useState<DetectedSuggestion[]>([]);
+  // On-demand AI extraction (Layer 2) — finds names not yet in the DB.
+  const [aiResults, setAiResults] = useState<{ name: string; role: string | null }[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Validation state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -145,6 +150,32 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
 
   const removePerformer = (index: number) => {
     setPerformers(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Layer 2: ask the AI to pull performer names out of the title/description
+  // (catches new names + shared surnames that string-matching can't).
+  const runAiExtract = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/talent/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, eventType }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data?.error || 'AI request failed.');
+        setAiResults([]);
+      } else {
+        setAiResults(Array.isArray(data?.results) ? data.results : []);
+      }
+    } catch {
+      setAiError('AI request failed.');
+      setAiResults([]);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Populate venueOptions from props when open/atPrimaryVenue changes
@@ -238,6 +269,8 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
       );
       setTalentInput('');
       setTalentOptions([]);
+      setAiResults([]);
+      setAiError(null);
       setErrors({});
     } else {
       setIsCreatingNewEvent(forceCreateNew); // Reset based on forceCreateNew
@@ -246,6 +279,8 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
       setPerformers([]);
       setTalentInput('');
       setTalentOptions([]);
+      setAiResults([]);
+      setAiError(null);
       setErrors({});
     }
   }, [open, item, forceCreateNew]);
@@ -257,6 +292,10 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
   const pendingSuggestions = detected.filter(d => !performers.some(p => p.talentId === d.id));
   const exactSuggestions = pendingSuggestions.filter(d => !d.fuzzy);
   const fuzzySuggestions = pendingSuggestions.filter(d => d.fuzzy);
+  // AI results not already added as a performer (matched by name).
+  const aiPending = aiResults.filter(r =>
+    !performers.some(p => p.name.trim().toLowerCase() === r.name.trim().toLowerCase())
+  );
 
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
@@ -513,6 +552,49 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
                 />
               )}
             />
+            <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={aiLoading ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}
+                onClick={runAiExtract}
+                disabled={aiLoading || (!title.trim() && !description.trim())}
+              >
+                {aiLoading ? 'Scanning…' : 'Find performers with AI'}
+              </Button>
+              {aiError && <Typography variant="caption" color="error.main">{aiError}</Typography>}
+              {!aiError && !aiLoading && aiResults.length > 0 && aiPending.length === 0 && (
+                <Typography variant="caption" color="text.secondary">No new names found.</Typography>
+              )}
+            </Box>
+            {aiPending.length > 0 && (
+              <Box mt={1} mb={0.5}>
+                <Typography variant="caption" color="text.secondary">AI-detected — tap to add:</Typography>
+                <Box display="flex" flexWrap="wrap" gap={0.75} mt={0.5} alignItems="center">
+                  {aiPending.map((r, i) => (
+                    <Chip
+                      key={`ai-${r.name}-${i}`}
+                      icon={<AutoAwesomeIcon />}
+                      label={r.role ? `${r.name} · ${r.role}` : r.name}
+                      onClick={() => addPerformer({ name: r.name, role: r.role || guessRole(eventType, title) })}
+                      color="secondary"
+                      variant="outlined"
+                      size="small"
+                      clickable
+                    />
+                  ))}
+                  {aiPending.length > 1 && (
+                    <Button
+                      size="small"
+                      onClick={() => aiPending.forEach(r => addPerformer({ name: r.name, role: r.role || guessRole(eventType, title) }))}
+                    >
+                      Add all
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            )}
+
             {performers.length > 0 && (
               <Box mt={1.5}>
                 {performers.map((p, i) => (
