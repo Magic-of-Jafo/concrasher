@@ -347,7 +347,16 @@ model ScheduleEventTalentLink {
   id              String                 @id @default(cuid())
   scheduleItemId  String
   talentProfileId String
+  role            String?
+  order           Int?
+  // The raw name as listed on the source (for provenance / de-dup) when the
+  // matched profile's displayName differs.
+  nameAsListed    String?
   scheduleItem    ConventionScheduleItem @relation(fields: [scheduleItemId], references: [id], onDelete: Cascade)
+  talentProfile   TalentProfile          @relation(fields: [talentProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleItemId, talentProfileId])
+  @@index([talentProfileId])
 }
 
 model ScheduleEventBrandLink {
@@ -441,7 +450,10 @@ model Currency {
 
 model TalentProfile {
   id                String               @id @default(cuid())
-  userId            String               @unique
+  // Nullable: a profile can exist "unclaimed" (created by scraping or an
+  // organizer) before any user owns it. claimedAt is set when a user claims it.
+  userId            String?              @unique
+  claimedAt         DateTime?
   displayName       String
   tagline           String?
   bio               String?
@@ -453,8 +465,10 @@ model TalentProfile {
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   conventions       ConventionTalent[]
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Deleting the owning user un-claims the profile (public data + links survive).
+  user              User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
   media             TalentProfileMedia[]
+  scheduleLinks     ScheduleEventTalentLink[]
 }
 
 model ConventionTalent {
