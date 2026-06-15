@@ -24,6 +24,8 @@ const EnrichmentSchema = z.object({
         registrationUrl: z.string().url().max(500).nullable().optional(),
         descriptionShort: z.string().max(1000).nullable().optional(),
         keywords: z.array(z.string().max(50)).optional(),
+        // IANA timezone id inferred from the venue location (e.g. "America/New_York").
+        timezone: z.string().max(60).nullable().optional(),
     }).optional(),
     tier2: z.object({
         currency: z.string().max(10).nullable().optional(),
@@ -197,6 +199,22 @@ export async function PATCH(
                 if (merged.length !== convention.keywords.length) {
                     update.keywords = merged;
                     changes.push({ field: 'keywords', from: convention.keywords, to: merged, reason: 'tier1 (append-only)' });
+                }
+            }
+
+            // Timezone: the agent infers an IANA id from the venue location. We
+            // resolve it against the seeded Timezone table and set it fill-only,
+            // so an organizer's manual selection is never overridden.
+            if (tier1.timezone && !convention.timezoneId) {
+                const tz = await prisma.timezone.findFirst({
+                    where: { OR: [{ ianaId: tier1.timezone }, { utcAliases: { has: tier1.timezone } }] },
+                    select: { id: true, ianaId: true },
+                });
+                if (tz) {
+                    update.timezoneId = tz.id;
+                    changes.push({ field: 'timezone', from: null, to: tz.ianaId, reason: 'tier1' });
+                } else {
+                    skipped.push(`timezone (unknown IANA "${tier1.timezone}")`);
                 }
             }
         }

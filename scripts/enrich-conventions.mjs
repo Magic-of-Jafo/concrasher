@@ -81,8 +81,9 @@ const EXTRACTION_SCHEMA = {
                     registrationUrl: { type: ['string', 'null'] },
                     descriptionShort: { type: ['string', 'null'], description: 'One or two sentences, neutral tone, max 300 chars' },
                     keywords: { type: 'array', items: { type: 'string' } },
+                    timezone: { type: ['string', 'null'], description: 'IANA timezone id for the venue location, inferred from the city/country, e.g. "America/New_York", "Europe/London", "Australia/Melbourne". null if the location is unknown.' },
                 },
-                required: ['officialName', 'startDate', 'endDate', 'city', 'stateOrRegion', 'country', 'venueName', 'registrationUrl', 'descriptionShort', 'keywords'],
+                required: ['officialName', 'startDate', 'endDate', 'city', 'stateOrRegion', 'country', 'venueName', 'registrationUrl', 'descriptionShort', 'keywords', 'timezone'],
             },
             tier2: {
                 type: 'object',
@@ -361,6 +362,7 @@ async function extract(convention) {
                 '- descriptionShort: neutral, factual, no marketing superlatives.',
                 '- CRITICAL: if the site shows a DIFFERENT year/edition than the one asked about, set ALL confidence to low, use nulls, and explain in notes.',
                 '- For US locations, stateOrRegion must be the two-letter abbreviation.',
+                '- timezone: infer the venue\'s IANA timezone id from its city/country (e.g. "America/New_York", "Europe/London"). Use null only if the location is genuinely unknown.',
             ].join('\n'),
         },
         {
