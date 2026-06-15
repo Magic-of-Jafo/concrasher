@@ -7,18 +7,7 @@ import FlagIcon from '@mui/icons-material/Flag';
 import { useTheme, Theme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import Image from 'next/image';
-
-const EVENT_TYPES = [
-  { value: 'Lecture', color: '#64b5f6' },     // Blue 300
-  { value: 'Workshop', color: '#81c784' },    // Green 300
-  { value: 'Show', color: '#ba68c8' },        // Purple 300
-  { value: 'Panel', color: '#ffb74d' },       // Orange 300
-  { value: 'Competition', color: '#f06292' },  // Pink 300
-  { value: 'Dealers', color: '#4db6ac' },     // Teal 300
-  { value: 'Other', color: '#90a4ae' },       // Blue Grey 300
-  { value: 'Milestone', color: '#ffd54f' },   // Amber 300 - Added for Milestones if not using eventType's color
-];
-const DEFAULT_EVENT_COLOR = '#bdbdbd'; // Grey 400
+import { getEventTypeColor } from '@/lib/eventTypes';
 
 const INTERVAL_MINUTES = 15;
 const ROWS_PER_HOUR = 60 / INTERVAL_MINUTES;
@@ -461,7 +450,7 @@ export default function ScheduleTimelineGrid({
       const { eventItem, layout } = eventData;
       const eventStartMinutes = eventItem.startTimeMinutes;
       const isMilestone = eventItem.durationMinutes === 0;
-      const eventTypeColor = EVENT_TYPES.find(t => t.value === eventItem.eventType)?.color || DEFAULT_EVENT_COLOR;
+      const eventTypeColor = getEventTypeColor(eventItem.eventType);
 
       const isBeingDragged = draggingEventInfo && (eventItem.id || eventItem.tempId) === draggingEventInfo.id;
       // Milestones cannot be resized, so isBeingResized will effectively be false for them due to handleEventMouseDown logic
@@ -524,16 +513,12 @@ export default function ScheduleTimelineGrid({
               onMouseDown={(e) => handleEventMouseDown(e, eventItem)}
               onClick={() => {
                 const eventId = eventItem.id || eventItem.tempId;
-                const wasDragOrResize = dragOrResizeJustFinishedRef.current; // Capture state
-                console.log('[ScheduleTimelineGrid] Milestone Card Clicked. ID:', eventId, 'dragOrResizeJustFinishedRef was:', wasDragOrResize);
-                if (wasDragOrResize) {
-                  dragOrResizeJustFinishedRef.current = false; // Consume the flag
-                  console.log('[ScheduleTimelineGrid] Action (Milestone): Consumed drag/resize flag. onEventSelect NOT called. Ref now false.');
+                // A just-finished drag/resize fires a click too — consume it so
+                // it doesn't also open the editor.
+                if (dragOrResizeJustFinishedRef.current) {
+                  dragOrResizeJustFinishedRef.current = false;
                 } else if (onEventSelect && eventId) {
-                  console.log('[ScheduleTimelineGrid] Action (Milestone): Genuine click. Calling onEventSelect. Ref was already false.');
                   onEventSelect(eventId);
-                } else {
-                  console.log('[ScheduleTimelineGrid] Action (Milestone): Genuine click, but onEventSelect/eventId missing. Ref was false.');
                 }
               }}
               // No resize cursor for milestones
@@ -575,16 +560,12 @@ export default function ScheduleTimelineGrid({
           onMouseDown={(e) => handleEventMouseDown(e, eventItem)}
           onClick={() => {
             const eventId = eventItem.id || eventItem.tempId;
-            const wasDragOrResize = dragOrResizeJustFinishedRef.current; // Capture state
-            console.log('[ScheduleTimelineGrid] Event Card Clicked. ID:', eventId, 'dragOrResizeJustFinishedRef was:', wasDragOrResize);
-            if (wasDragOrResize) {
-              dragOrResizeJustFinishedRef.current = false; // Consume the flag
-              console.log('[ScheduleTimelineGrid] Action (Regular Event): Consumed drag/resize flag. onEventSelect NOT called. Ref now false.');
+            // A just-finished drag/resize fires a click too — consume it so it
+            // doesn't also open the editor.
+            if (dragOrResizeJustFinishedRef.current) {
+              dragOrResizeJustFinishedRef.current = false;
             } else if (onEventSelect && eventId) {
-              console.log('[ScheduleTimelineGrid] Action (Regular Event): Genuine click. Calling onEventSelect. Ref was already false.');
               onEventSelect(eventId);
-            } else {
-              console.log('[ScheduleTimelineGrid] Action (Regular Event): Genuine click, but onEventSelect/eventId missing. Ref was false.');
             }
           }}
           onMouseMove={(e) => {

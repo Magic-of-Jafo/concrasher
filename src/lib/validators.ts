@@ -417,7 +417,7 @@ const ConventionScheduleItemBaseSchema = z.object({
   ),
   eventType: z.string().optional(),
   atPrimaryVenue: z.boolean().default(true),
-  locationName: z.string().optional(),
+  locationName: z.string().optional().nullable(),
   venueId: z.string().uuid().optional().nullable(),
   hasFee: z.boolean().default(false),
   feeTiers: z.array(ScheduleEventFeeTierSchema).optional(),

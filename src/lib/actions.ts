@@ -3,6 +3,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // Correctly import authOptions
 import { db } from "@/lib/db"; // Ensure db is imported
+import { setEventTalent } from "@/lib/talent";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
 import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem } from "@prisma/client"; // Added import
@@ -1226,7 +1227,8 @@ export async function createScheduleItem(input: {
     };
   }
 
-  const { feeTiers, ...itemData } = validatedData.data;
+  // hasFee is not a column on the model (only in the Zod schema) — drop it.
+  const { feeTiers, hasFee, ...itemData } = validatedData.data;
 
   try {
     const newItem = await db.conventionScheduleItem.create({
@@ -1250,8 +1252,27 @@ export async function createScheduleItem(input: {
       },
     });
 
+    // Persist performers (talent tagging). `talent` is stripped by the Zod
+    // schema, so read it from the raw input; setEventTalent matches/creates
+    // unclaimed profiles and links them to the event + convention.
+    const talent = (input.data as any)?.talent;
+    if (Array.isArray(talent)) {
+      await setEventTalent(newItem.id, input.conventionId, talent);
+    }
+
+    const itemWithRelations = await db.conventionScheduleItem.findUniqueOrThrow({
+      where: { id: newItem.id },
+      include: {
+        feeTiers: true,
+        talentLinks: {
+          include: { talentProfile: { select: { id: true, displayName: true, userId: true } } },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
     revalidatePath(`/organizer/conventions/${input.conventionId}/edit`);
-    return { success: true, item: newItem };
+    return { success: true, item: itemWithRelations };
   } catch (error: any) {
     console.error("FULL ERROR when creating schedule item:", error);
     return { success: false, error: `Database error: ${error.message}` };
@@ -1280,7 +1301,10 @@ export async function updateScheduleItem(input: {
     };
   }
 
-  const { id, feeTiers, ...itemData } = validatedData.data;
+  // venueId/scheduleDayId must be written through their relations (Prisma
+  // rejects the scalar FK on this update input); hasFee is not a column on the
+  // model (only in the Zod schema). Pull all three out of the scalar spread.
+  const { id, feeTiers, venueId, scheduleDayId, hasFee, ...itemData } = validatedData.data;
   if (!id) {
     return { success: false, error: "Item ID is required for updates." };
   }
@@ -1292,7 +1316,12 @@ export async function updateScheduleItem(input: {
         where: { id },
         data: {
           ...itemData,
-          scheduleDayId: itemData.scheduleDayId,
+          ...(scheduleDayId !== undefined
+            ? { scheduleDay: scheduleDayId === null ? { disconnect: true } : { connect: { id: scheduleDayId } } }
+            : {}),
+          ...(venueId !== undefined
+            ? { venue: venueId === null ? { disconnect: true } : { connect: { id: venueId } } }
+            : {}),
         },
       });
 
@@ -1343,8 +1372,26 @@ export async function updateScheduleItem(input: {
       return finalItem;
     });
 
+    // Persist performers (talent tagging). `talent` is stripped by the Zod
+    // schema, so read it from the raw input. Runs outside the transaction.
+    const talent = (input.data as any)?.talent;
+    if (Array.isArray(talent)) {
+      await setEventTalent(id, input.conventionId, talent);
+    }
+
+    const itemWithRelations = await db.conventionScheduleItem.findUniqueOrThrow({
+      where: { id },
+      include: {
+        feeTiers: true,
+        talentLinks: {
+          include: { talentProfile: { select: { id: true, displayName: true, userId: true } } },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
     revalidatePath(`/organizer/conventions/${input.conventionId}/edit`);
-    return { success: true, item: updatedItem };
+    return { success: true, item: itemWithRelations };
 
   } catch (error: any) {
     console.error("Failed to update schedule item:", error);
@@ -1386,7 +1433,13 @@ export async function getScheduleItemsByConvention(conventionId: string) {
   try {
     const items = await db.conventionScheduleItem.findMany({
       where: { conventionId },
-      include: { feeTiers: true },
+      include: {
+        feeTiers: true,
+        talentLinks: {
+          include: { talentProfile: { select: { id: true, displayName: true, userId: true } } },
+          orderBy: { order: 'asc' },
+        },
+      },
       orderBy: [
         { dayOffset: 'asc' },
         { startTimeMinutes: 'asc' }

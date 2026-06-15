@@ -105,6 +105,90 @@ export async function findOrCreateUnclaimedTalent(
     return { ...created, created: true };
 }
 
+export interface DetectedTalent {
+    id: string;
+    displayName: string;
+    claimed: boolean;
+    matchedName: string;  // the normalized name/alias that matched the text
+    fuzzy: boolean;       // matched approximately (likely misspelling) vs exactly
+}
+
+/** Levenshtein edit distance (iterative, two-row). */
+function levenshtein(a: string, b: string): number {
+    const m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        }
+        prev = cur;
+    }
+    return prev[n];
+}
+
+/** How many edits we'll tolerate for a fuzzy name match, by name length. */
+function fuzzyTolerance(len: number): number {
+    if (len <= 6) return 1;   // short names: only tiny typos
+    if (len <= 12) return 2;
+    return 3;
+}
+
+/**
+ * Find existing talent whose name (or any alias) appears in free text — used to
+ * auto-suggest performers from an event title/description as the organizer types.
+ *
+ * Two passes, both bounded to names already in the DB (so effectively
+ * zero-false-positive — non-person titles like "Dealer's Room" never hit):
+ *   1. Exact: whole-word match over the normalized text.
+ *   2. Fuzzy: for multi-word names only, slide a same-length token window over
+ *      the text and accept small edit distances — catches misspellings like
+ *      "John Shyrock" → "John Shryock". Flagged `fuzzy` so the UI can ask
+ *      "did you mean…?" rather than silently asserting a match.
+ *
+ * Naive full scan of the talent table — fine at current scale; swap for a
+ * token-prefix index if the table grows large.
+ */
+export async function detectTalentInText(text: string): Promise<DetectedTalent[]> {
+    const norm = normalizeName(text);
+    if (!norm) return [];
+    const tokens = norm.split(' ').filter(Boolean);
+    const haystack = ` ${norm} `;
+    const all = await prisma.talentProfile.findMany({
+        select: { id: true, displayName: true, userId: true, normalizedNames: true },
+    });
+    const out: DetectedTalent[] = [];
+    for (const t of all) {
+        const names = t.normalizedNames.length ? t.normalizedNames : [normalizeName(t.displayName)];
+
+        const exact = names.find(n => n && haystack.includes(` ${n} `));
+        if (exact) {
+            out.push({ id: t.id, displayName: t.displayName, claimed: t.userId !== null, matchedName: exact, fuzzy: false });
+            continue;
+        }
+
+        // Fuzzy pass — multi-word names only (single short words are too noisy).
+        let best: { name: string; dist: number } | null = null;
+        for (const n of names) {
+            const words = n.split(' ').filter(Boolean);
+            if (words.length < 2) continue;
+            const tol = fuzzyTolerance(n.length);
+            for (let i = 0; i + words.length <= tokens.length; i++) {
+                const window = tokens.slice(i, i + words.length).join(' ');
+                const d = levenshtein(window, n);
+                if (d > 0 && d <= tol && (!best || d < best.dist)) best = { name: n, dist: d };
+            }
+        }
+        if (best) {
+            out.push({ id: t.id, displayName: t.displayName, claimed: t.userId !== null, matchedName: best.name, fuzzy: true });
+        }
+    }
+    return out;
+}
+
 export interface ClaimCandidate {
     id: string;
     displayName: string;

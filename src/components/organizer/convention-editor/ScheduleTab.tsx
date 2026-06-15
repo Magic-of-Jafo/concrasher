@@ -19,17 +19,16 @@ import {
 import ScheduleEventForm from './ScheduleEventForm';
 import ScheduleTimelineGrid from './ScheduleTimelineGrid';
 import { format, addDays } from 'date-fns';
+import { getEventTypeColor } from '@/lib/eventTypes';
 
-const EVENT_TYPES = [
-  { value: 'Lecture', color: '#64b5f6' },
-  { value: 'Workshop', color: '#81c784' },
-  { value: 'Show', color: '#ba68c8' },
-  { value: 'Panel', color: '#ffb74d' },
-  { value: 'Competition', color: '#f06292' },
-  { value: 'Dealers', color: '#4db6ac' },
-  { value: 'Other', color: '#90a4ae' },
-];
-const DEFAULT_EVENT_COLOR = '#bdbdbd';
+// Minutes-since-midnight → "9:30 AM" (for the left-list hover tooltip).
+function fmtTime(mins: number): string {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const dh = h % 12 || 12;
+  return `${dh}:${m.toString().padStart(2, '0')} ${period}`;
+}
 
 interface ScheduleTabProps {
   conventionId: string;
@@ -307,14 +306,14 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
       }
 
       if (result.success) {
-        const updatedItem = result.item;
-        if (updatedItem) {
-          if (data.id) { // It was an update
-            setScheduleItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
-          } else { // It was a create
-            setScheduleItems(prev => [...prev, updatedItem]);
-          }
-        }
+        // Re-fetch authoritatively so the list + editor reflect persisted
+        // relations (talent links, fee tiers). Optimistic patching can leave a
+        // stale item missing its relations, which made reopened events look
+        // like their talent didn't save.
+        try {
+          const refreshed = await getScheduleItemsByConvention(conventionId);
+          if (refreshed.success) setScheduleItems(refreshed.items ?? []);
+        } catch { /* keep existing items if refetch fails */ }
         setSaveSuccessMessage('Event saved!');
         setTimeout(() => setSaveSuccessMessage(null), 3000);
         setFormOpen(false); // Close the form on successful save
@@ -663,6 +662,10 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
     );
   }
 
+  // Init requires a start date, and (for multi-day cons) an end date — the day
+  // structures are generated from the start→end span.
+  const datesReady = !!startDate && (isOneDayEvent || !!conventionEndDate);
+
   if (scheduleDays.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', mt: 4, p: 2 }}>
@@ -675,13 +678,13 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Click the button below to create the daily timeline structures based on your convention's start date and duration.
         </Typography>
-        <Tooltip title={!startDate ? "Convention start date is not set. Please set it in the 'Details' tab first." : ""}>
+        <Tooltip title={!datesReady ? "Set the convention's start and end dates in the 'Details' tab first." : ""}>
           <span>
             <Button
               variant="contained"
               color="primary"
               onClick={handleInitializeScheduleDays}
-              disabled={initLoading || !startDate}
+              disabled={initLoading || !datesReady}
               sx={{ minWidth: 180 }}
             >
               {initLoading ? <CircularProgress size={24} /> : 'Initialize Timelines'}
@@ -739,16 +742,50 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
               <Typography sx={{ mt: 2, textAlign: 'center' }}>No events created yet. Click "Add New Event" to start.</Typography>
             )}
             {sortedScheduleItemsForList.map((item, index) => {
-              const eventTypeDetails = EVENT_TYPES.find(et => et.value === item.eventType);
-              const baseColor = eventTypeDetails?.color || DEFAULT_EVENT_COLOR;
+              const baseColor = getEventTypeColor(item.eventType);
               const isPlaced = typeof item.startTimeMinutes === 'number' && typeof item.dayOffset === 'number';
               const finalColor = baseColor;
               const paperBorder = '1px solid #eee';
               const showDivider = firstPlacedItemIndex > 0 && index === firstPlacedItemIndex;
 
+              const dayLabel = startDate
+                ? format(addDays(startDate, item.dayOffset), 'EEE, MMM d')
+                : `Day ${(item.dayOffset ?? 0) + 1}`;
+              const timeLabel = isPlaced
+                ? (item.durationMinutes === 0
+                  ? `${dayLabel} · ${fmtTime(item.startTimeMinutes)} · Milestone`
+                  : `${dayLabel} · ${fmtTime(item.startTimeMinutes)}–${fmtTime(item.startTimeMinutes + (item.durationMinutes || 0))}`)
+                : 'Unscheduled';
+              const talentNames: string[] = (item.talentLinks || [])
+                .map((l: any) => l.nameAsListed || l.talentProfile?.displayName)
+                .filter(Boolean);
+              const tooltipContent = (
+                <Box sx={{ p: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{item.title || '(Untitled Event)'}</Typography>
+                  <Typography variant="caption" component="div" sx={{ opacity: 0.9 }}>
+                    {(item.eventType || 'Other')}{item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}
+                  </Typography>
+                  <Typography variant="caption" component="div" sx={{ opacity: 0.9 }}>{timeLabel}</Typography>
+                  {item.locationName && (
+                    <Typography variant="caption" component="div" sx={{ opacity: 0.9 }}>📍 {item.locationName}</Typography>
+                  )}
+                  {item.description && (
+                    <Typography variant="caption" component="div" sx={{ mt: 0.5, maxWidth: 260, whiteSpace: 'normal' }}>
+                      {item.description.length > 160 ? item.description.slice(0, 160) + '…' : item.description}
+                    </Typography>
+                  )}
+                  {talentNames.length > 0 && (
+                    <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+                      <strong>Talent:</strong> {talentNames.join(', ')}
+                    </Typography>
+                  )}
+                </Box>
+              );
+
               return (
                 <React.Fragment key={item.id || item.tempId}>
                   {showDivider && <Divider sx={{ my: 1.5, borderColor: 'primary.main', borderWidth: '1px' }} />}
+                  <Tooltip title={tooltipContent} placement="right" arrow enterDelay={350} enterNextDelay={350}>
                   <Paper
                     data-event-id={item.id || item.tempId}
                     draggable={true}
@@ -804,6 +841,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
                       {item.title || '(Untitled Event)'}
                     </Typography>
                   </Paper>
+                  </Tooltip>
                 </React.Fragment>
               );
             })}

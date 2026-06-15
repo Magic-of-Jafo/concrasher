@@ -2,21 +2,49 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Switch, FormControlLabel, Select, InputLabel, FormControl, Box, Typography, IconButton, Tooltip, FormHelperText
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Switch, FormControlLabel, Select, InputLabel, FormControl, Box, Typography, IconButton, Tooltip, FormHelperText, Autocomplete, Chip, CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EventIcon from '@mui/icons-material/Event';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import { EVENT_TYPES, getEventTypeColor, isCanonicalEventType } from '@/lib/eventTypes';
 
-const EVENT_TYPES = [
-  { value: 'Lecture', color: '#64b5f6' },     // Blue 300
-  { value: 'Workshop', color: '#81c784' },    // Green 300
-  { value: 'Show', color: '#ba68c8' },        // Purple 300
-  { value: 'Panel', color: '#ffb74d' },       // Orange 300
-  { value: 'Competition', color: '#f06292' },  // Pink 300
-  { value: 'Dealers', color: '#4db6ac' },     // Teal 300
-  { value: 'Other', color: '#90a4ae' },       // Blue Grey 300
-];
+// Roles a performer can have on an event. Free text also allowed via the form.
+const PERFORMER_ROLES = ['Performer', 'Lecturer', 'MC', 'Panelist', 'Host', 'Workshop Leader', 'Judge', 'Guest of Honor', 'Other'];
+
+// Best-guess role from the event type + title, so confirming a detected
+// performer is a single click. Falls back to 'Performer'.
+function guessRole(eventType: string, title: string): string {
+  const t = `${eventType} ${title}`.toLowerCase();
+  if (/\bmc\b|emcee|\bhost(ed)?\b/.test(t)) return 'MC';
+  if (/panel/.test(t)) return 'Panelist';
+  if (/lecture/.test(t)) return 'Lecturer';
+  if (/workshop/.test(t)) return 'Workshop Leader';
+  if (/compet|contest|judg/.test(t)) return 'Judge';
+  return 'Performer';
+}
+
+interface PerformerRow {
+  talentId?: string;   // set when matched to an existing profile
+  name: string;        // display name (also used to create/match)
+  role: string;
+  claimed?: boolean;   // existing profile is owned by a real user
+}
+
+interface TalentSearchOption {
+  id: string;
+  displayName: string;
+  claimed: boolean;
+}
+
+interface DetectedSuggestion {
+  id: string;
+  displayName: string;
+  claimed: boolean;
+  fuzzy?: boolean;
+}
+
 
 interface ScheduleEventFormProps {
   open: boolean;
@@ -50,9 +78,74 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
   const [noFee, setNoFee] = useState(true);
   const [feeTiers, setFeeTiers] = useState<{ id?: string; label: string; amount: string }[]>([{ label: 'Standard', amount: '' }]);
 
+  // Performers (talent tagging)
+  const [performers, setPerformers] = useState<PerformerRow[]>([]);
+  const [talentInput, setTalentInput] = useState('');
+  const [talentOptions, setTalentOptions] = useState<TalentSearchOption[]>([]);
+  const [talentLoading, setTalentLoading] = useState(false);
+  // Auto-detected existing talent found in the title/description.
+  const [detected, setDetected] = useState<DetectedSuggestion[]>([]);
+
   // Validation state
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isCreatingNewEvent, setIsCreatingNewEvent] = useState(forceCreateNew);
+
+  // Debounced search against existing talent (claimed or unclaimed).
+  useEffect(() => {
+    const q = talentInput.trim();
+    if (!q) { setTalentOptions([]); return; }
+    setTalentLoading(true);
+    const handle = setTimeout(() => {
+      fetch(`/api/talent/search?q=${encodeURIComponent(q)}`)
+        .then(res => res.json())
+        .then(data => setTalentOptions(Array.isArray(data?.results) ? data.results : []))
+        .catch(() => setTalentOptions([]))
+        .finally(() => setTalentLoading(false));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [talentInput]);
+
+  // Auto-detect existing talent named in the title/description (debounced).
+  useEffect(() => {
+    if (!open) { setDetected([]); return; }
+    const text = `${title} ${description}`.trim();
+    if (!text) { setDetected([]); return; }
+    const handle = setTimeout(() => {
+      fetch('/api/talent/detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+        .then(res => res.json())
+        .then(data => setDetected(Array.isArray(data?.results) ? data.results : []))
+        .catch(() => setDetected([]));
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [open, title, description]);
+
+  const addPerformer = (row: PerformerRow) => {
+    const name = row.name.trim();
+    if (!name) return;
+    // De-dupe inside the updater (by talentId if known, else by name) so rapid
+    // adds — e.g. "Add all" — can't create duplicates from stale state.
+    setPerformers(prev => {
+      const exists = prev.some(p =>
+        (row.talentId && p.talentId === row.talentId) ||
+        (!row.talentId && p.name.trim().toLowerCase() === name.toLowerCase())
+      );
+      return exists ? prev : [...prev, { ...row, name }];
+    });
+    setTalentInput('');
+    setTalentOptions([]);
+  };
+
+  const updatePerformerRole = (index: number, role: string) => {
+    setPerformers(prev => prev.map((p, i) => i === index ? { ...p, role } : p));
+  };
+
+  const removePerformer = (index: number) => {
+    setPerformers(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Populate venueOptions from props when open/atPrimaryVenue changes
   useEffect(() => {
@@ -132,17 +225,38 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
           }))
           : [{ label: 'Standard', amount: '' }]
       );
+
+      // Load existing performers from the event's talent links.
+      const links = Array.isArray(eventToLoad?.talentLinks) ? eventToLoad.talentLinks : [];
+      setPerformers(
+        links.map((l: any) => ({
+          talentId: l.talentProfile?.id ?? l.talentProfileId,
+          name: l.nameAsListed || l.talentProfile?.displayName || '',
+          role: l.role || 'Performer',
+          claimed: !!l.talentProfile?.userId,
+        })).filter((p: PerformerRow) => p.name)
+      );
+      setTalentInput('');
+      setTalentOptions([]);
       setErrors({});
     } else {
       setIsCreatingNewEvent(forceCreateNew); // Reset based on forceCreateNew
       setDurationMinutes('30'); // Reset duration on close if needed
       setIsMilestone(false);     // Reset milestone on close
+      setPerformers([]);
+      setTalentInput('');
+      setTalentOptions([]);
       setErrors({});
     }
   }, [open, item, forceCreateNew]);
 
   // Color for event type
-  const eventTypeColor = EVENT_TYPES.find(t => t.value === eventType)?.color || '#1976d2';
+  const eventTypeColor = getEventTypeColor(eventType);
+
+  // Detected talent not already added as a performer, split by match confidence.
+  const pendingSuggestions = detected.filter(d => !performers.some(p => p.talentId === d.id));
+  const exactSuggestions = pendingSuggestions.filter(d => !d.fuzzy);
+  const fuzzySuggestions = pendingSuggestions.filter(d => d.fuzzy);
 
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
@@ -198,6 +312,12 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
           label: t.label.trim(),
           amount: Number(t.amount.trim())
         })),
+      // Performers — backend matches/creates talent and links them to the event.
+      talent: performers.map(p => ({
+        talentId: p.talentId,
+        name: p.name.trim(),
+        role: p.role || null,
+      })),
     };
 
     // Add fields that only exist on the original `item` if needed for context,
@@ -257,11 +377,18 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
               label="Event Type"
               renderValue={(selectedValue) => (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <EventIcon sx={{ color: EVENT_TYPES.find(t => t.value === selectedValue)?.color || 'inherit', mr: 1 }} />
+                  <EventIcon sx={{ color: getEventTypeColor(selectedValue as string), mr: 1 }} />
                   {selectedValue}
                 </Box>
               )}
             >
+              {/* Keep a legacy value (e.g. "Show") selectable so it doesn't render blank. */}
+              {eventType && !isCanonicalEventType(eventType) && (
+                <MenuItem value={eventType}>
+                  <EventIcon sx={{ color: getEventTypeColor(eventType), mr: 1 }} />
+                  {eventType} (legacy)
+                </MenuItem>
+              )}
               {EVENT_TYPES.map((type) => (
                 <MenuItem key={type.value} value={type.value}>
                   <EventIcon sx={{ color: type.color, mr: 1 }} />
@@ -279,6 +406,143 @@ export default function ScheduleEventForm({ open, onClose, item, conventionId, v
             rows={3}
             margin="normal"
           />
+
+          {/* Performers — tag the talent appearing in this event */}
+          <Box mt={2} p={2} border={1} borderColor="grey.300" borderRadius={1}>
+            <Typography variant="subtitle1" mb={1}>Talent</Typography>
+
+            {exactSuggestions.length > 0 && (
+              <Box mb={1.5}>
+                <Typography variant="caption" color="text.secondary">
+                  Detected in title/description — tap to add:
+                </Typography>
+                <Box display="flex" flexWrap="wrap" gap={0.75} mt={0.5} alignItems="center">
+                  {exactSuggestions.map(s => (
+                    <Chip
+                      key={s.id}
+                      icon={<AddIcon />}
+                      label={s.displayName}
+                      onClick={() => addPerformer({ talentId: s.id, name: s.displayName, role: guessRole(eventType, title), claimed: s.claimed })}
+                      color={s.claimed ? 'success' : 'default'}
+                      variant="outlined"
+                      size="small"
+                      clickable
+                    />
+                  ))}
+                  {exactSuggestions.length > 1 && (
+                    <Button
+                      size="small"
+                      onClick={() => exactSuggestions.forEach(s => addPerformer({ talentId: s.id, name: s.displayName, role: guessRole(eventType, title), claimed: s.claimed }))}
+                    >
+                      Add all
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            )}
+
+            {fuzzySuggestions.length > 0 && (
+              <Box mb={1.5}>
+                <Typography variant="caption" color="warning.main">
+                  Did you mean… ? (possible misspelling — tap to add the correct name)
+                </Typography>
+                <Box display="flex" flexWrap="wrap" gap={0.75} mt={0.5} alignItems="center">
+                  {fuzzySuggestions.map(s => (
+                    <Tooltip key={s.id} title={`Add "${s.displayName}" as the performer`}>
+                      <Chip
+                        icon={<AddIcon />}
+                        label={`${s.displayName}?`}
+                        onClick={() => addPerformer({ talentId: s.id, name: s.displayName, role: guessRole(eventType, title), claimed: s.claimed })}
+                        color="warning"
+                        variant="outlined"
+                        size="small"
+                        clickable
+                      />
+                    </Tooltip>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            <Autocomplete
+              freeSolo
+              options={talentOptions}
+              loading={talentLoading}
+              value={null}
+              inputValue={talentInput}
+              onInputChange={(_, v) => setTalentInput(v)}
+              filterOptions={(x) => x}
+              getOptionLabel={(o) => (typeof o === 'string' ? o : o.displayName)}
+              isOptionEqualToValue={(o, v) => (o as TalentSearchOption).id === (v as TalentSearchOption).id}
+              onChange={(_, value) => {
+                if (!value) return;
+                if (typeof value === 'string') {
+                  addPerformer({ name: value, role: 'Performer' });
+                } else {
+                  addPerformer({ talentId: value.id, name: value.displayName, role: 'Performer', claimed: value.claimed });
+                }
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={(option as TalentSearchOption).id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                    <Typography sx={{ flexGrow: 1 }}>{(option as TalentSearchOption).displayName}</Typography>
+                    <Chip
+                      size="small"
+                      label={(option as TalentSearchOption).claimed ? 'Claimed' : 'Unclaimed'}
+                      color={(option as TalentSearchOption).claimed ? 'success' : 'default'}
+                      variant={(option as TalentSearchOption).claimed ? 'filled' : 'outlined'}
+                    />
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Add talent"
+                  placeholder="Search existing talent, or type a new name…"
+                  helperText="Pick an existing profile, or type a new name to create an unclaimed one"
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {talentLoading ? <CircularProgress size={18} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+            {performers.length > 0 && (
+              <Box mt={1.5}>
+                {performers.map((p, i) => (
+                  <Box key={p.talentId || `new-${p.name}`} display="flex" alignItems="center" gap={1} mb={1}>
+                    <Box display="flex" alignItems="center" gap={0.5} sx={{ flexGrow: 1, minWidth: 0 }}>
+                      {p.claimed && (
+                        <Tooltip title="Claimed profile (owned by a registered user)">
+                          <VerifiedIcon fontSize="small" color="success" />
+                        </Tooltip>
+                      )}
+                      <Typography noWrap title={p.name}>{p.name}</Typography>
+                      {!p.talentId && <Chip size="small" label="New" color="info" variant="outlined" />}
+                    </Box>
+                    <FormControl size="small" sx={{ width: 160 }}>
+                      <Select
+                        value={PERFORMER_ROLES.includes(p.role) ? p.role : 'Other'}
+                        onChange={e => updatePerformerRole(i, e.target.value)}
+                      >
+                        {PERFORMER_ROLES.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    <Tooltip title="Remove performer">
+                      <IconButton onClick={() => removePerformer(i)}><DeleteIcon /></IconButton>
+                    </Tooltip>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+
           <FormControlLabel
             control={<Switch checked={isMilestone} onChange={(e) => handleMilestoneChange(e.target.checked)} />}
             label="This is a milestone event (no duration)"
