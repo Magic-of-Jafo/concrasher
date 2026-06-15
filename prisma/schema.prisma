@@ -455,6 +455,12 @@ model TalentProfile {
   userId            String?              @unique
   claimedAt         DateTime?
   displayName       String
+  // Other names this person performs/is listed under (real name, other stage
+  // names), shown as "aka …". e.g. displayName "Lucy Darling", alias "Carissa Hendrix".
+  aliases           String[]             @default([])
+  // Normalized displayName + aliases — the match key for de-dup across the
+  // real-name / stage-name divide. Maintained by the talent service.
+  normalizedNames   String[]             @default([])
   tagline           String?
   bio               String?
   profilePictureUrl String?
