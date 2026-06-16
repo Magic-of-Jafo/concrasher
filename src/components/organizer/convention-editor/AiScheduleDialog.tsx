@@ -222,7 +222,7 @@ export default function AiScheduleDialog({
                         <Typography variant="caption" color="text.secondary">Source: {preview.source}</Typography>
 
                         <Box sx={{ mt: 1.5, maxHeight: 340, overflowY: 'auto', pr: 0.5 }}>
-                            {[...byDay.keys()].sort((a, b) => a - b).map(off => (
+                            {Array.from(byDay.keys()).sort((a, b) => a - b).map(off => (
                                 <Box key={off} sx={{ mb: 1.5 }}>
                                     <Typography variant="overline" color="text.secondary">Day {off + 1}</Typography>
                                     {byDay.get(off)!.sort((a, b) => a.startTimeMinutes - b.startTimeMinutes).map((e, i) => {
