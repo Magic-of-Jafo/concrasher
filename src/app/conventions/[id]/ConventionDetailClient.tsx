@@ -40,6 +40,7 @@ import PricingSection from '@/components/conventions/detail/PricingSection';
 import VenueSection from '@/components/conventions/detail/VenueSection';
 import HotelSection from '@/components/conventions/detail/HotelSection';
 import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
+import FestivalSchedule from '@/components/conventions/detail/FestivalSchedule';
 import DealersSection from '@/components/conventions/detail/DealersSection';
 import MediaGallerySection from '@/components/conventions/detail/MediaGallerySection';
 import { TrackedTabs, TabData } from '@/components/TrackedTabs';
@@ -579,7 +580,9 @@ export default function ConventionDetailClient({ convention, canEdit = false }: 
             case 'hotel':
                 return <HotelSection convention={convention} />;
             case 'schedule':
-                return <ScheduleSection convention={convention} />;
+                return convention.type === 'FESTIVAL'
+                    ? <FestivalSchedule convention={convention} />
+                    : <ScheduleSection convention={convention} />;
             case 'dealers':
                 return <DealersSection convention={convention} />;
             case 'media':

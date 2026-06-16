@@ -157,6 +157,7 @@ model Convention {
   venueName                String?
   websiteUrl               String?
   status                   ConventionStatus         @default(DRAFT)
+  type                     ConventionType           @default(CONVENTION)
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
   stateAbbreviation        String?
@@ -183,6 +184,7 @@ model Convention {
   hotels                   Hotel[]
   priceDiscounts           PriceDiscount[]
   priceTiers               PriceTier[]
+  productions              Production[]
   scheduleDays             ScheduleDay[]
   venues                   Venue[]
   tags                     Tag[]                    @relation("ConventionTags")
@@ -327,12 +329,40 @@ model ConventionScheduleItem {
   durationMinutes  Int?
   startTimeMinutes Int?
   scheduleDayId    String?
+  productionId     String?
+  soldOut          Boolean                   @default(false)
   convention       Convention                @relation(fields: [conventionId], references: [id], onDelete: Cascade)
   scheduleDay      ScheduleDay?              @relation(fields: [scheduleDayId], references: [id])
   venue            Venue?                    @relation(fields: [venueId], references: [id])
+  production       Production?               @relation(fields: [productionId], references: [id], onDelete: Cascade)
   brandLinks       ScheduleEventBrandLink[]
   feeTiers         ScheduleEventFeeTier[]
   talentLinks      ScheduleEventTalentLink[]
+
+  @@index([productionId])
+}
+
+// A festival "Show" (production/act): groups its repeat performances
+// (ConventionScheduleItem) and holds the show-level metadata the public
+// show-cards display. Only used when Convention.type == FESTIVAL.
+model Production {
+  id            String                   @id @default(cuid())
+  conventionId  String
+  title         String
+  tagline       String?
+  ageRating     String?
+  description   String?
+  coverImageUrl String?
+  detailsUrl    String?
+  priceTiers    Json?
+  priceNote     String?
+  order         Int?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  convention    Convention               @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  performances  ConventionScheduleItem[]
+
+  @@index([conventionId])
 }
 
 model ScheduleEventFeeTier {
@@ -536,6 +566,11 @@ enum ConventionStatus {
   PUBLISHED
   PAST
   CANCELLED
+}
+
+enum ConventionType {
+  CONVENTION
+  FESTIVAL
 }
 
 enum BrandUserRole {

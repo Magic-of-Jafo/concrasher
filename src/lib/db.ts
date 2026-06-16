@@ -106,6 +106,17 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
           ]
         },
 
+        // Festival productions (shows) + their performances
+        productions: {
+          include: {
+            performances: {
+              include: { venue: true },
+              orderBy: [{ dayOffset: 'asc' }, { startTimeMinutes: 'asc' }],
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+
         // Dealer information
         dealerLinks: {
           orderBy: {
