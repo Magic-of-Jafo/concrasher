@@ -222,6 +222,14 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             const start = event.startTimeMinutes as number;
                             const isMilestone = !event.durationMinutes;
                             const talent = (event.talentLinks || []).filter(l => l.talentProfile?.id);
+                            // "Featuring" is a catch-all: only performers NOT already named in
+                            // the title or description, so no name is shown twice.
+                            const proseText = `${event.title || ''} ${event.description || ''}`.toLowerCase();
+                            const featuring = talent.filter(l =>
+                                ![l.nameAsListed, l.talentProfile?.displayName]
+                                    .filter(Boolean)
+                                    .some(n => proseText.includes(String(n).toLowerCase()))
+                            );
 
                             return (
                                 <Box
@@ -292,21 +300,22 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                             </Box>
                                         )}
 
-                                        {talent.length > 0 && (
+                                        {featuring.length > 0 && (
                                             <Typography variant="body2" sx={{ mt: 0.4, fontSize: '0.82rem', color: 'text.secondary' }}>
-                                                {renderTalentList(talent)}
-                                            </Typography>
-                                        )}
-
-                                        {event.locationName && (
-                                            <Typography variant="body2" sx={{ mt: 0.25, fontSize: '0.78rem', color: 'text.secondary' }}>
-                                                📍 {event.locationName}
+                                                <Box component="span" sx={{ fontWeight: 600 }}>Featuring: </Box>
+                                                {renderTalentList(featuring)}
                                             </Typography>
                                         )}
 
                                         {event.description && (
                                             <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.82rem', color: 'text.secondary', whiteSpace: 'pre-wrap' }}>
                                                 {linkifyNames(event.description, event.talentLinks)}
+                                            </Typography>
+                                        )}
+
+                                        {event.locationName && (
+                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.78rem', color: 'text.secondary' }}>
+                                                📍 {event.locationName}
                                             </Typography>
                                         )}
                                     </Box>

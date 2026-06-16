@@ -582,7 +582,7 @@ export default function ScheduleTimelineGrid({
           sx={{
             ...commonSx,
             height: `${heightPx}px`,
-            backgroundColor: eventTypeColor, color: '#fff', p: 0.5, borderRadius: '4px', overflow: 'hidden',
+            backgroundColor: eventTypeColor, color: theme.palette.getContrastText(eventTypeColor), p: 0.5, borderRadius: '4px', overflow: 'hidden',
             fontSize: '0.75rem',
           }}
         >

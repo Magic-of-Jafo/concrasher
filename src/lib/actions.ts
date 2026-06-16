@@ -15,7 +15,6 @@ import {
   type ConventionScheduleItemCreateInput,
   type ConventionScheduleItemUpdateInput,
   type ScheduleEventFeeTierInput,
-  ConventionScheduleItemBulkInputSchema, // Added for bulk upload
   BrandCreateSchema,
   type BrandCreateInput,
   BrandUpdateSchema,
@@ -24,7 +23,6 @@ import {
   type ConventionMediaData,
   ConventionSettingSchema,
   type ConventionSettingData,
-  // ConventionScheduleItemBulkUploadSchema, // Corrected: Removed the problematic one, this is the main schema for the array - THIS LINE IS THE CULPRIT
 } from './validators';
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
@@ -1648,177 +1646,6 @@ export async function deleteScheduleDay(conventionId: string, scheduleDayId: str
       return { success: false, error: `Database error: ${error.message}` };
     }
     return { success: false, error: "An unexpected error occurred while deleting the schedule day." };
-  }
-}
-
-export async function bulkCreateScheduleItems(
-  conventionId: string,
-  rawItems: any[] // Raw items from JSON input, expect array of objects
-): Promise<{
-  success: boolean;
-  message?: string;
-  error?: string;
-  createdCount?: number;
-  errors?: { itemIndex: number; message: string; originalItem?: any }[];
-}> {
-  "use server";
-
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return { success: false, error: "Authentication required." };
-  }
-
-  // Authorization: Check if user is admin or organizer of this convention
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { roles: true }
-  });
-  const userRoles = user?.roles || [];
-
-  if (!userRoles.includes(Role.ADMIN)) {
-    const conventionForAuth = await db.convention.findUnique({
-      where: { id: conventionId },
-      select: { series: { select: { organizerUserId: true } } },
-    });
-    if (!conventionForAuth?.series?.organizerUserId || conventionForAuth.series.organizerUserId !== session.user.id) {
-      return { success: false, error: "Unauthorized. You must be an admin or the organizer of this convention." };
-    }
-  }
-
-  if (!Array.isArray(rawItems)) {
-    return { success: false, error: "Invalid input: Expected an array of schedule items." };
-  }
-
-  const normalizedItemsForZod = rawItems.map((item) => {
-    let mutableItem = { ...item };
-    if (typeof mutableItem.startTimeMinutes === 'number' && mutableItem.startTimeMinutes >= 1440) {
-      const additionalDays = Math.floor(mutableItem.startTimeMinutes / 1440);
-      mutableItem.dayOffset = (typeof mutableItem.dayOffset === 'number' ? mutableItem.dayOffset : 0) + additionalDays;
-      mutableItem.startTimeMinutes %= 1440;
-    }
-    if (typeof mutableItem.dayOffset !== 'number') {
-      mutableItem.dayOffset = 0;
-    }
-    return mutableItem;
-  });
-
-  const payload = {
-    conventionId,
-    scheduleItems: normalizedItemsForZod,
-  };
-
-  // Validate the entire payload against the main schema
-  const validationResult = ConventionScheduleItemBulkInputSchema.safeParse(payload);
-
-  if (!validationResult.success) {
-    return {
-      success: false,
-      error: "Payload validation failed.",
-      errors: validationResult.error.issues.map(issue => {
-        let itemIndex = -1;
-        if (issue.path.length > 1 && issue.path[0] === 'scheduleItems' && typeof issue.path[1] === 'number') {
-          itemIndex = issue.path[1];
-        }
-        return {
-          itemIndex: itemIndex,
-          message: `Validation error for item at index ${itemIndex !== -1 ? itemIndex : '(unknown)'}: [${issue.path.join('.')}] ${issue.message}`,
-          originalItem: itemIndex !== -1 && itemIndex < rawItems.length ? rawItems[itemIndex] : undefined
-        };
-      }),
-    };
-  }
-
-  const validatedItems = validationResult.data.scheduleItems;
-  const itemProcessingErrors: { itemIndex: number; message: string; originalItem?: any }[] = [];
-  let createdCount = 0;
-
-  try {
-    await db.$transaction(async (tx) => {
-      for (let i = 0; i < validatedItems.length; i++) {
-        const itemData = validatedItems[i];
-        const originalItemForError = rawItems[i];
-
-        try {
-          let scheduleDay = await tx.scheduleDay.findFirst({
-            where: { conventionId, dayOffset: itemData.dayOffset },
-          });
-
-          if (!scheduleDay) {
-            scheduleDay = await tx.scheduleDay.create({
-              data: {
-                conventionId,
-                dayOffset: itemData.dayOffset,
-                isOfficial: false,
-                label: `Day ${itemData.dayOffset + 1} (Auto-created)`,
-              },
-            });
-          }
-
-          const newScheduleItem = await tx.conventionScheduleItem.create({
-            data: {
-              conventionId,
-              scheduleDayId: scheduleDay.id,
-              title: itemData.title,
-              startTimeMinutes: normalizedItemsForZod[i].startTimeMinutes,
-              durationMinutes: itemData.durationMinutes,
-              description: itemData.description,
-              locationName: itemData.locationName,
-              venueId: itemData.venueId,
-              eventType: itemData.eventType || 'Other',
-              atPrimaryVenue: !itemData.venueId,
-              dayOffset: itemData.dayOffset,
-            },
-          });
-
-          if (itemData.feeTiers && itemData.feeTiers.length > 0) {
-            await tx.scheduleEventFeeTier.createMany({
-              data: itemData.feeTiers.map(tier => ({
-                scheduleItemId: newScheduleItem.id,
-                label: tier.label,
-                amount: tier.amount,
-              })),
-            });
-          }
-          createdCount++;
-        } catch (e: any) {
-          console.error(`Error processing item at index ${i} ('${itemData.title}') during bulk create:`, e);
-          itemProcessingErrors.push({
-            itemIndex: i,
-            message: `Failed to process item '${itemData.title}': ${e.message || 'Unknown error'}`,
-            originalItem: originalItemForError
-          });
-        }
-      }
-
-      if (itemProcessingErrors.length > 0 && itemProcessingErrors.length === validatedItems.length) {
-        throw new Error("All items failed during bulk processing. Transaction rolled back.");
-      }
-    });
-
-    if (itemProcessingErrors.length > 0) {
-      return {
-        success: createdCount > 0,
-        message: `Bulk operation partially completed. ${createdCount} item(s) created. ${itemProcessingErrors.length} item(s) failed.`,
-        createdCount: createdCount,
-        errors: itemProcessingErrors,
-      };
-    }
-
-    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
-    return {
-      success: true,
-      message: `${createdCount} schedule item(s) created successfully.`,
-      createdCount: createdCount,
-    };
-
-  } catch (error: any) {
-    console.error("Error during bulk schedule item creation process:", error);
-    return {
-      success: false,
-      error: `Bulk creation failed: ${error.message || 'An unexpected error occurred.'}`,
-      createdCount: createdCount,
-      errors: itemProcessingErrors.length > 0 ? itemProcessingErrors : undefined,
-    };
   }
 }
 

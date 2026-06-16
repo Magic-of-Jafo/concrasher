@@ -439,26 +439,10 @@ export const ConventionScheduleItemUpdateSchema = ConventionScheduleItemBaseSche
   ),
 });
 
-// Schemas for BULK importing schedule items
-export const ConventionScheduleItemBulkItemSchema = ConventionScheduleItemBaseSchema.extend({
-  dayOffset: z.number().int().min(0, 'Day offset must be a positive integer'),
-  startTimeMinutes: z.preprocess(
-    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
-    z.number().int().min(0, 'Start time must be a positive number')
-  ),
-});
-
-export const ConventionScheduleItemBulkInputSchema = z.object({
-  conventionId: z.string().cuid(),
-  scheduleItems: z.array(ConventionScheduleItemBulkItemSchema),
-});
-
 // Type exports
 export type ScheduleEventFeeTierInput = z.infer<typeof ScheduleEventFeeTierSchema>;
 export type ConventionScheduleItemCreateInput = z.infer<typeof ConventionScheduleItemCreateSchema>;
 export type ConventionScheduleItemUpdateInput = z.infer<typeof ConventionScheduleItemUpdateSchema>;
-export type ConventionScheduleItemBulkItemInput = z.infer<typeof ConventionScheduleItemBulkItemSchema>;
-export type ConventionScheduleItemBulkInput = z.infer<typeof ConventionScheduleItemBulkInputSchema>;
 
 // --- Convention Media Tab Schemas ---
 

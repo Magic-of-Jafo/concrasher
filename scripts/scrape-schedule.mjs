@@ -158,9 +158,16 @@ Rules:
   the same morning stays AM (e.g. "8:00 AM" - "8:30 AM"). Avoid durations over ~13 hours
   unless clearly all-day (registration / dealer room).
 - "eventType" MUST be exactly one of: ${TAXONOMY.join(', ')}.
-- "title": give each event a descriptive title with context. For a lecture/show/session led
-  by specific people, include them, e.g. "Lecture - John Bannon" (use a hyphen). Never output
-  a bare generic title like just "Lecture" when a presenter is named.
+- "title": a concise event title. If the event has exactly ONE presenter (a lecture or a
+  one-person show), put their name in the title, e.g. "Lecture - John Bannon" (use a hyphen).
+  If the event has MULTIPLE performers (a gala or group show), keep the title to the event
+  name only (e.g. "Gala Show", "Close-up Show") — do NOT list the cast in the title.
+- "description": for an event with MULTIPLE performers, a short natural sentence naming the
+  cast (e.g. "Featuring Keith Fields and Lady Sarah (MCs), with Shchukin and Gladwin.").
+  For single-presenter or no-performer events, use null.
+- "location": the room, area, or stage the event is in — usually a meeting-room name listed
+  with the event (e.g. "Grand Ballroom A-E", "Salon F"). Use null if not stated. Do NOT use the
+  convention's hotel/venue name itself as the location.
 - "performers": real human names presenting/performing in that event, with an optional role
   (Performer, Lecturer, MC, Panelist, Host, Judge, Guest of Honor). Expand shared surnames
   ("David and Jake Rangel" -> two people). Spell each person's name correctly and consistently
@@ -170,7 +177,7 @@ Rules:
 
 Respond ONLY as JSON:
 {"days":[{"dayOffset":0,"label":"Friday"}],
- "events":[{"dayOffset":0,"start":"9:00 AM","end":"7:00 PM","title":"Registration Open","eventType":"Registration","performers":[{"name":"Full Name","role":"MC"}]}]}`;
+ "events":[{"dayOffset":0,"start":"9:00 AM","end":"7:00 PM","title":"Registration Open","eventType":"Registration","description":null,"location":"North Ballroom Foyer","performers":[{"name":"Full Name","role":"MC"}]}]}`;
 
 const user = `Convention: ${conv.name}\nConvention start date (day 0): ${fmtUTCDay(conv.startDate, 0)}\n\nSchedule page text:\n${text}`;
 
@@ -184,8 +191,10 @@ const events = (Array.isArray(parsed.events) ? parsed.events : [])
         dayOffset: Number(e.dayOffset) || 0,
         title: String(e.title || '').trim(),
         eventType: TAXONOMY.includes(e.eventType) ? e.eventType : 'Other',
+        description: e.description && String(e.description).trim() ? String(e.description).trim() : null,
         startMin: toMinutes(e.start),
         durationMin: duration(toMinutes(e.start), e.end),
+        location: e.location && String(e.location).trim() ? String(e.location).trim() : null,
         performers: Array.isArray(e.performers) ? e.performers.filter(p => p?.name) : [],
     }))
     .filter(e => e.title && e.startMin != null);
@@ -199,9 +208,21 @@ const applyNameFixes = s => NAME_CORRECTIONS.reduce((acc, [re, to]) => acc.repla
 for (const e of events) {
     e.performers = e.performers.map(p => ({ ...p, name: applyNameFixes(String(p.name).trim()) }));
     e.title = applyNameFixes(e.title).replace(/^([^:]{2,40}):\s+/, '$1 - ');
-    // Bare type-only title (e.g. "Lecture") → add performer context.
-    if (e.title.trim().toLowerCase() === e.eventType.toLowerCase() && e.performers.length) {
-        e.title = `${e.eventType} - ${e.performers.map(p => p.name).join(' & ')}`;
+    e.description = e.description ? applyNameFixes(e.description) : null;
+    const names = e.performers.map(p => p.name);
+    // Single presenter → in the title; multiple performers → in the description.
+    if (e.performers.length === 1) {
+        if (e.title.trim().toLowerCase() === e.eventType.toLowerCase()) {
+            e.title = `${e.eventType} - ${names[0]}`;
+        }
+    } else if (e.performers.length > 1) {
+        const dashIdx = e.title.indexOf(' - ');
+        if (dashIdx > 0 && names.some(n => e.title.slice(dashIdx + 3).toLowerCase().includes(n.toLowerCase()))) {
+            e.title = e.title.slice(0, dashIdx).trim();
+        }
+        if (!e.description) {
+            e.description = `Featuring ${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}.`;
+        }
     }
     // "General Meeting" is a short morning meeting — fix the AM/PM end slip.
     if (/general meeting/i.test(e.title) && e.durationMin > 180) e.durationMin = 30;
@@ -217,7 +238,7 @@ for (const off of [...byDay.keys()].sort((a, b) => a - b)) {
     for (const e of byDay.get(off).sort((a, b) => a.startMin - b.startMin)) {
         const who = e.performers.map(p => `${p.name}${p.role ? ` (${p.role})` : ''}`).join(', ');
         e.performers.forEach(p => talentSet.add(p.name));
-        console.log(`  ${fmt(e.startMin)}${e.durationMin ? `–${fmt(e.startMin + e.durationMin)}` : ''}  [${e.eventType}]  ${e.title}${who ? `  — ${who}` : ''}`);
+        console.log(`  ${fmt(e.startMin)}${e.durationMin ? `–${fmt(e.startMin + e.durationMin)}` : ''}  [${e.eventType}]  ${e.title}${e.location ? `  @ ${e.location}` : ''}${who ? `  — ${who}` : ''}`);
     }
 }
 console.log(`\nExtracted: ${events.length} events across ${byDay.size} days, ${talentSet.size} distinct performers.`);
@@ -252,8 +273,9 @@ for (const off of [...byDay.keys()].sort((a, b) => a - b)) {
         const item = await prisma.conventionScheduleItem.create({
             data: {
                 conventionId: conv.id, scheduleDayId: dayIdByOffset[off], dayOffset: off,
-                title: e.title, eventType: e.eventType, startTimeMinutes: e.startMin,
-                durationMinutes: e.durationMin, atPrimaryVenue: true, order: order++,
+                title: e.title, eventType: e.eventType, description: e.description || null,
+                startTimeMinutes: e.startMin, durationMinutes: e.durationMin,
+                atPrimaryVenue: true, order: order++, locationName: e.location || null,
             },
         });
         created++;

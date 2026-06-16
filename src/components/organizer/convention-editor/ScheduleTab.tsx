@@ -1,22 +1,21 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Box, Button, CircularProgress, Typography, Tooltip, Alert, Paper, IconButton, Divider, TextField } from '@mui/material';
+import { Box, Button, CircularProgress, Typography, Tooltip, Alert, Paper, IconButton, Divider } from '@mui/material';
 import { Theme, useTheme, alpha } from '@mui/material/styles';
 import StarIcon from '@mui/icons-material/Star';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import LinkIcon from '@mui/icons-material/Link';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import {
   getScheduleItemsByConvention,
   initializeScheduleDays,
-  bulkCreateScheduleItems,
   deleteScheduleDay as deleteScheduleDayAction,
   createScheduleItem,
   updateScheduleItem
 } from '@/lib/actions';
 import ScheduleEventForm from './ScheduleEventForm';
+import AiScheduleDialog from './AiScheduleDialog';
 import ScheduleTimelineGrid from './ScheduleTimelineGrid';
 import { formatConventionDay } from '@/lib/scheduleDates';
 import { getEventTypeColor } from '@/lib/eventTypes';
@@ -49,6 +48,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [venues, setVenues] = useState<{ id: string; venueName: string; isPrimaryVenue?: boolean }[]>([]);
   const [hotels, setHotels] = useState<{ id: string; hotelName: string }[]>([]);
   const [initLoading, setInitLoading] = useState(false);
@@ -62,9 +62,6 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
   const [addDayError, setAddDayError] = useState<string | null>(null);
   const addDayErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [jsonInput, setJsonInput] = useState('');
-  const [jsonError, setJsonError] = useState<string | null>(null);
-  const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
 
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -329,6 +326,20 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
     }
   };
 
+  const refreshSchedule = async () => {
+    await fetchScheduleDays();
+    try {
+      const res = await getScheduleItemsByConvention(conventionId);
+      if (res.success) setScheduleItems(res.items ?? []);
+    } catch { /* keep current items if refetch fails */ }
+  };
+
+  const handleAiApplied = (summary: { days: number; events: number; talent: number }) => {
+    refreshSchedule();
+    setSaveSuccessMessage(`Schedule Helper added ${summary.events} events across ${summary.days} day(s) · ${summary.talent} talent linked.`);
+    setTimeout(() => setSaveSuccessMessage(null), 6000);
+  };
+
   const handleEditEvent = (item: any) => {
     setEditingItem(item);
     setFormOpen(true);
@@ -509,75 +520,6 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
     }
   };
 
-  const handleBulkUpload = async () => {
-    setBulkUploadLoading(true);
-    setJsonError(null);
-    setSaveError(null);
-    setSaveSuccessMessage(null);
-    setError(null);
-
-    let parsedItems;
-    try {
-      // Attempt to parse the JSON input
-      // The input might be a single object or an array of objects.
-      // We'll normalize it to an array.
-      const rawParsed = JSON.parse(jsonInput);
-      if (Array.isArray(rawParsed)) {
-        parsedItems = rawParsed;
-      } else if (typeof rawParsed === 'object' && rawParsed !== null) {
-        parsedItems = [rawParsed];
-      } else {
-        throw new Error("Input must be a JSON object or an array of JSON objects.");
-      }
-
-      if (parsedItems.length === 0) {
-        setJsonError("No items to upload. Please provide at least one event object.");
-        setBulkUploadLoading(false);
-        return;
-      }
-
-    } catch (e: any) {
-      setJsonError(`Invalid JSON: ${e.message}`);
-      setBulkUploadLoading(false);
-      return;
-    }
-
-    try {
-      const result = await bulkCreateScheduleItems(conventionId, parsedItems);
-      if (result.success) {
-        setSaveSuccessMessage(result.message || 'Bulk upload successful! Refreshing schedule...');
-        setJsonInput(''); // Clear input on success
-        // Refresh schedule items and days
-        fetchScheduleDays();
-        getScheduleItemsByConvention(conventionId)
-          .then(res => {
-            if (res.success) {
-              setScheduleItems(res.items ?? []);
-            } else {
-              setError(res.error || 'Failed to reload schedule after bulk upload.');
-            }
-          })
-          .finally(() => setLoading(false));
-
-      } else {
-        setSaveError(result.error || 'Bulk upload failed.');
-        if (result.errors && result.errors.length > 0) {
-          const errorDetails = result.errors.map((err: any, index: number) => `Item ${err.itemIndex !== undefined ? err.itemIndex + 1 : index + 1}: ${err.message}`).join('\n');
-          setJsonError(`Validation errors:\n${errorDetails}`);
-        }
-      }
-    } catch (e: any) {
-      setSaveError(`An unexpected error occurred during bulk upload: ${e.message}`);
-    } finally {
-      setBulkUploadLoading(false);
-      setTimeout(() => {
-        setSaveSuccessMessage(null);
-        setSaveError(null);
-        // Keep jsonError if there were specific validation issues from backend
-      }, 5000);
-    }
-  };
-
   // Sort schedule items for the left column
   const sortedScheduleItemsForList = useMemo(() => {
     return [...scheduleItems].sort((a, b) => {
@@ -691,7 +633,22 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
             </Button>
           </span>
         </Tooltip>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>— or —</Typography>
+        <Tooltip title={!datesReady ? "Set the convention's start and end dates first." : ""}>
+          <span>
+            <Button variant="outlined" color="primary" startIcon={<AutoAwesomeIcon />} disabled={!datesReady} onClick={() => setAiDialogOpen(true)}>
+              Schedule Helper
+            </Button>
+          </span>
+        </Tooltip>
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        <AiScheduleDialog
+          open={aiDialogOpen}
+          onClose={() => setAiDialogOpen(false)}
+          conventionId={conventionId}
+          hasExistingEvents={scheduleItems.length > 0}
+          onApplied={handleAiApplied}
+        />
       </Box>
     );
   }
@@ -717,16 +674,23 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
             p: 1,
             borderBottom: '1px solid #ddd',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: 1,
             flexShrink: 0
           }}>
             <Typography variant="h6" sx={{ mb: 0 }}>
               All Events ({scheduleItems.length})
             </Typography>
-            <Button variant="contained" color="primary" onClick={handleCreate} size="small">
-              Add New Event
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Tooltip title="Build the schedule from a URL, website, or PDF">
+                <Button variant="outlined" color="primary" onClick={() => setAiDialogOpen(true)} size="small" startIcon={<AutoAwesomeIcon />} sx={{ flex: 1, whiteSpace: 'nowrap' }}>
+                  Schedule Helper
+                </Button>
+              </Tooltip>
+              <Button variant="contained" color="primary" onClick={handleCreate} size="small" sx={{ flex: 1, whiteSpace: 'nowrap' }}>
+                Add New Event
+              </Button>
+            </Box>
           </Box>
 
           {/* Scrollable List Container for Left Column */}
@@ -807,7 +771,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
                       p: 1.5,
                       cursor: 'pointer',
                       backgroundColor: finalColor,
-                      color: '#fff',
+                      color: theme.palette.getContrastText(finalColor),
                       border: paperBorder,
                       boxShadow: highlightedEventId === (item.id || item.tempId)
                         ? `inset 0 0 10px 4px ${alpha(theme.palette.common.white, 0.85)}`
@@ -1000,119 +964,15 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
               forceCreateNew={!editingItem}
             />
           )}
+          <AiScheduleDialog
+            open={aiDialogOpen}
+            onClose={() => setAiDialogOpen(false)}
+            conventionId={conventionId}
+            hasExistingEvents={scheduleItems.length > 0}
+            onApplied={handleAiApplied}
+          />
         </Box>
       </Box>
-
-      {/* Bulk JSON Upload Section - Moved here */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h5" component="h3" gutterBottom>Need Help Formatting Your Schedule?</Typography>
-        <Typography variant="body1" gutterBottom>
-          Skip the manual typing. Click the link below to open the <strong>Convention Crasher Event Automator</strong>.
-        </Typography>
-        <Typography variant="body1" gutterBottom>
-          This assistant will turn your full event schedule into a clean, ready-to-paste JSON file—one day at a time.
-        </Typography>
-        <Typography variant="body1" component="div" gutterBottom sx={{ fontWeight: 'bold' }}>
-          Here's how to use it:
-        </Typography>
-        <Box component="ol" sx={{ pl: 2, mb: 2 }}>
-          <Typography component="li" variant="body1">Click the link below. It will open the assistant with your convention dates already filled in.</Typography>
-          <Typography component="li" variant="body1">Press <code>Enter</code> when the page loads to send the first message.</Typography>
-          <Typography component="li" variant="body1">When prompted, upload or paste your schedule. You can share:</Typography>
-          <Box component="ul" sx={{ pl: 2, listStyleType: 'disc' }}>
-            <Typography component="li" variant="body1">A link to your schedule webpage</Typography>
-            <Typography component="li" variant="body1">A PDF</Typography>
-            <Typography component="li" variant="body1">An Excel or Google Sheets file</Typography>
-            <Typography component="li" variant="body1">Or even a copy/pasted table</Typography>
-          </Box>
-          <Typography component="li" variant="body1">The assistant will return one day's worth of events as a code block. <strong>Copy and paste the code block into the field below.</strong></Typography>
-        </Box>
-
-        {(() => {
-          const assistantBaseUrl = "https://chatgpt.com/g/g-6831c0ee9010819186a19abf89a98e4c-convention-crasher-event-automator?prompt=";
-          let promptText = "My Convention Schedule"; // Default if no dates/name
-
-          if (!startDate) {
-            return (
-              <Box sx={{ mb: 2 }}>
-                <Button
-                  variant="contained"
-                  color="info"
-                  disabled={true}
-                  startIcon={<LinkIcon />}
-                  sx={{ fontWeight: 'bold' }}
-                >
-                  Click Here to Use the Schedule Assistant
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                  Convention start and end dates are required to use the Schedule Assistant. Please set them in the 'Details' tab.
-                </Typography>
-              </Box>
-            );
-          }
-
-          const formattedStartDate = formatConventionDay(startDate, 0, 'MMMM d, yyyy');
-          let conventionDetails = conventionName || "My Convention";
-          conventionDetails += ` - Start Date: ${formattedStartDate}`;
-          if (conventionEndDate) {
-            conventionDetails += ` - End Date: ${formatConventionDay(conventionEndDate, 0, 'MMMM d, yyyy')}`;
-          }
-          promptText = conventionDetails;
-
-          const fullUrl = `${assistantBaseUrl}${encodeURIComponent(promptText)}`;
-
-          return (
-            <Button
-              variant="contained"
-              color="info"
-              href={fullUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              startIcon={<LinkIcon />}
-              sx={{ mb: 2, fontWeight: 'bold' }}
-            >
-              Click Here to Use the Schedule Assistant
-            </Button>
-          );
-        })()}
-
-        <TextField
-          fullWidth
-          multiline
-          rows={6}
-          variant="outlined"
-          value={jsonInput}
-          onChange={(e) => {
-            setJsonInput(e.target.value);
-            if (jsonError) setJsonError(null); // Clear previous JSON parse error on new input
-          }}
-          error={!!jsonError}
-          helperText={jsonError}
-          sx={{ mb: 1 }}
-        />
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<UploadFileIcon />}
-            onClick={handleBulkUpload}
-            disabled={bulkUploadLoading || !jsonInput.trim()}
-          >
-            {bulkUploadLoading ? <CircularProgress size={24} color="inherit" /> : 'Upload JSON'}
-          </Button>
-          <Button
-            variant="outlined"
-            color="inherit" // Using inherit to make it less prominent than the upload button
-            onClick={() => {
-              setJsonInput('');
-              setJsonError(null);
-            }}
-            disabled={bulkUploadLoading || !jsonInput.trim()} // Also disable if no input or loading
-          >
-            Clear
-          </Button>
-        </Box>
-      </Paper>
     </Box>
   );
 }

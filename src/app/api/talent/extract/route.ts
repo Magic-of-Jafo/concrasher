@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
                     { role: 'user', content: userContent },
                 ],
                 response_format: { type: 'json_object' },
+                ...(/^gpt-5/.test(model) ? { reasoning_effort: 'low' } : {}),
             }),
             signal: AbortSignal.timeout(60000),
         });
