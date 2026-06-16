@@ -336,9 +336,36 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     );
 
     if (priceTiers.length === 0) {
+        // Festivals price each show individually, so there's no single table —
+        // point ticket-buyers to the festival's own site instead.
+        if (convention.type === 'FESTIVAL') {
+            return (
+                <Paper sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>Tickets &amp; Pricing</Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: officialPricingUrl ? 2.5 : 0 }}>
+                        Each show at this festival is ticketed individually, with its own price.
+                        For tickets and full pricing, visit the festival&apos;s official site.
+                    </Typography>
+                    {officialPricingUrl && (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            component="a"
+                            href={officialPricingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ fontWeight: 600, px: 3, py: 1.5 }}
+                        >
+                            Tickets &amp; pricing on the festival site
+                        </Button>
+                    )}
+                </Paper>
+            );
+        }
         return (
             <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h4" component="h1" gutterBottom color="text.primary">Pricing</Typography>
+                <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>Pricing</Typography>
                 <Typography variant="body1" color="text.secondary">
                     Pricing information is not yet available for this convention.
                 </Typography>
