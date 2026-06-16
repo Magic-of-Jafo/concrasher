@@ -1,24 +1,13 @@
 'use client';
 
-import React from 'react';
-import {
-    Box,
-    Typography,
-    Paper,
-    List,
-    ListItem,
-    ListItemText,
-    Divider,
-    useTheme,
-    useMediaQuery,
-} from '@mui/material';
-import { add, format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
-import Image from 'next/image';
+import React, { useMemo, useState } from 'react';
+import { Box, Typography, Tabs, Tab, Chip, useTheme } from '@mui/material';
+import { alpha, darken } from '@mui/material/styles';
+import { keyframes } from '@mui/system';
 import Link from '@mui/material/Link';
 import NextLink from 'next/link';
-import { conventionDayDate } from '@/lib/scheduleDates';
-
+import { conventionDayDate, formatConventionDay } from '@/lib/scheduleDates';
+import { getEventTypeColor } from '@/lib/eventTypes';
 
 interface TalentLink {
     role?: string | null;
@@ -26,18 +15,34 @@ interface TalentLink {
     talentProfile?: { id: string; displayName: string; userId?: string | null } | null;
 }
 
-// Based on prisma/schema.prisma
 interface ConventionScheduleItem {
     id: string;
     title: string;
     description?: string | null;
     locationName?: string | null;
+    eventType?: string | null;
     startTimeMinutes?: number | null;
     durationMinutes?: number | null;
     talentLinks?: TalentLink[];
 }
 
-// A blue link to a talent's public profile.
+interface ScheduleDay {
+    id: string;
+    label?: string | null;
+    dayOffset: number;
+    events: ConventionScheduleItem[];
+}
+
+interface ScheduleSectionProps {
+    convention: {
+        startDate: string;
+        endDate: string;
+        scheduleDays: ScheduleDay[];
+        timezone?: { ianaId: string } | null;
+    };
+}
+
+// ── talent link helpers ───────────────────────────────────────────────────────
 function ProfileLink({ id, children }: { id: string; children: React.ReactNode }) {
     return (
         <Link
@@ -52,7 +57,6 @@ function ProfileLink({ id, children }: { id: string; children: React.ReactNode }
     );
 }
 
-// "@John Bannon, @Mike Pisciotta" — the event's tagged talent as profile links.
 function renderTalentList(links: TalentLink[]): React.ReactNode {
     const valid = links.filter(l => l.talentProfile?.id);
     return valid.map((l, i) => (
@@ -63,14 +67,11 @@ function renderTalentList(links: TalentLink[]): React.ReactNode {
     ));
 }
 
-// Turn any occurrence of a tagged talent's name inside free text into a profile
-// link (display-only styling — the structured talent links are the source of
-// truth). Longer names win so "John Bannon" beats a stray "John".
+// Link any tagged talent's name found inside free text (display-only styling).
 function linkifyNames(text: string | null | undefined, links?: TalentLink[]): React.ReactNode {
     if (!text) return text;
     const valid = (links || []).filter(l => l.talentProfile?.id);
     if (valid.length === 0) return text;
-
     const nameToId = new Map<string, string>();
     for (const l of valid) {
         const id = l.talentProfile!.id;
@@ -80,11 +81,9 @@ function linkifyNames(text: string | null | undefined, links?: TalentLink[]): Re
     }
     const names = Array.from(nameToId.keys()).sort((a, b) => b.length - a.length);
     if (names.length === 0) return text;
-
     const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
-    const parts = text.split(regex);
-    return parts.map((part, i) => {
+    return text.split(regex).map((part, i) => {
         const key = Array.from(nameToId.keys()).find(n => n.toLowerCase() === part.toLowerCase());
         return key
             ? <ProfileLink key={i} id={nameToId.get(key)!}>{part}</ProfileLink>
@@ -92,78 +91,49 @@ function linkifyNames(text: string | null | undefined, links?: TalentLink[]): Re
     });
 }
 
-interface ScheduleDay {
-    id: string;
-    label?: string | null;
-    dayOffset: number;
-    events: ConventionScheduleItem[];
-}
-
-interface ScheduleSectionProps {
-    convention: {
-        startDate: string; // ISO string
-        endDate: string; // ISO string
-        scheduleDays: ScheduleDay[];
-        timezone?: {
-            ianaId: string;
-        } | null;
-    };
-}
-
-const formatTime = (date: Date, timeZone: string): string => {
-    try {
-        return formatInTimeZone(date, timeZone, 'h:mm a');
-    } catch (e) {
-        console.error('Failed to format time with timezone:', timeZone, e);
-        return format(date, 'h:mm a') + ' UTC';
-    }
+// Minutes-since-midnight (the convention's wall clock) → "7:00 PM".
+const fmtMins = (m: number): string => {
+    const h = Math.floor(m / 60) % 24;
+    const mm = (m % 60).toString().padStart(2, '0');
+    const period = h >= 12 ? 'PM' : 'AM';
+    const dh = h % 12 || 12;
+    return `${dh}:${mm} ${period}`;
 };
 
-const formatDate = (date: Date, timeZone: string): string => {
-    try {
-        return formatInTimeZone(date, timeZone, 'eeee, MMMM d, yyyy');
-    } catch (e) {
-        console.error('Failed to format date with timezone:', timeZone, e);
-        return format(date, 'eeee, MMMM d, yyyy');
-    }
-};
-
+const fadeInUp = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
 
 export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    const scheduleDays: ScheduleDay[] = convention.scheduleDays || [];
-    // Schedule times are stored as the convention's local wall-clock under the
-    // relative model, so render them in UTC (no conversion) to avoid drift.
-    // Per-viewer timezone conversion is a separate, deferred workstream.
-    const timeZone = 'UTC';
-    const conventionStartDate = new Date(convention.startDate);
-    const conventionEndDate = new Date(convention.endDate);
+    const sortedDays = useMemo(
+        () => [...(convention.scheduleDays || [])].sort((a, b) => a.dayOffset - b.dayOffset),
+        [convention.scheduleDays],
+    );
 
-    // Calculate the difference in days for the main convention duration
-    const conventionDurationDays = Math.round((conventionEndDate.getTime() - conventionStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    // Convention duration (for pre/post-convention chips).
+    const durationDays = useMemo(() => {
+        const ms = new Date(convention.endDate).getTime() - new Date(convention.startDate).getTime();
+        return Math.round(ms / 86_400_000);
+    }, [convention.startDate, convention.endDate]);
 
-    // Responsive image sizing
-    const imageSize = isMobile ? 120 : 200;
-    const imageStyles = {
-        position: 'absolute' as const,
-        top: isMobile ? 8 : 16,
-        right: isMobile ? 8 : 16,
-        opacity: 0.7,
-        zIndex: 1,
-    };
+    // Auto-select today's day if the convention is currently running.
+    const initialIndex = useMemo(() => {
+        const now = new Date();
+        const todayKey = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        const idx = sortedDays.findIndex(d => conventionDayDate(convention.startDate, d.dayOffset).getTime() === todayKey);
+        return idx >= 0 ? idx : 0;
+    }, [sortedDays, convention.startDate]);
 
-    // Responsive h1 Typography styles
-    const h1Styles = {
-        fontSize: { xs: '1.5rem', md: '3rem' },
-        lineHeight: { xs: 1.2, md: 1.167 },
-    };
+    const [selected, setSelected] = useState(initialIndex);
+    const activeIndex = Math.min(selected, Math.max(0, sortedDays.length - 1));
 
-    if (scheduleDays.length === 0) {
+    if (sortedDays.length === 0) {
         return (
             <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
-                <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
+                <Typography variant="h1" component="h1" gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '3rem' } }}>
                     Schedule
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
@@ -173,204 +143,179 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
         );
     }
 
-    const sortedDays = [...scheduleDays].sort((a, b) => a.dayOffset - b.dayOffset);
-    const preConventionDays = sortedDays.filter(day => day.dayOffset < 0);
-    const mainConventionDays = sortedDays.filter(day => day.dayOffset >= 0 && day.dayOffset <= conventionDurationDays);
-    const postConventionDays = sortedDays.filter(day => day.dayOffset > conventionDurationDays);
+    const day = sortedDays[activeIndex];
+    const events = [...(day.events || [])]
+        .filter(e => e.startTimeMinutes != null)
+        .sort((a, b) => (a.startTimeMinutes ?? 0) - (b.startTimeMinutes ?? 0));
+    const phase = day.dayOffset < 0 ? 'Pre-Convention' : day.dayOffset > durationDays ? 'Post-Convention' : null;
 
     return (
-        <Box sx={{ width: '100%' }}>
-            {preConventionDays.length > 0 && (
-                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative', mb: 3 }}>
-                    <Box sx={imageStyles}>
-                        <Image
-                            src="https://convention-crasher.s3.amazonaws.com/images/pre-con-schedule.png"
-                            alt="Pre-convention schedule graphic"
-                            width={imageSize}
-                            height={imageSize}
-                            unoptimized
+        <Box sx={{ width: '100%', pb: 4 }}>
+            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 }, pb: 1.5 }}>
+                <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.75rem' }, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    Schedule
+                </Typography>
+            </Box>
+
+            {/* Sticky day tabs — stay pinned while scrolling a day's events on mobile. */}
+            <Box
+                sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 3,
+                    bgcolor: alpha(theme.palette.background.paper, 0.85),
+                    backdropFilter: 'blur(8px)',
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    px: { xs: 1, sm: 2, md: 3 },
+                }}
+            >
+                <Tabs
+                    value={activeIndex}
+                    onChange={(_, v) => setSelected(v)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    allowScrollButtonsMobile
+                    sx={{
+                        minHeight: 0,
+                        '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+                        '& .MuiTab-root': { minHeight: 0, py: 1, px: { xs: 1.75, sm: 2.5 }, textTransform: 'none' },
+                    }}
+                >
+                    {sortedDays.map((d, i) => (
+                        <Tab
+                            key={d.id}
+                            disableRipple
+                            label={
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>
+                                    <Typography component="span" sx={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', color: activeIndex === i ? 'primary.main' : 'text.secondary' }}>
+                                        {formatConventionDay(convention.startDate, d.dayOffset, 'EEE').toUpperCase()}
+                                    </Typography>
+                                    <Typography component="span" sx={{ fontSize: '0.95rem', fontWeight: activeIndex === i ? 800 : 600, color: activeIndex === i ? 'text.primary' : 'text.secondary' }}>
+                                        {formatConventionDay(convention.startDate, d.dayOffset, 'MMM d')}
+                                    </Typography>
+                                </Box>
+                            }
                         />
-                    </Box>
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: isMobile ? 12 : 28 }}>
-                        Pre-Convention Schedule
+                    ))}
+                </Tabs>
+            </Box>
+
+            {/* Selected day */}
+            <Box sx={{ px: { xs: 1.5, sm: 3, md: 4 }, pt: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2, px: { xs: 0.5, sm: 0 } }}>
+                    <Typography variant="h6" component="h2" sx={{ fontWeight: 700 }}>
+                        {formatConventionDay(convention.startDate, day.dayOffset, 'EEEE, MMMM d')}
                     </Typography>
-                    {preConventionDays.map(day => {
-                        const dayDate = conventionDayDate(convention.startDate, day.dayOffset);
-                        return (
-                            <Box key={day.id} sx={{ mb: 4, mt: 2 }}>
-                                <Typography variant="h6" component="h3" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1 }}>
-                                    {formatDate(dayDate, timeZone)}
-                                </Typography>
-                                <List>
-                                    {[...day.events]
-                                        .filter(event => event.startTimeMinutes != null)
-                                        .sort((a, b) => (a.startTimeMinutes ?? 0) - (b.startTimeMinutes ?? 0))
-                                        .map((event, index) => {
-                                            const startTime = add(dayDate, { minutes: event.startTimeMinutes! });
-                                            const endTime = add(startTime, { minutes: event.durationMinutes ?? 0 });
-
-                                            return (
-                                                <React.Fragment key={event.id}>
-                                                    <ListItem>
-                                                        <ListItemText
-                                                            primary={
-                                                                <Typography variant="h6">
-                                                                    {`${formatTime(startTime, timeZone)} - ${formatTime(endTime, timeZone)}: `}
-                                                                    {linkifyNames(event.title, event.talentLinks)}
-                                                                </Typography>
-                                                            }
-                                                            secondary={
-                                                                <>
-                                                                    {event.locationName && <Typography component="span" display="block" variant="body2">Location: {event.locationName}</Typography>}
-                                                                    {event.description && <Typography component="span" display="block" variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{linkifyNames(event.description, event.talentLinks)}</Typography>}
-                                                                    {event.talentLinks && event.talentLinks.length > 0 && (
-                                                                        <Typography component="span" display="block" variant="body2" sx={{ mt: 1 }}>
-                                                                            Featuring: {renderTalentList(event.talentLinks)}
-                                                                        </Typography>
-                                                                    )}
-                                                                </>
-                                                            }
-                                                        />
-                                                    </ListItem>
-                                                    {index < day.events.length - 1 && <Divider component="li" />}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                </List>
-                            </Box>
-                        );
-                    })}
-                </Box>
-            )}
-
-            {mainConventionDays.length > 0 && (
-                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative', mb: 3 }}>
-                    {(preConventionDays.length > 0 || postConventionDays.length > 0) && (
-                        <Box sx={imageStyles}>
-                            <Image
-                                src="https://convention-crasher.s3.amazonaws.com/images/main-schedule.png"
-                                alt="Main schedule graphic"
-                                width={imageSize}
-                                height={imageSize}
-                                unoptimized
-                            />
-                        </Box>
+                    {phase && (
+                        <Chip label={phase} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600 }} />
                     )}
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: (preConventionDays.length > 0 || postConventionDays.length > 0) ? (isMobile ? 12 : 28) : 0 }}>
-                        Convention Schedule
-                    </Typography>
-                    {mainConventionDays.map(day => {
-                        const dayDate = conventionDayDate(convention.startDate, day.dayOffset);
-
-                        return (
-                            <Box key={day.id} sx={{ mb: 4, mt: 2 }}>
-                                <Typography variant="h6" component="h3" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1 }}>
-                                    {day.label} - {formatDate(dayDate, timeZone)}
-                                </Typography>
-                                <List>
-                                    {[...day.events]
-                                        .filter(event => event.startTimeMinutes != null)
-                                        .sort((a, b) => (a.startTimeMinutes ?? 0) - (b.startTimeMinutes ?? 0))
-                                        .map((event, index) => {
-                                            const startTime = add(dayDate, { minutes: event.startTimeMinutes! });
-                                            const endTime = add(startTime, { minutes: event.durationMinutes ?? 0 });
-
-                                            return (
-                                                <React.Fragment key={event.id}>
-                                                    <ListItem>
-                                                        <ListItemText
-                                                            primary={
-                                                                <Typography variant="h6">
-                                                                    {`${formatTime(startTime, timeZone)} - ${formatTime(endTime, timeZone)}: `}
-                                                                    {linkifyNames(event.title, event.talentLinks)}
-                                                                </Typography>
-                                                            }
-                                                            secondary={
-                                                                <>
-                                                                    {event.locationName && <Typography component="span" display="block" variant="body2">Location: {event.locationName}</Typography>}
-                                                                    {event.description && <Typography component="span" display="block" variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{linkifyNames(event.description, event.talentLinks)}</Typography>}
-                                                                    {event.talentLinks && event.talentLinks.length > 0 && (
-                                                                        <Typography component="span" display="block" variant="body2" sx={{ mt: 1 }}>
-                                                                            Featuring: {renderTalentList(event.talentLinks)}
-                                                                        </Typography>
-                                                                    )}
-                                                                </>
-                                                            }
-                                                        />
-                                                    </ListItem>
-                                                    {index < day.events.length - 1 && <Divider component="li" />}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                </List>
-                            </Box>
-                        );
-                    })}
                 </Box>
-            )}
 
-            {postConventionDays.length > 0 && (
-                <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 }, position: 'relative' }}>
-                    <Box sx={imageStyles}>
-                        <Image
-                            src="https://convention-crasher.s3.amazonaws.com/images/post-con-schedule.png"
-                            alt="Post-convention schedule graphic"
-                            width={imageSize}
-                            height={imageSize}
-                            unoptimized
-                        />
+                {events.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 2 }}>
+                        No events scheduled for this day yet.
+                    </Typography>
+                ) : (
+                    <Box key={activeIndex}>
+                        {events.map((event, i) => {
+                            const color = getEventTypeColor(event.eventType);
+                            const start = event.startTimeMinutes as number;
+                            const isMilestone = !event.durationMinutes;
+                            const talent = (event.talentLinks || []).filter(l => l.talentProfile?.id);
+
+                            return (
+                                <Box
+                                    key={event.id}
+                                    sx={{
+                                        position: 'relative',
+                                        display: 'flex',
+                                        gap: { xs: 1.25, sm: 2 },
+                                        pl: { xs: 1.5, sm: 2 },
+                                        pr: { xs: 1.25, sm: 2 },
+                                        py: 1.4,
+                                        mb: 1,
+                                        borderRadius: 2,
+                                        bgcolor: alpha(color, 0.05),
+                                        border: `1px solid ${alpha(color, 0.18)}`,
+                                        overflow: 'hidden',
+                                        transition: 'background-color .18s ease, transform .18s ease, box-shadow .18s ease',
+                                        animation: `${fadeInUp} .35s ease both`,
+                                        animationDelay: `${Math.min(i, 12) * 35}ms`,
+                                        '&:before': {
+                                            content: '""',
+                                            position: 'absolute',
+                                            left: 0, top: 0, bottom: 0,
+                                            width: 4,
+                                            bgcolor: color,
+                                        },
+                                        '&:hover': {
+                                            bgcolor: alpha(color, 0.10),
+                                            transform: 'translateY(-1px)',
+                                            boxShadow: `0 4px 16px ${alpha(color, 0.18)}`,
+                                        },
+                                    }}
+                                >
+                                    {/* Time rail */}
+                                    <Box sx={{ flexShrink: 0, minWidth: { xs: 64, sm: 74 }, pt: 0.1 }}>
+                                        <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.82rem', sm: '0.9rem' }, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
+                                            {fmtMins(start)}
+                                        </Typography>
+                                        {!isMilestone && (
+                                            <Typography sx={{ color: 'text.secondary', fontSize: '0.72rem', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
+                                                {fmtMins(start + (event.durationMinutes as number))}
+                                            </Typography>
+                                        )}
+                                    </Box>
+
+                                    {/* Content */}
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Typography component="div" sx={{ fontWeight: 600, fontSize: { xs: '0.92rem', sm: '1rem' }, lineHeight: 1.3 }}>
+                                            {linkifyNames(event.title, event.talentLinks)}
+                                        </Typography>
+                                        {event.eventType && (
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    display: 'inline-block',
+                                                    mt: 0.6,
+                                                    fontSize: '0.62rem',
+                                                    fontWeight: 700,
+                                                    letterSpacing: '0.04em',
+                                                    textTransform: 'uppercase',
+                                                    color: darken(color, 0.45),
+                                                    bgcolor: alpha(color, 0.16),
+                                                    px: 0.75, py: '2px',
+                                                    borderRadius: 1,
+                                                }}
+                                            >
+                                                {event.eventType}
+                                            </Box>
+                                        )}
+
+                                        {talent.length > 0 && (
+                                            <Typography variant="body2" sx={{ mt: 0.4, fontSize: '0.82rem', color: 'text.secondary' }}>
+                                                {renderTalentList(talent)}
+                                            </Typography>
+                                        )}
+
+                                        {event.locationName && (
+                                            <Typography variant="body2" sx={{ mt: 0.25, fontSize: '0.78rem', color: 'text.secondary' }}>
+                                                📍 {event.locationName}
+                                            </Typography>
+                                        )}
+
+                                        {event.description && (
+                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.82rem', color: 'text.secondary', whiteSpace: 'pre-wrap' }}>
+                                                {linkifyNames(event.description, event.talentLinks)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Box>
+                            );
+                        })}
                     </Box>
-                    <Typography variant="h1" component="h2" gutterBottom sx={{ ...h1Styles, color: 'text.secondary', pr: isMobile ? 12 : 28 }}>
-                        Post-Convention Schedule
-                    </Typography>
-                    {postConventionDays.map(day => {
-                        const dayDate = conventionDayDate(convention.startDate, day.dayOffset);
-                        return (
-                            <Box key={day.id} sx={{ mb: 4, mt: 2 }}>
-                                <Typography variant="h6" component="h3" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1 }}>
-                                    {formatDate(dayDate, timeZone)}
-                                </Typography>
-                                <List>
-                                    {[...day.events]
-                                        .filter(event => event.startTimeMinutes != null)
-                                        .sort((a, b) => (a.startTimeMinutes ?? 0) - (b.startTimeMinutes ?? 0))
-                                        .map((event, index) => {
-                                            const startTime = add(dayDate, { minutes: event.startTimeMinutes! });
-                                            const endTime = add(startTime, { minutes: event.durationMinutes ?? 0 });
-
-                                            return (
-                                                <React.Fragment key={event.id}>
-                                                    <ListItem>
-                                                        <ListItemText
-                                                            primary={
-                                                                <Typography variant="h6">
-                                                                    {`${formatTime(startTime, timeZone)} - ${formatTime(endTime, timeZone)}: `}
-                                                                    {linkifyNames(event.title, event.talentLinks)}
-                                                                </Typography>
-                                                            }
-                                                            secondary={
-                                                                <>
-                                                                    {event.locationName && <Typography component="span" display="block" variant="body2">Location: {event.locationName}</Typography>}
-                                                                    {event.description && <Typography component="span" display="block" variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{linkifyNames(event.description, event.talentLinks)}</Typography>}
-                                                                    {event.talentLinks && event.talentLinks.length > 0 && (
-                                                                        <Typography component="span" display="block" variant="body2" sx={{ mt: 1 }}>
-                                                                            Featuring: {renderTalentList(event.talentLinks)}
-                                                                        </Typography>
-                                                                    )}
-                                                                </>
-                                                            }
-                                                        />
-                                                    </ListItem>
-                                                    {index < day.events.length - 1 && <Divider component="li" />}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                </List>
-                            </Box>
-                        );
-                    })}
-                </Box>
-            )}
+                )}
+            </Box>
         </Box>
     );
-} 
+}
