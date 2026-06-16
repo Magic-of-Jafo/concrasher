@@ -74,7 +74,10 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
             events: {
               include: {
                 venue: true,
-                talentLinks: true,
+                talentLinks: {
+                  include: { talentProfile: { select: { id: true, displayName: true, userId: true } } },
+                  orderBy: { order: 'asc' },
+                },
                 brandLinks: true,
                 feeTiers: true
               },

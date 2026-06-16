@@ -18,7 +18,7 @@ import {
 } from '@/lib/actions';
 import ScheduleEventForm from './ScheduleEventForm';
 import ScheduleTimelineGrid from './ScheduleTimelineGrid';
-import { format, addDays } from 'date-fns';
+import { formatConventionDay } from '@/lib/scheduleDates';
 import { getEventTypeColor } from '@/lib/eventTypes';
 
 // Minutes-since-midnight → "9:30 AM" (for the left-list hover tooltip).
@@ -749,7 +749,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
               const showDivider = firstPlacedItemIndex > 0 && index === firstPlacedItemIndex;
 
               const dayLabel = startDate
-                ? format(addDays(startDate, item.dayOffset), 'EEE, MMM d')
+                ? formatConventionDay(startDate, item.dayOffset, 'EEE, MMM d')
                 : `Day ${(item.dayOffset ?? 0) + 1}`;
               const timeLabel = isPlaced
                 ? (item.durationMinutes === 0
@@ -885,7 +885,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
                   sx={{ width: `${PREVIEW_PANE_WIDTH_PX}px`, height: '100%', overflow: 'hidden', position: 'relative', cursor: 'pointer', backgroundColor: 'background.default' }}
                 >
                   <Box sx={{ position: 'absolute', right: 0, width: `${TIMELINE_GRID_WIDTH_PX}px`, height: '100%', pointerEvents: 'none' }}>
-                    <Typography variant="h6" sx={{ textAlign: 'right', py: 1, pr: 1 }}>{startDate ? format(addDays(startDate, previousDayData.dayOffset), 'EEEE') : `Day ${previousDayData.dayOffset + 1}`}</Typography>
+                    <Typography variant="h6" sx={{ textAlign: 'right', py: 1, pr: 1 }}>{startDate ? formatConventionDay(startDate, previousDayData.dayOffset, 'EEEE') : `Day ${previousDayData.dayOffset + 1}`}</Typography>
                     <ScheduleTimelineGrid dayOffset={previousDayData.dayOffset} allScheduleItems={scheduleItems.filter(item => item.dayOffset === previousDayData.dayOffset && typeof item.startTimeMinutes === 'number')} />
                   </Box>
                   <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: (theme: Theme) => `linear-gradient(to right, ${theme.palette.background.default} 0%, rgba(255,255,255,0) 70%)`, pointerEvents: 'none' }} />
@@ -911,13 +911,13 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
                 <Box sx={{ width: `${TIMELINE_GRID_WIDTH_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, backgroundColor: 'background.paper' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pt: 0.5, position: 'relative', width: '100%' }}>
                     <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 0 /* Override gutterBottom */ }}>
-                      {startDate ? format(addDays(startDate, currentDayData.dayOffset), 'EEEE, MMMM d') : `Day ${currentDayData.dayOffset + 1}`}
+                      {startDate ? formatConventionDay(startDate, currentDayData.dayOffset, 'EEEE, MMMM d') : `Day ${currentDayData.dayOffset + 1}`}
                     </Typography>
                     {currentDayData.isOfficial === false && (
                       <Tooltip title="Delete this day's timeline">
                         <span>
                           <IconButton
-                            onClick={() => handleDeleteDay(currentDayData.id, startDate ? format(addDays(startDate, currentDayData.dayOffset), 'EEEE, MMMM d') : `Day ${currentDayData.dayOffset + 1}`)}
+                            onClick={() => handleDeleteDay(currentDayData.id, startDate ? formatConventionDay(startDate, currentDayData.dayOffset, 'EEEE, MMMM d') : `Day ${currentDayData.dayOffset + 1}`)}
                             disabled={isDeletingDay}
                             size="small"
                             sx={{
@@ -956,7 +956,7 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
                   sx={{ width: `${PREVIEW_PANE_WIDTH_PX}px`, height: '100%', overflow: 'hidden', position: 'relative', cursor: 'pointer', backgroundColor: 'background.default' }}
                 >
                   <Box sx={{ position: 'absolute', left: 0, width: `${TIMELINE_GRID_WIDTH_PX}px`, height: '100%', pointerEvents: 'none' }}>
-                    <Typography variant="h6" sx={{ textAlign: 'left', py: 1, pl: 1 }}>{startDate ? format(addDays(startDate, nextDayData.dayOffset), 'EEEE') : `Day ${nextDayData.dayOffset + 1}`}</Typography>
+                    <Typography variant="h6" sx={{ textAlign: 'left', py: 1, pl: 1 }}>{startDate ? formatConventionDay(startDate, nextDayData.dayOffset, 'EEEE') : `Day ${nextDayData.dayOffset + 1}`}</Typography>
                     <ScheduleTimelineGrid dayOffset={nextDayData.dayOffset} allScheduleItems={scheduleItems.filter(item => item.dayOffset === nextDayData.dayOffset && typeof item.startTimeMinutes === 'number')} />
                   </Box>
                   <Box sx={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '100%', background: (theme: Theme) => `linear-gradient(to left, ${theme.palette.background.default} 0%, rgba(255,255,255,0) 70%)`, pointerEvents: 'none' }} />
@@ -1051,11 +1051,11 @@ export default function ScheduleTab({ conventionId, startDate, isOneDayEvent, co
             );
           }
 
-          const formattedStartDate = format(startDate, 'MMMM d, yyyy');
+          const formattedStartDate = formatConventionDay(startDate, 0, 'MMMM d, yyyy');
           let conventionDetails = conventionName || "My Convention";
           conventionDetails += ` - Start Date: ${formattedStartDate}`;
           if (conventionEndDate) {
-            conventionDetails += ` - End Date: ${format(conventionEndDate, 'MMMM d, yyyy')}`;
+            conventionDetails += ` - End Date: ${formatConventionDay(conventionEndDate, 0, 'MMMM d, yyyy')}`;
           }
           promptText = conventionDetails;
 
