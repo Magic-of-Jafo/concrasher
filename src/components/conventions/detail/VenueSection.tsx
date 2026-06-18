@@ -71,7 +71,9 @@ export default function VenueSection({ convention }: { convention: any }) {
                     target="_blank"
                     sx={{ mb: 2 }}
                 >
-                    Book your room at {primaryVenue.venueName}
+                    {convention.guestsStayAtPrimaryVenue
+                        ? `Book your room at ${primaryVenue.venueName}`
+                        : 'Venue website'}
                 </Button>
             )}
             {primaryVenue && <VenueCard venue={primaryVenue} isCompact={false} />}
