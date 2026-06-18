@@ -25,23 +25,22 @@ interface PricingSectionProps {
     convention: any;
 }
 
+// Site-wide money formatting: thousands separators, and the fractional part
+// shown only when it exists ($5 → $5, $5.12 → $5.12, ₩280000 → ₩280,000).
+function formatMoney(numAmount: number, currencySymbol: string): string {
+    const grouped = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: Number.isInteger(numAmount) ? 0 : 2,
+        maximumFractionDigits: 2,
+    }).format(numAmount);
+    return `${currencySymbol}${grouped}`;
+}
+
 // Helper function to format price
 function formatPrice(amount: number | string, currencySymbol: string = '$', currencyCode: string = 'USD'): string {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (!Number.isFinite(numAmount)) return '';
     if (numAmount === 0) return 'FREE';
-
-    if (['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'].includes(currencyCode)) {
-        try {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: currencyCode,
-            }).format(numAmount);
-        } catch (error) {
-            return `${currencySymbol}${numAmount.toFixed(2)}`;
-        }
-    }
-
-    return `${currencySymbol}${numAmount.toFixed(2)}`;
+    return formatMoney(numAmount, currencySymbol);
 }
 
 // Helper function to format discount cutoff date in "mmm dd" format
@@ -66,17 +65,9 @@ function formatDiscountDate(date: Date, timezone?: string): string {
     return format(displayDate, 'MMM dd');
 }
 
-// Compact money for the badge — drops the ".00" on whole amounts ("Save $30").
-function formatSave(amount: number, currencySymbol: string, currencyCode: string): string {
-    try {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: currencyCode,
-            minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-        }).format(amount);
-    } catch {
-        return `${currencySymbol}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
-    }
+// Compact money for the badge — same rules as the tables ("Save $30", "Save ₩30,000").
+function formatSave(amount: number, currencySymbol: string, _currencyCode: string): string {
+    return formatMoney(amount, currencySymbol);
 }
 
 // Green "Save $X" badge — the single, consistent way we signal any discount
