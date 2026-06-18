@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Tabs, Tab, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Tabs, Tab, Box, Button, CircularProgress, Typography, FormControlLabel, Switch, Paper, Snackbar, Alert } from '@mui/material';
+import { Festival as FestivalIcon } from '@mui/icons-material';
 import { BasicInfoTab } from './BasicInfoTab';
+import FestivalShowsTab from './FestivalShowsTab';
+import { setConventionType as setConventionTypeAction } from '@/lib/actions';
 import { type BasicInfoFormData } from '@/lib/validators';
 import { PricingTab } from './PricingTab';
 import { type PricingTabData, type PriceTier, type PriceDiscount } from '@/lib/validators';
@@ -88,6 +91,7 @@ const initialBasicFormData: BasicInfoFormData = {
 
 export interface ConventionDataForEditor extends BasicInfoFormData {
   id?: string;
+  type?: 'CONVENTION' | 'FESTIVAL';
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
   venueHotel?: VenueHotelTabData;
@@ -126,6 +130,11 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   const [activeTab, setActiveTab] = useState(0);
   const [hasVenueHotelTabBeenInteractedWith, setHasVenueHotelTabBeenInteractedWith] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [conventionType, setConventionType] = useState<'CONVENTION' | 'FESTIVAL'>(
+    initialConventionData?.type ?? 'CONVENTION'
+  );
+  const [typeSaving, setTypeSaving] = useState(false);
+  const [typeToast, setTypeToast] = useState<string | null>(null);
 
   const localStorageKey = 'conventionEditorActiveTab';
 
@@ -203,6 +212,16 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     return selectedCurrency?.symbol || ''; // Default to empty string if not found
   }, [currencies, settingsData.currency]);
 
+  const festivalVenues = useMemo(() => {
+    const list: { id: string; name: string }[] = [];
+    const pv = (venueHotelData as any)?.primaryVenue;
+    if (pv?.id) list.push({ id: pv.id, name: pv.venueName || 'Primary venue' });
+    for (const v of (venueHotelData as any)?.secondaryVenues || []) {
+      if (v?.id) list.push({ id: v.id, name: v.venueName || 'Venue' });
+    }
+    return list;
+  }, [venueHotelData]);
+
   const conventionId = initialConventionData?.id;
   const conventionName = initialConventionData?.name || 'this convention';
   // console.log('[ConventionEditorTabs] Derived conventionId:', conventionId);
@@ -257,6 +276,33 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   }, [initialConventionData, defaultVenueHotelData]);
 
 
+
+  // Keep festival/convention type in sync once the convention data loads (async).
+  useEffect(() => {
+    if (initialConventionData?.type) {
+      setConventionType(initialConventionData.type);
+    }
+  }, [initialConventionData?.type]);
+
+  const handleConventionTypeChange = async (makeFestival: boolean) => {
+    const next = makeFestival ? 'FESTIVAL' : 'CONVENTION';
+    if (!conventionId) {
+      // No persistence target yet (new convention) — just reflect locally.
+      setConventionType(next);
+      return;
+    }
+    const prev = conventionType;
+    setConventionType(next); // optimistic
+    setTypeSaving(true);
+    const res = await setConventionTypeAction(conventionId, next as any);
+    setTypeSaving(false);
+    if (res.success) {
+      setTypeToast(next === 'FESTIVAL' ? 'Switched to festival mode.' : 'Switched to convention mode.');
+    } else {
+      setConventionType(prev); // revert
+      setTypeToast(res.error || 'Could not change the event type.');
+    }
+  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -353,7 +399,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           <Tab label="Basic Info" {...allyProps(0)} />
           <Tab label="Pricing" {...allyProps(1)} />
           <Tab label="Venue/Hotel" {...allyProps(2)} />
-          <Tab label="Schedule" {...allyProps(3)} />
+          <Tab label={conventionType === 'FESTIVAL' ? 'Shows' : 'Schedule'} {...allyProps(3)} />
           <Tab label="Dealers" {...allyProps(4)} disabled={!isEditing} />
           <Tab label="Media" {...allyProps(5)} disabled={!isEditing} />
           <Tab label="Settings" {...allyProps(6)} disabled={!isEditing} />
@@ -399,13 +445,43 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
 
       <TabPanel value={activeTab} index={3}>
         {conventionId ? (
-          <ScheduleTab
-            conventionId={conventionId}
-            startDate={basicInfoData.startDate}
-            isOneDayEvent={basicInfoData.isOneDayEvent}
-            conventionName={basicInfoData.name}
-            conventionEndDate={basicInfoData.endDate}
-          />
+          <Box>
+            <Paper variant="outlined" sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <FestivalIcon color={conventionType === 'FESTIVAL' ? 'primary' : 'disabled'} />
+              <Box sx={{ flexGrow: 1, minWidth: 200 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={conventionType === 'FESTIVAL'}
+                      onChange={(e) => handleConventionTypeChange(e.target.checked)}
+                      disabled={typeSaving}
+                    />
+                  }
+                  label="This is a festival"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Festivals are organized as <strong>shows</strong> (each running at multiple times/venues) instead of a single timeline.
+                </Typography>
+              </Box>
+            </Paper>
+
+            {conventionType === 'FESTIVAL' ? (
+              <FestivalShowsTab
+                conventionId={conventionId}
+                startDate={basicInfoData.startDate}
+                endDate={basicInfoData.endDate}
+                venues={festivalVenues}
+              />
+            ) : (
+              <ScheduleTab
+                conventionId={conventionId}
+                startDate={basicInfoData.startDate}
+                isOneDayEvent={basicInfoData.isOneDayEvent}
+                conventionName={basicInfoData.name}
+                conventionEndDate={basicInfoData.endDate}
+              />
+            )}
+          </Box>
         ) : (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <CircularProgress />
@@ -469,6 +545,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           Failed to save changes: {saveError}
         </Typography>
       )}
+
+      <Snackbar
+        open={!!typeToast}
+        autoHideDuration={3000}
+        onClose={() => setTypeToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" onClose={() => setTypeToast(null)} sx={{ width: '100%' }}>
+          {typeToast}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

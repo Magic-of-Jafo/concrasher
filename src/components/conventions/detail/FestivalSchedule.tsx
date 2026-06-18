@@ -141,7 +141,6 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
                                     <Typography variant="body2" color="text.secondary">
                                         {[p.venue?.venueName, p.locationName].filter(Boolean).join(' — ')}
                                     </Typography>
-                                    {p.soldOut && <Chip label="SOLD OUT" size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: '0.62rem' }} />}
                                 </Box>
                             ))}
                         </Box>

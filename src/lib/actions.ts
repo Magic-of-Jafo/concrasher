@@ -6,7 +6,7 @@ import { db } from "@/lib/db"; // Ensure db is imported
 import { setEventTalent } from "@/lib/talent";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
-import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem } from "@prisma/client"; // Added import
+import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType } from "@prisma/client"; // Added import
 import { Prisma } from '@prisma/client'; // For types if needed
 import {
   ConventionScheduleItemCreateSchema,
@@ -2259,5 +2259,323 @@ export async function deleteConvention(conventionId: string): Promise<{
       return { success: false, error: "A database error occurred while deleting the convention." };
     }
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Festival shows (Productions)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** True if the current user may edit this convention (admin or owning organizer). */
+async function canEditConvention(conventionId: string, userId: string, roles: Role[]): Promise<boolean> {
+  if (roles.includes(Role.ADMIN)) return true;
+  const convention = await db.convention.findUnique({
+    where: { id: conventionId },
+    select: { series: { select: { organizerUserId: true } } },
+  });
+  return !!convention && convention.series?.organizerUserId === userId;
+}
+
+/** Flip a convention between CONVENTION and FESTIVAL mode. */
+export async function setConventionType(conventionId: string, type: ConventionType) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!(await canEditConvention(conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'You are not authorized to edit this convention.' };
+  }
+  try {
+    await db.convention.update({ where: { id: conventionId }, data: { type } });
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    return { success: true, type };
+  } catch (error) {
+    console.error('Error setting convention type:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function getProductionsForConvention(conventionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.', data: [] as any[] };
+  if (!(await canEditConvention(conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'You are not authorized to view this convention.', data: [] as any[] };
+  }
+  try {
+    const productions = await db.production.findMany({
+      where: { conventionId },
+      orderBy: { order: 'asc' },
+      include: { _count: { select: { performances: true } } },
+    });
+    return { success: true, data: productions };
+  } catch (error) {
+    console.error('Error fetching productions:', error);
+    return { success: false, error: 'An unexpected error occurred.', data: [] as any[] };
+  }
+}
+
+export interface ProductionInput {
+  title: string;
+  tagline?: string | null;
+  ageRating?: string | null;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  detailsUrl?: string | null;
+  priceTiers?: Prisma.InputJsonValue | null;
+  priceNote?: string | null;
+}
+
+export async function createProduction(conventionId: string, data: ProductionInput) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!(await canEditConvention(conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'You are not authorized to edit this convention.' };
+  }
+  if (!data.title?.trim()) return { success: false, error: 'A show title is required.' };
+  try {
+    const last = await db.production.findFirst({
+      where: { conventionId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    const production = await db.production.create({
+      data: {
+        conventionId,
+        title: data.title.trim(),
+        tagline: data.tagline ?? null,
+        ageRating: data.ageRating ?? null,
+        description: data.description ?? null,
+        coverImageUrl: data.coverImageUrl ?? null,
+        detailsUrl: data.detailsUrl ?? null,
+        priceTiers: data.priceTiers ?? undefined,
+        priceNote: data.priceNote ?? null,
+        order: (last?.order ?? -1) + 1,
+      },
+    });
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    return { success: true, data: production };
+  } catch (error) {
+    console.error('Error creating production:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function updateProduction(productionId: string, data: ProductionInput) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const existing = await db.production.findUnique({
+    where: { id: productionId },
+    select: { conventionId: true },
+  });
+  if (!existing) return { success: false, error: 'Show not found.' };
+  if (!(await canEditConvention(existing.conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'You are not authorized to edit this convention.' };
+  }
+  if (!data.title?.trim()) return { success: false, error: 'A show title is required.' };
+  try {
+    const production = await db.production.update({
+      where: { id: productionId },
+      data: {
+        title: data.title.trim(),
+        tagline: data.tagline ?? null,
+        ageRating: data.ageRating ?? null,
+        description: data.description ?? null,
+        coverImageUrl: data.coverImageUrl ?? null,
+        detailsUrl: data.detailsUrl ?? null,
+        priceTiers: data.priceTiers ?? undefined,
+        priceNote: data.priceNote ?? null,
+      },
+    });
+    revalidatePath(`/organizer/conventions/${existing.conventionId}/edit`);
+    return { success: true, data: production };
+  } catch (error) {
+    console.error('Error updating production:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+/** Delete a show. Its performances are detached (productionId set null) so the
+ *  schedule items survive as standalone events rather than being destroyed. */
+export async function deleteProduction(productionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const existing = await db.production.findUnique({
+    where: { id: productionId },
+    select: { conventionId: true },
+  });
+  if (!existing) return { success: false, error: 'Show not found.' };
+  if (!(await canEditConvention(existing.conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'You are not authorized to edit this convention.' };
+  }
+  try {
+    await db.conventionScheduleItem.updateMany({
+      where: { productionId },
+      data: { productionId: null },
+    });
+    await db.production.delete({ where: { id: productionId } });
+    revalidatePath(`/organizer/conventions/${existing.conventionId}/edit`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting production:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Festival performances (showings of a Production)
+// A performance is a ConventionScheduleItem linked via productionId.
+// ──────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_PERFORMANCE_EVENT_TYPE = 'Stage/Gala Show';
+
+export interface PerformanceInput {
+  dayOffset: number;
+  startTimeMinutes?: number | null;
+  durationMinutes?: number | null;
+  venueId?: string | null;
+  locationName?: string | null;
+  soldOut?: boolean;
+}
+
+/** Authorize against a production and return its convention + title, or null. */
+async function authorizeProduction(productionId: string, userId: string, roles: Role[]) {
+  const production = await db.production.findUnique({
+    where: { id: productionId },
+    select: { conventionId: true, title: true },
+  });
+  if (!production) return null;
+  const allowed = await canEditConvention(production.conventionId, userId, roles);
+  return allowed ? production : null;
+}
+
+/** Find an existing schedule day for this offset so the public day grouping lines up. */
+async function findScheduleDayId(conventionId: string, dayOffset: number): Promise<string | null> {
+  const day = await db.scheduleDay.findFirst({
+    where: { conventionId, dayOffset },
+    select: { id: true },
+  });
+  return day?.id ?? null;
+}
+
+export async function getPerformancesForProduction(productionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.', data: [] as any[] };
+  const prod = await authorizeProduction(productionId, session.user.id, session.user.roles as Role[]);
+  if (!prod) return { success: false, error: 'Not authorized.', data: [] as any[] };
+  try {
+    const performances = await db.conventionScheduleItem.findMany({
+      where: { productionId },
+      orderBy: [{ dayOffset: 'asc' }, { startTimeMinutes: 'asc' }],
+      include: { venue: { select: { id: true, venueName: true } } },
+    });
+    return { success: true, data: performances };
+  } catch (error) {
+    console.error('Error fetching performances:', error);
+    return { success: false, error: 'An unexpected error occurred.', data: [] as any[] };
+  }
+}
+
+async function buildPerformanceData(conventionId: string, title: string, p: PerformanceInput) {
+  return {
+    conventionId,
+    title,
+    eventType: DEFAULT_PERFORMANCE_EVENT_TYPE,
+    atPrimaryVenue: false,
+    dayOffset: p.dayOffset,
+    startTimeMinutes: p.startTimeMinutes ?? null,
+    durationMinutes: p.durationMinutes ?? null,
+    venueId: p.venueId ?? null,
+    locationName: p.locationName?.trim() || null,
+    soldOut: p.soldOut ?? false,
+    scheduleDayId: await findScheduleDayId(conventionId, p.dayOffset),
+  };
+}
+
+export async function createPerformance(productionId: string, p: PerformanceInput) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const prod = await authorizeProduction(productionId, session.user.id, session.user.roles as Role[]);
+  if (!prod) return { success: false, error: 'Not authorized.' };
+  try {
+    const data = await buildPerformanceData(prod.conventionId, prod.title, p);
+    const item = await db.conventionScheduleItem.create({ data: { ...data, productionId } });
+    revalidatePath(`/organizer/conventions/${prod.conventionId}/edit`);
+    return { success: true, data: item };
+  } catch (error: any) {
+    console.error('Error creating performance:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+/** Create several showings at once (the repeat helper). */
+export async function createPerformancesBulk(productionId: string, performances: PerformanceInput[]) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const prod = await authorizeProduction(productionId, session.user.id, session.user.roles as Role[]);
+  if (!prod) return { success: false, error: 'Not authorized.' };
+  if (!performances.length) return { success: false, error: 'No showings to add.' };
+  try {
+    for (const p of performances) {
+      const data = await buildPerformanceData(prod.conventionId, prod.title, p);
+      await db.conventionScheduleItem.create({ data: { ...data, productionId } });
+    }
+    revalidatePath(`/organizer/conventions/${prod.conventionId}/edit`);
+    return { success: true, count: performances.length };
+  } catch (error: any) {
+    console.error('Error creating performances:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function updatePerformance(itemId: string, p: PerformanceInput) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const item = await db.conventionScheduleItem.findUnique({
+    where: { id: itemId },
+    select: { conventionId: true },
+  });
+  if (!item) return { success: false, error: 'Performance not found.' };
+  if (!(await canEditConvention(item.conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'Not authorized.' };
+  }
+  try {
+    const scheduleDayId = await findScheduleDayId(item.conventionId, p.dayOffset);
+    await db.conventionScheduleItem.update({
+      where: { id: itemId },
+      data: {
+        dayOffset: p.dayOffset,
+        startTimeMinutes: p.startTimeMinutes ?? null,
+        durationMinutes: p.durationMinutes ?? null,
+        locationName: p.locationName?.trim() || null,
+        soldOut: p.soldOut ?? false,
+        // FK relations must be written through connect/disconnect on update.
+        venue: p.venueId ? { connect: { id: p.venueId } } : { disconnect: true },
+        scheduleDay: scheduleDayId ? { connect: { id: scheduleDayId } } : { disconnect: true },
+      },
+    });
+    revalidatePath(`/organizer/conventions/${item.conventionId}/edit`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating performance:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+export async function deletePerformance(itemId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  const item = await db.conventionScheduleItem.findUnique({
+    where: { id: itemId },
+    select: { conventionId: true },
+  });
+  if (!item) return { success: false, error: 'Performance not found.' };
+  if (!(await canEditConvention(item.conventionId, session.user.id, session.user.roles as Role[]))) {
+    return { success: false, error: 'Not authorized.' };
+  }
+  try {
+    await db.conventionScheduleItem.delete({ where: { id: itemId } });
+    revalidatePath(`/organizer/conventions/${item.conventionId}/edit`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting performance:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
   }
 }

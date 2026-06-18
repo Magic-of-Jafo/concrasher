@@ -34,6 +34,7 @@ interface ConventionSeries {
 // This interface will hold the complete data for the convention being edited on this page
 interface PageConventionData extends BasicInfoFormData {
   id?: string; // Convention ID itself
+  type?: 'CONVENTION' | 'FESTIVAL'; // Convention vs festival mode
   status?: ConventionStatus; // Add status property
   priceTiers?: PriceTier[];
   priceDiscounts?: PriceDiscount[];
@@ -347,6 +348,7 @@ function ConventionEditPage() { // Remove params from props
 
           setConventionPageData({
             id: conventionId,
+            type: loadedApiConvention.type || 'CONVENTION',
             name: loadedApiConvention.name || '',
             slug: loadedApiConvention.slug || '',
             status: loadedApiConvention.status || ConventionStatus.DRAFT,
@@ -534,6 +536,7 @@ function ConventionEditPage() { // Remove params from props
       delete (payload as any).priceTiers;
       delete (payload as any).priceDiscounts;
       delete (payload as any).newSeriesName; // Should not be sent
+      delete (payload as any).type; // Festival/convention type is persisted via its own toggle action
 
       const response = await fetch(`/api/organizer/conventions/${conventionId}`, {
         method: 'PUT',
