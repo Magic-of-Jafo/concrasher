@@ -76,8 +76,10 @@ Rules:
 - "performers": real human names presenting/performing, with an optional role (Performer,
   Lecturer, MC, Panelist, Host, Judge, Guest of Honor). Expand shared surnames ("David and
   Jake Rangel" -> two people). Spell each person's name correctly and consistently. Empty array if none.
+- If the source (text or image) is in another language, translate titles and descriptions into
+  natural English; keep people's and venue names in their original spelling.
 - Include every event with a start time. If end time is missing, omit "end".
-- Do NOT invent events or people. If the text contains no schedule, return empty arrays.
+- Do NOT invent events or people. If the source contains no schedule, return empty arrays.
 
 Respond ONLY as JSON:
 {"days":[{"dayOffset":0,"label":"Friday"}],
@@ -103,19 +105,8 @@ async function callOpenAI(apiKey: string, model: string, messages: any[]): Promi
     return json.choices?.[0]?.message?.content ?? '{}';
 }
 
-export async function extractScheduleFromText(
-    text: string,
-    ctx: { conventionName: string; startDate: Date | string; apiKey: string; model: string },
-): Promise<ScrapedSchedule> {
-    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
-    if (!trimmed) return { days: [], events: [] };
-
-    const user = `Convention: ${ctx.conventionName}\nConvention start date (day 0): ${fmtUTCDay(ctx.startDate, 0, 'full')}\n\nSchedule source text:\n${trimmed}`;
-    const content = await callOpenAI(ctx.apiKey, ctx.model, [
-        { role: 'system', content: systemPrompt() },
-        { role: 'user', content: user },
-    ]);
-
+// Shape the model's JSON into our schedule structure (shared by text + image paths).
+function shapeSchedule(content: string): ScrapedSchedule {
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { return { days: [], events: [] }; }
 
@@ -163,6 +154,39 @@ export async function extractScheduleFromText(
         .map((d: any) => ({ dayOffset: Number(d.dayOffset) || 0, label: d.label ?? null }));
 
     return { days, events };
+}
+
+export async function extractScheduleFromText(
+    text: string,
+    ctx: { conventionName: string; startDate: Date | string; apiKey: string; model: string },
+): Promise<ScrapedSchedule> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return { days: [], events: [] };
+
+    const user = `Convention: ${ctx.conventionName}\nConvention start date (day 0): ${fmtUTCDay(ctx.startDate, 0, 'full')}\n\nSchedule source text:\n${trimmed}`;
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: systemPrompt() },
+        { role: 'user', content: user },
+    ]);
+    return shapeSchedule(content);
+}
+
+/** Read a schedule out of one or more images (vision). Handles image-only or
+ *  non-English (e.g. Korean) schedules that the text path can't see. */
+export async function extractScheduleFromImages(
+    images: string[],
+    ctx: { conventionName: string; startDate: Date | string; apiKey: string; model: string },
+): Promise<ScrapedSchedule> {
+    if (!images.length) return { days: [], events: [] };
+    const userParts: any[] = [
+        { type: 'text', text: `Convention: ${ctx.conventionName}\nConvention start date (day 0): ${fmtUTCDay(ctx.startDate, 0, 'full')}\n\nThe schedule is in the following image(s). Read it and return the JSON.` },
+        ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: systemPrompt() },
+        { role: 'user', content: userParts },
+    ]);
+    return shapeSchedule(content);
 }
 
 // ── input adapters ────────────────────────────────────────────────────────────
@@ -225,6 +249,73 @@ export async function findScheduleFromWebsite(homepageUrl: string): Promise<{ te
     }
     // Fall back to the homepage text itself (schedule may be inline).
     return { text: htmlToText(html), chosenUrl: homepageUrl };
+}
+
+// ── images / auto-detection ─────────────────────────────────────────────────
+export function bufferToDataUrl(contentType: string, buf: Buffer): string {
+    const mime = (contentType || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+/** Fetch an image URL and return it as a base64 data URL (for the vision model). */
+export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+    try {
+        const res = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(20000) });
+        if (!res.ok) return null;
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.startsWith('image/') && !/\.(jpe?g|png|webp|gif)(\?|$)/i.test(url)) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 8 * 1024 * 1024) return null; // keep payloads sane
+        return bufferToDataUrl(ct || 'image/jpeg', buf);
+    } catch { return null; }
+}
+
+/** Pull plausible content image URLs out of HTML (skipping logos/icons/ads). */
+function candidateImageUrls(html: string, baseUrl: string): string[] {
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    for (const m of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+        let abs: URL;
+        try { abs = new URL(m[1], baseUrl); } catch { continue; }
+        if (!/^https?:/.test(abs.protocol)) continue;
+        const u = abs.href;
+        if (seen.has(u) || !/\.(jpe?g|png|webp)(\?|$)/i.test(abs.pathname)) continue;
+        if (/(logo|icon|sprite|favicon|avatar|profile|btn|button|banner-ad|ad[-_])/i.test(u)) continue;
+        seen.add(u);
+        urls.push(u);
+        if (urls.length >= 12) break;
+    }
+    return urls;
+}
+
+/**
+ * Fetch a URL and auto-detect what kind of source it is — letting the caller
+ * route to the right extractor:
+ *   - a PDF                → text (pdfToText)
+ *   - an image (JPEG/PNG)  → vision (images)
+ *   - an HTML page         → page text, PLUS its prominent images as a vision
+ *                            fallback for image-only / non-text schedules.
+ */
+export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image' | 'html'; text: string; images: string[] }> {
+    const res = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/pdf') || /\.pdf(\?|$)/i.test(url)) {
+        return { kind: 'pdf', text: await pdfToText(await res.arrayBuffer()), images: [] };
+    }
+    if (ct.startsWith('image/') || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url)) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        return { kind: 'image', text: '', images: [bufferToDataUrl(ct, buf)] };
+    }
+    const html = await res.text();
+    const text = htmlToText(html);
+    const images: string[] = [];
+    for (const u of candidateImageUrls(html, url)) {
+        const d = await fetchImageAsDataUrl(u);
+        if (d) images.push(d);
+        if (images.length >= 4) break;
+    }
+    return { kind: 'html', text, images };
 }
 
 // ── apply ──────────────────────────────────────────────────────────────────────
@@ -327,25 +418,15 @@ Rules:
 - performance: { "date": "YYYY-MM-DD", "start": "h:mm AM/PM", "end": "h:mm AM/PM" }  (year is ${year}; include end only if a time range is given)
 - show: { "title", "performer" (the act/person as written), "venue" (the space/room name as written),
   "ageRating" (as written, e.g. "9+", "0-12", "All"), "performances": [...] }
+- If the programme is in another language, translate the show titles into natural English; keep
+  performer and venue names in their original spelling.
 - Include EVERY show/row. Do NOT invent shows or dates.
 
 Respond ONLY as JSON:
 {"shows":[{"title":"...","performer":"...","venue":"...","ageRating":"...","performances":[{"date":"${year}-06-30","start":"10:45 AM","end":"11:30 AM"}]}]}`;
 }
 
-export async function extractFestivalFromText(
-    text: string,
-    ctx: { festivalName: string; year: number; apiKey: string; model: string },
-): Promise<ScrapedFestival> {
-    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
-    if (!trimmed) return { shows: [] };
-
-    const user = `Festival: ${ctx.festivalName}\nYear: ${ctx.year}\n\nProgramme:\n${trimmed}`;
-    const content = await callOpenAI(ctx.apiKey, ctx.model, [
-        { role: 'system', content: festivalSystemPrompt(ctx.year) },
-        { role: 'user', content: user },
-    ]);
-
+function shapeFestival(content: string): ScrapedFestival {
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { return { shows: [] }; }
 
@@ -370,6 +451,38 @@ export async function extractFestivalFromText(
         .filter((s: ScrapedShow) => s.title && s.performances.length);
 
     return { shows };
+}
+
+export async function extractFestivalFromText(
+    text: string,
+    ctx: { festivalName: string; year: number; apiKey: string; model: string },
+): Promise<ScrapedFestival> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return { shows: [] };
+
+    const user = `Festival: ${ctx.festivalName}\nYear: ${ctx.year}\n\nProgramme:\n${trimmed}`;
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: festivalSystemPrompt(ctx.year) },
+        { role: 'user', content: user },
+    ]);
+    return shapeFestival(content);
+}
+
+/** Read festival shows out of one or more images (vision). */
+export async function extractFestivalFromImages(
+    images: string[],
+    ctx: { festivalName: string; year: number; apiKey: string; model: string },
+): Promise<ScrapedFestival> {
+    if (!images.length) return { shows: [] };
+    const userParts: any[] = [
+        { type: 'text', text: `Festival: ${ctx.festivalName}\nYear: ${ctx.year}\n\nThe programme is in the following image(s). Read it and return the JSON.` },
+        ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: festivalSystemPrompt(ctx.year) },
+        { role: 'user', content: userParts },
+    ]);
+    return shapeFestival(content);
 }
 
 const dayDiffUTC = (a: Date, b: Date): number =>

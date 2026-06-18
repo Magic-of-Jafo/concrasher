@@ -10,9 +10,10 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LinkIcon from '@mui/icons-material/Link';
 import LanguageIcon from '@mui/icons-material/Language';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ImageIcon from '@mui/icons-material/Image';
 import EventIcon from '@mui/icons-material/Event';
 
-type SourceType = 'url' | 'website' | 'pdf';
+type SourceType = 'url' | 'website' | 'pdf' | 'image';
 
 interface PreviewPerformance { date: string; startMin: number; durationMin: number; }
 interface PreviewShow {
@@ -99,6 +100,13 @@ export default function FestivalHelperDialog({
                 fd.append('sourceType', 'pdf');
                 fd.append('replace', String(replace));
                 res = await fetch(`/api/conventions/${conventionId}/scrape-schedule`, { method: 'POST', body: fd, signal: controller.signal });
+            } else if (sourceType === 'image' && file) {
+                const fd = new FormData();
+                fd.append('image', file);
+                fd.append('mode', 'preview');
+                fd.append('sourceType', 'image');
+                fd.append('replace', String(replace));
+                res = await fetch(`/api/conventions/${conventionId}/scrape-schedule`, { method: 'POST', body: fd, signal: controller.signal });
             } else {
                 res = await fetch(`/api/conventions/${conventionId}/scrape-schedule`, {
                     method: 'POST',
@@ -160,9 +168,10 @@ export default function FestivalHelperDialog({
                         </Typography>
 
                         <ToggleButtonGroup exclusive fullWidth size="small" value={sourceType} onChange={(_, v) => v && setSourceType(v)} sx={{ mb: 2 }}>
-                            <ToggleButton value="url"><LinkIcon fontSize="small" sx={{ mr: 0.5 }} /> Programme URL</ToggleButton>
-                            <ToggleButton value="website"><LanguageIcon fontSize="small" sx={{ mr: 0.5 }} /> Scan website</ToggleButton>
+                            <ToggleButton value="url"><LinkIcon fontSize="small" sx={{ mr: 0.5 }} /> URL</ToggleButton>
+                            <ToggleButton value="website"><LanguageIcon fontSize="small" sx={{ mr: 0.5 }} /> Website</ToggleButton>
                             <ToggleButton value="pdf"><UploadFileIcon fontSize="small" sx={{ mr: 0.5 }} /> PDF</ToggleButton>
+                            <ToggleButton value="image"><ImageIcon fontSize="small" sx={{ mr: 0.5 }} /> Image</ToggleButton>
                         </ToggleButtonGroup>
 
                         {sourceType === 'url' && (
@@ -186,6 +195,21 @@ export default function FestivalHelperDialog({
                                 {file ? file.name : 'Choose a PDF…'}
                                 <input type="file" accept="application/pdf,.pdf" hidden onChange={e => setFile(e.target.files?.[0] || null)} />
                             </Button>
+                        )}
+                        {sourceType === 'image' && (
+                            <>
+                                <TextField
+                                    fullWidth size="small" label="Image URL"
+                                    placeholder="https://…/programme.jpg"
+                                    value={url} onChange={e => setUrl(e.target.value)}
+                                    helperText="Paste a link to the programme image, or upload one below. Works for screenshots and non-English programmes."
+                                    sx={{ mb: 1 }}
+                                />
+                                <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} fullWidth sx={{ justifyContent: 'flex-start' }}>
+                                    {file ? file.name : 'Or upload an image…'}
+                                    <input type="file" accept="image/*" hidden onChange={e => setFile(e.target.files?.[0] || null)} />
+                                </Button>
+                            </>
                         )}
 
                         {error && <Alert severity="warning" sx={{ mt: 2 }}>{error}</Alert>}

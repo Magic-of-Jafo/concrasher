@@ -5,11 +5,15 @@ import prisma from '@/lib/prisma';
 import { getOpenAIConfig } from '@/lib/ai-settings';
 import {
     extractScheduleFromText,
-    fetchUrlText,
+    extractScheduleFromImages,
     findScheduleFromWebsite,
+    gatherFromUrl,
+    fetchImageAsDataUrl,
+    bufferToDataUrl,
     pdfToText,
     applyScrapedSchedule,
     extractFestivalFromText,
+    extractFestivalFromImages,
     applyScrapedFestival,
 } from '@/lib/scheduleScraper';
 
@@ -46,9 +50,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
     const festivalYear = conv.startDate ? new Date(conv.startDate).getUTCFullYear() : new Date().getUTCFullYear();
 
-    // ── parse input (JSON or multipart for PDF upload) ──
+    // ── parse input (JSON, or multipart for PDF / image upload) ──
     let mode = 'preview', replace = true, sourceType = 'url', url = '';
     let pdfData: ArrayBuffer | null = null;
+    let imageData: ArrayBuffer | null = null;
+    let imageMime = 'image/jpeg';
     let providedSchedule: any = null;
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('multipart/form-data')) {
@@ -57,8 +63,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         replace = String(form.get('replace') ?? 'true') === 'true';
         sourceType = String(form.get('sourceType') || 'pdf');
         url = String(form.get('url') || '');
-        const file = form.get('pdf');
-        if (file && typeof file !== 'string') pdfData = await file.arrayBuffer();
+        const pdf = form.get('pdf');
+        if (pdf && typeof pdf !== 'string') pdfData = await pdf.arrayBuffer();
+        const image = form.get('image');
+        if (image && typeof image !== 'string') { imageData = await image.arrayBuffer(); imageMime = image.type || 'image/jpeg'; }
     } else {
         const body = await req.json().catch(() => ({}));
         mode = body.mode || 'preview';
@@ -85,42 +93,60 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: 'The Schedule Helper isn\'t configured. Please contact the site administrator.' }, { status: 400 });
     }
 
-    // ── acquire source text ──
+    // ── acquire source: text and/or images, auto-detecting per source ──
+    // A URL is sniffed (PDF / image / HTML); HTML also yields its prominent
+    // images as a vision fallback so image-only or non-English schedules read.
     let text = '';
+    let images: string[] = [];
     let source = '';
     try {
         if (sourceType === 'pdf' && pdfData) {
             text = await pdfToText(pdfData);
             source = 'Uploaded PDF';
+        } else if (sourceType === 'image' && imageData) {
+            images = [bufferToDataUrl(imageMime, Buffer.from(imageData))];
+            source = 'Uploaded image';
+        } else if (sourceType === 'image') {
+            if (!url) return NextResponse.json({ error: 'Provide an image URL.' }, { status: 400 });
+            const d = await fetchImageAsDataUrl(url);
+            if (!d) return NextResponse.json({ error: 'Could not read that image URL.' }, { status: 422 });
+            images = [d];
+            source = `Image: ${url}`;
         } else if (sourceType === 'website') {
             const target = url || conv.websiteUrl;
             if (!target) return NextResponse.json({ error: 'No website URL available for this convention.' }, { status: 400 });
             const r = await findScheduleFromWebsite(target);
+            const g = await gatherFromUrl(r.chosenUrl);
+            text = g.text; images = g.images;
             source = `Website (found: ${r.chosenUrl})`;
-            text = r.text;
         } else {
             const target = url || conv.websiteUrl;
             if (!target) return NextResponse.json({ error: 'Provide a schedule URL.' }, { status: 400 });
-            const r = await fetchUrlText(target);
-            source = `${r.kind.toUpperCase()}: ${target}`;
-            text = r.text;
+            const g = await gatherFromUrl(target);
+            text = g.text; images = g.images;
+            source = `${g.kind.toUpperCase()}: ${target}`;
         }
     } catch (e: any) {
         return NextResponse.json({ error: `Could not read the source: ${e?.message || e}` }, { status: 502 });
     }
 
-    if (!text.trim()) {
-        return NextResponse.json({ error: 'Couldn\'t find readable text at that source. A scanned or image-only PDF can\'t be read yet.' }, { status: 422 });
+    if (!text.trim() && !images.length) {
+        return NextResponse.json({ error: 'Couldn\'t find readable text or images at that source. Try a different page, a PDF, or the schedule image directly.' }, { status: 422 });
     }
 
     // ── festival branch: extract SHOWS with their performances ──
+    // Try the page text first; if it has no shows, read the image(s) (vision).
     if (festival) {
-        let result;
+        let result: { shows: any[] } = { shows: [] };
         try {
-            result = await extractFestivalFromText(text, { festivalName: conv.name, year: festivalYear, apiKey, model });
+            if (text.trim()) result = await extractFestivalFromText(text, { festivalName: conv.name, year: festivalYear, apiKey, model });
+            if (!result.shows.length && images.length) {
+                result = await extractFestivalFromImages(images, { festivalName: conv.name, year: festivalYear, apiKey, model });
+                if (result.shows.length) source += ' (read from image)';
+            }
         } catch (e: any) {
             console.error('scrape-festival extraction failed:', e?.message || e);
-            return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page or PDF.' }, { status: 502 });
+            return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page, PDF, or image.' }, { status: 502 });
         }
         if (mode === 'apply') {
             const summary = await applyScrapedFestival(conventionId, result, { replace });
@@ -129,13 +155,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ success: true, applied: false, festival: true, source, shows: result.shows });
     }
 
-    // ── extract ──
-    let schedule;
+    // ── convention branch: text first, image(s) as fallback ──
+    let schedule: { days: any[]; events: any[] } = { days: [], events: [] };
     try {
-        schedule = await extractScheduleFromText(text, { conventionName: conv.name, startDate: conv.startDate!, apiKey, model });
+        if (text.trim()) schedule = await extractScheduleFromText(text, { conventionName: conv.name, startDate: conv.startDate!, apiKey, model });
+        if (!schedule.events.length && images.length) {
+            schedule = await extractScheduleFromImages(images, { conventionName: conv.name, startDate: conv.startDate!, apiKey, model });
+            if (schedule.events.length) source += ' (read from image)';
+        }
     } catch (e: any) {
         console.error('scrape-schedule extraction failed:', e?.message || e);
-        return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page or PDF.' }, { status: 502 });
+        return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page, PDF, or image.' }, { status: 502 });
     }
 
     if (mode === 'apply') {
