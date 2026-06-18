@@ -9,6 +9,8 @@ import {
     findScheduleFromWebsite,
     pdfToText,
     applyScrapedSchedule,
+    extractFestivalFromText,
+    applyScrapedFestival,
 } from '@/lib/scheduleScraper';
 
 // POST /api/conventions/[id]/scrape-schedule
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const conventionId = params.id;
     const conv = await prisma.convention.findUnique({
         where: { id: conventionId },
-        select: { id: true, name: true, startDate: true, websiteUrl: true, series: { select: { organizerUserId: true } } },
+        select: { id: true, name: true, type: true, startDate: true, websiteUrl: true, series: { select: { organizerUserId: true } } },
     });
     if (!conv) return NextResponse.json({ error: 'Convention not found' }, { status: 404 });
 
@@ -35,9 +37,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!isAdmin && !isOwner) {
         return NextResponse.json({ error: 'You must be the organizer or an admin for this convention.' }, { status: 403 });
     }
-    if (!conv.startDate) {
+
+    const festival = conv.type === 'FESTIVAL';
+    // Festivals carry their own dates in the programme and the helper sets them
+    // on apply; regular schedules are anchored to a pre-set start date.
+    if (!festival && !conv.startDate) {
         return NextResponse.json({ error: "Set the convention's start date first — the schedule is anchored to it." }, { status: 400 });
     }
+    const festivalYear = conv.startDate ? new Date(conv.startDate).getUTCFullYear() : new Date().getUTCFullYear();
 
     // ── parse input (JSON or multipart for PDF upload) ──
     let mode = 'preview', replace = true, sourceType = 'url', url = '';
@@ -61,10 +68,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         providedSchedule = body.schedule || null;
     }
 
-    // Apply the already-previewed events directly (no re-extraction / drift).
-    if (mode === 'apply' && providedSchedule && Array.isArray(providedSchedule.events)) {
-        const summary = await applyScrapedSchedule(conventionId, providedSchedule, { replace });
-        return NextResponse.json({ success: true, applied: true, summary, source: 'confirmed preview' });
+    // Apply the already-previewed result directly (no re-extraction / drift).
+    if (mode === 'apply' && providedSchedule) {
+        if (festival && Array.isArray(providedSchedule.shows)) {
+            const summary = await applyScrapedFestival(conventionId, providedSchedule, { replace });
+            return NextResponse.json({ success: true, applied: true, summary, source: 'confirmed preview' });
+        }
+        if (!festival && Array.isArray(providedSchedule.events)) {
+            const summary = await applyScrapedSchedule(conventionId, providedSchedule, { replace });
+            return NextResponse.json({ success: true, applied: true, summary, source: 'confirmed preview' });
+        }
     }
 
     const { apiKey, model } = await getOpenAIConfig();
@@ -100,10 +113,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: 'Couldn\'t find readable text at that source. A scanned or image-only PDF can\'t be read yet.' }, { status: 422 });
     }
 
+    // ── festival branch: extract SHOWS with their performances ──
+    if (festival) {
+        let result;
+        try {
+            result = await extractFestivalFromText(text, { festivalName: conv.name, year: festivalYear, apiKey, model });
+        } catch (e: any) {
+            console.error('scrape-festival extraction failed:', e?.message || e);
+            return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page or PDF.' }, { status: 502 });
+        }
+        if (mode === 'apply') {
+            const summary = await applyScrapedFestival(conventionId, result, { replace });
+            return NextResponse.json({ success: true, applied: true, summary, source });
+        }
+        return NextResponse.json({ success: true, applied: false, festival: true, source, shows: result.shows });
+    }
+
     // ── extract ──
     let schedule;
     try {
-        schedule = await extractScheduleFromText(text, { conventionName: conv.name, startDate: conv.startDate, apiKey, model });
+        schedule = await extractScheduleFromText(text, { conventionName: conv.name, startDate: conv.startDate!, apiKey, model });
     } catch (e: any) {
         console.error('scrape-schedule extraction failed:', e?.message || e);
         return NextResponse.json({ error: 'The Schedule Helper couldn\'t read that source. Try a different page or PDF.' }, { status: 502 });

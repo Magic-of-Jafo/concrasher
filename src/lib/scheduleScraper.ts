@@ -281,3 +281,188 @@ export async function applyScrapedSchedule(
 
     return { days: offsets.length, events: created, talent: talentIds.size };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Festival mode — extract SHOWS (productions) with expanded runs of performances
+// and write them as Production + performance (ConventionScheduleItem) records.
+// Ported from scripts/scrape-festival.mjs into the shared, in-app core.
+// ════════════════════════════════════════════════════════════════════════════
+
+const FESTIVAL_EVENT_TYPE = 'Stage/Gala Show';
+// performer strings that aren't a single bookable act → don't make a talent profile
+const NON_TALENT = /\b(acts|many magicians|various|tbc|tba|all)\b/i;
+
+export interface ScrapedPerformance { date: string; startMin: number; durationMin: number; }
+export interface ScrapedShow {
+    title: string;
+    performer: string | null;
+    venue: string | null;
+    ageRating: string | null;
+    performances: ScrapedPerformance[];
+}
+export interface ScrapedFestival { shows: ScrapedShow[]; }
+
+function festToMinutes(t: any): number | null {
+    const s = String(t ?? '').trim();
+    let m = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+    if (m) { let h = parseInt(m[1], 10) % 12; if (/pm/i.test(m[3])) h += 12; return h * 60 + parseInt(m[2], 10); }
+    m = s.match(/^(\d{1,2})\s*(am|pm)$/i);
+    if (m) { let h = parseInt(m[1], 10) % 12; if (/pm/i.test(m[2])) h += 12; return h * 60; }
+    return null;
+}
+
+function festivalSystemPrompt(year: number): string {
+    return `You convert a magic festival programme into structured JSON of SHOWS and their PERFORMANCES.
+
+The programme is usually a grid; a single show often runs on multiple days. Day-range headers like
+"WEEK ONE – Tuesday June 30 to Sunday July 5" give the dates for rows that say "Tue to Sun",
+"Sat only", "Fri, Sat, Sun", etc. Single-day section headers like "SATURDAY – June 27" date the
+rows beneath them.
+
+Rules:
+- A SHOW is a production/act: group ALL its performances under one show entry.
+- Expand recurring runs into explicit dated performances: "Tue to Sun" within a labeled week =
+  one performance on each of those days at the listed time; "Sat only" = just that Saturday;
+  "Fri, Sat, Sun" = those three days. Single-weekday rows = that one date.
+- performance: { "date": "YYYY-MM-DD", "start": "h:mm AM/PM", "end": "h:mm AM/PM" }  (year is ${year}; include end only if a time range is given)
+- show: { "title", "performer" (the act/person as written), "venue" (the space/room name as written),
+  "ageRating" (as written, e.g. "9+", "0-12", "All"), "performances": [...] }
+- Include EVERY show/row. Do NOT invent shows or dates.
+
+Respond ONLY as JSON:
+{"shows":[{"title":"...","performer":"...","venue":"...","ageRating":"...","performances":[{"date":"${year}-06-30","start":"10:45 AM","end":"11:30 AM"}]}]}`;
+}
+
+export async function extractFestivalFromText(
+    text: string,
+    ctx: { festivalName: string; year: number; apiKey: string; model: string },
+): Promise<ScrapedFestival> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return { shows: [] };
+
+    const user = `Festival: ${ctx.festivalName}\nYear: ${ctx.year}\n\nProgramme:\n${trimmed}`;
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: festivalSystemPrompt(ctx.year) },
+        { role: 'user', content: user },
+    ]);
+
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { return { shows: [] }; }
+
+    const shows: ScrapedShow[] = (Array.isArray(parsed.shows) ? parsed.shows : [])
+        .map((s: any) => ({
+            title: String(s.title || '').trim(),
+            performer: s.performer && String(s.performer).trim() ? String(s.performer).trim() : null,
+            venue: s.venue && String(s.venue).trim() ? String(s.venue).trim() : null,
+            ageRating: s.ageRating && String(s.ageRating).trim() ? String(s.ageRating).trim() : null,
+            performances: (Array.isArray(s.performances) ? s.performances : [])
+                .map((p: any) => {
+                    const startMin = festToMinutes(p.start);
+                    const endMin = festToMinutes(p.end);
+                    return {
+                        date: String(p.date || '').trim(),
+                        startMin: startMin as number,
+                        durationMin: endMin != null && startMin != null ? Math.max(0, endMin - startMin) || 60 : 60,
+                    };
+                })
+                .filter((p: ScrapedPerformance) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && p.startMin != null),
+        }))
+        .filter((s: ScrapedShow) => s.title && s.performances.length);
+
+    return { shows };
+}
+
+const dayDiffUTC = (a: Date, b: Date): number =>
+    Math.round((Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()) -
+        Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate())) / 86400000);
+
+export async function applyScrapedFestival(
+    conventionId: string,
+    festival: ScrapedFestival,
+    opts: { replace: boolean },
+): Promise<{ shows: number; performances: number; venues: number; talent: number }> {
+    const shows = festival.shows.filter(s => s.title && s.performances.length);
+    if (!shows.length) return { shows: 0, performances: 0, venues: 0, talent: 0 };
+
+    // Date math: anchor dayOffset to the convention's start date (relative-time
+    // model). If the festival has no dates yet, set them from the programme.
+    const allDates = shows.flatMap(s => s.performances.map(p => p.date)).sort();
+    const minDate = new Date(allDates[0] + 'T00:00:00Z');
+    const maxDate = new Date(allDates[allDates.length - 1] + 'T00:00:00Z');
+
+    const conv = await prisma.convention.findUnique({
+        where: { id: conventionId },
+        select: { startDate: true, endDate: true },
+    });
+    const base = conv?.startDate ? new Date(conv.startDate) : minDate;
+    const dateUpdates: { startDate?: Date; endDate?: Date } = {};
+    if (!conv?.startDate) dateUpdates.startDate = minDate;
+    if (!conv?.endDate || new Date(conv.endDate) < maxDate) dateUpdates.endDate = maxDate;
+    if (Object.keys(dateUpdates).length) {
+        await prisma.convention.update({ where: { id: conventionId }, data: dateUpdates });
+    }
+
+    if (opts.replace) {
+        // Deleting Productions cascade-deletes their performances (FK onDelete: Cascade).
+        await prisma.production.deleteMany({ where: { conventionId } });
+    }
+
+    // Venues: find-or-create by name within the convention.
+    const venueNames = Array.from(new Set(shows.map(s => s.venue).filter(Boolean))) as string[];
+    const existingVenues = await prisma.venue.findMany({ where: { conventionId }, select: { id: true, venueName: true } });
+    const venueId = new Map(existingVenues.map(v => [v.venueName, v.id]));
+    let createdVenues = 0;
+    for (const name of venueNames) {
+        if (venueId.has(name)) continue;
+        const anyVenueYet = venueId.size > 0;
+        const v = await prisma.venue.create({ data: { conventionId, venueName: name, isPrimaryVenue: !anyVenueYet } });
+        venueId.set(name, v.id);
+        createdVenues++;
+    }
+
+    // Schedule days: find-or-create for each offset present.
+    const offsets = Array.from(new Set(
+        shows.flatMap(s => s.performances.map(p => dayDiffUTC(new Date(p.date + 'T00:00:00Z'), base)))
+    ));
+    const existingDays = await prisma.scheduleDay.findMany({ where: { conventionId }, select: { id: true, dayOffset: true } });
+    const dayId = new Map(existingDays.map(d => [d.dayOffset, d.id]));
+    for (const off of offsets) {
+        if (dayId.has(off)) continue;
+        const label = new Date(base.getTime() + off * 86400000).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+        const d = await prisma.scheduleDay.create({ data: { conventionId, dayOffset: off, isOfficial: true, label } });
+        dayId.set(off, d.id);
+    }
+
+    const talentIds = new Set<string>();
+    let prodOrder = await prisma.production.count({ where: { conventionId } });
+    let createdPerf = 0;
+    for (const s of shows) {
+        const tagline = s.ageRating ? (/^all$/i.test(s.ageRating) ? 'All ages' : `Ages ${s.ageRating}`) : null;
+        const prod = await prisma.production.create({
+            data: { conventionId, title: s.title, tagline, ageRating: s.ageRating, order: prodOrder++ },
+        });
+        let pOrder = 0;
+        const sorted = [...s.performances].sort((a, b) => a.date.localeCompare(b.date) || a.startMin - b.startMin);
+        for (const p of sorted) {
+            const off = dayDiffUTC(new Date(p.date + 'T00:00:00Z'), base);
+            const item = await prisma.conventionScheduleItem.create({
+                data: {
+                    conventionId, productionId: prod.id, scheduleDayId: dayId.get(off) ?? null, dayOffset: off,
+                    title: s.title, eventType: FESTIVAL_EVENT_TYPE, startTimeMinutes: p.startMin, durationMinutes: p.durationMin,
+                    atPrimaryVenue: false, venueId: s.venue ? venueId.get(s.venue) ?? null : null, order: pOrder++,
+                },
+            });
+            createdPerf++;
+            if (s.performer && !NON_TALENT.test(s.performer)) {
+                await setEventTalent(item.id, conventionId, [{ name: s.performer, role: 'Performer' }]);
+            }
+        }
+    }
+
+    const links = await prisma.scheduleEventTalentLink.findMany({
+        where: { scheduleItem: { conventionId } }, select: { talentProfileId: true },
+    });
+    links.forEach(l => talentIds.add(l.talentProfileId));
+
+    return { shows: shows.length, performances: createdPerf, venues: createdVenues, talent: talentIds.size };
+}

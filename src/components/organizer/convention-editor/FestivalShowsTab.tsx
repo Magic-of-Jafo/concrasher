@@ -34,6 +34,7 @@ import {
 } from '@/lib/actions';
 import { getS3ImageUrl } from '@/lib/defaults';
 import PerformancesDialog from './PerformancesDialog';
+import FestivalHelperDialog from './FestivalHelperDialog';
 
 interface VenueOption { id: string; name: string; }
 
@@ -71,7 +72,9 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
     const [shows, setShows] = useState<ProductionRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [perfShow, setPerfShow] = useState<ProductionRow | null>(null);
+    const [helperOpen, setHelperOpen] = useState(false);
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -193,11 +196,17 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
                         Each show is a production. Add performances (dates, times, venues) on the next step.
                     </Typography>
                 </Box>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-                    Add Show
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" startIcon={<AutoAwesomeIcon />} onClick={() => setHelperOpen(true)}>
+                        Schedule Helper
+                    </Button>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+                        Add Show
+                    </Button>
+                </Box>
             </Box>
 
+            {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice(null)}>{notice}</Alert>}
             {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
             {shows.length === 0 ? (
@@ -354,6 +363,17 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
                     onChanged={load}
                 />
             )}
+
+            <FestivalHelperDialog
+                open={helperOpen}
+                onClose={() => setHelperOpen(false)}
+                conventionId={conventionId}
+                hasExistingShows={shows.length > 0}
+                onApplied={(summary) => {
+                    setNotice(`Added ${summary.shows} show${summary.shows === 1 ? '' : 's'} and ${summary.performances} performance${summary.performances === 1 ? '' : 's'}.`);
+                    load();
+                }}
+            />
         </Box>
     );
 };
