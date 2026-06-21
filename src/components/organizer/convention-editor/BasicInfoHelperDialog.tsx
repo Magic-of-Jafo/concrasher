@@ -9,6 +9,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LinkIcon from '@mui/icons-material/Link';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ImageIcon from '@mui/icons-material/Image';
+import { usePasteImage } from '@/hooks/usePasteImage';
 
 type SourceType = 'url' | 'pdf' | 'image';
 
@@ -57,6 +58,9 @@ export default function BasicInfoHelperDialog({
     const [stageIdx, setStageIdx] = useState(0);
     const abortRef = useRef<AbortController | null>(null);
     const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Accept a clipboard-pasted image while the Image source is active.
+    usePasteImage(setFile, { enabled: open && sourceType === 'image' });
 
     const stopStages = () => { if (stageTimerRef.current) { clearInterval(stageTimerRef.current); stageTimerRef.current = null; } };
     const reset = () => { setPreview(null); setError(null); setFile(null); };
@@ -162,6 +166,9 @@ export default function BasicInfoHelperDialog({
                                     {file ? file.name : 'Or upload an image…'}
                                     <input type="file" accept="image/*" hidden onChange={e => setFile(e.target.files?.[0] || null)} />
                                 </Button>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    …or paste an image straight from your clipboard (Ctrl/Cmd+V).
+                                </Typography>
                             </>
                         )}
 

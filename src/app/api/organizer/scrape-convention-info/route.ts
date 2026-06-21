@@ -98,7 +98,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!info || !info.name) {
-        return NextResponse.json({ error: 'Couldn\'t find convention details in that source. Try the event\'s main page or a clearer image.' }, { status: 422 });
+        const likelyJsApp = !images.length && text.trim().length < 1500;
+        return NextResponse.json({
+            error: likelyJsApp
+                ? 'We couldn\'t read details from that page. Some event sites load their content with JavaScript that this tool can\'t see. Take a screenshot of the page and use the Image option — you can paste it straight from your clipboard.'
+                : 'Couldn\'t find convention details in that source. Try the event\'s main page or a clearer image.',
+        }, { status: 422 });
     }
 
     return NextResponse.json({ success: true, source, info });

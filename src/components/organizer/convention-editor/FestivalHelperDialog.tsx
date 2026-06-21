@@ -12,6 +12,7 @@ import LanguageIcon from '@mui/icons-material/Language';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ImageIcon from '@mui/icons-material/Image';
 import EventIcon from '@mui/icons-material/Event';
+import { usePasteImage } from '@/hooks/usePasteImage';
 
 type SourceType = 'url' | 'website' | 'pdf' | 'image';
 
@@ -65,6 +66,9 @@ export default function FestivalHelperDialog({
     const [stageIdx, setStageIdx] = useState(0);
     const abortRef = useRef<AbortController | null>(null);
     const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Accept a clipboard-pasted image while the Image source is active.
+    usePasteImage(setFile, { enabled: open && sourceType === 'image' });
 
     const stopStages = () => {
         if (stageTimerRef.current) { clearInterval(stageTimerRef.current); stageTimerRef.current = null; }
@@ -209,6 +213,9 @@ export default function FestivalHelperDialog({
                                     {file ? file.name : 'Or upload an image…'}
                                     <input type="file" accept="image/*" hidden onChange={e => setFile(e.target.files?.[0] || null)} />
                                 </Button>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    …or paste an image straight from your clipboard (Ctrl/Cmd+V).
+                                </Typography>
                             </>
                         )}
 
