@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import {
     Box,
     Avatar,
@@ -55,6 +56,8 @@ const BrandLogoUploader: React.FC<BrandLogoUploaderProps> = ({
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
     const getS3ImageUrl = (url: string | null): string | null => {
         if (!url) return null;
@@ -231,7 +234,7 @@ const BrandLogoUploader: React.FC<BrandLogoUploaderProps> = ({
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <Box ref={containerRef} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
                 <Avatar src={getS3ImageUrl(currentImageUrl || null) || undefined} sx={{ width: 200, height: 200 }} variant="circular" />
             </Box>

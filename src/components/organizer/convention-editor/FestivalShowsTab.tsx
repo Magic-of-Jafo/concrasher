@@ -33,6 +33,7 @@ import {
     type ProductionInput,
 } from '@/lib/actions';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import PerformancesDialog from './PerformancesDialog';
 import FestivalHelperDialog from './FestivalHelperDialog';
 
@@ -83,6 +84,8 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
     const [uploading, setUploading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Paste a show poster while the add/edit dialog is open.
+    usePasteImage((file) => fileToInput(fileInputRef.current, file), { enabled: dialogOpen });
 
     const [deleteTarget, setDeleteTarget] = useState<ProductionRow | null>(null);
     const [deleting, setDeleting] = useState(false);

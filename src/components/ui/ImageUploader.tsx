@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Button, Typography, CircularProgress, Paper, Alert, Tooltip, IconButton } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useDropzone, FileWithPath } from 'react-dropzone';
+import { usePasteImage } from '@/hooks/usePasteImage';
 import ReactCrop, {
   centerCrop,
   makeAspectCrop,
@@ -423,6 +424,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       }
     }
   }, [initialImageUrl, handleImageValidation, enableCropping, onCropComplete, autoUpload, uploadFile, uploadMultipleFiles, multiple]);
+
+  // Paste an image from the clipboard when no file is selected yet.
+  usePasteImage((f) => onDrop([f]), { enabled: !file });
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

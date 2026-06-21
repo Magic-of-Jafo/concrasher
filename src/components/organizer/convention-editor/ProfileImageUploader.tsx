@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import {
     Box,
     Typography,
@@ -39,6 +40,8 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     const [showCropDialog, setShowCropDialog] = useState(false);
     const [showRemoveDialog, setShowRemoveDialog] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
     const TARGET_WIDTH = 400;
     const TARGET_HEIGHT = 400;
@@ -342,7 +345,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     }, [imageSrc]);
 
     return (
-        <Box>
+        <Box ref={containerRef}>
             <Typography variant="h6" gutterBottom>
                 Profile Image
             </Typography>

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react'; // <-- Import useSession
+import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import {
     Box,
     Typography,
@@ -48,6 +49,8 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
     const [showCropDialog, setShowCropDialog] = useState(false);
     const [showRemoveDialog, setShowRemoveDialog] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
     const TARGET_WIDTH = 400;
     const TARGET_HEIGHT = 400;
@@ -240,7 +243,7 @@ const UserProfilePictureUploader: React.FC<UserProfilePictureUploaderProps> = ({
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <Box ref={containerRef} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <Box sx={{ position: 'relative', width: 200, height: 200 }}>
                 <Avatar
                     src={getS3ImageUrl(currentImageUrl) || undefined}

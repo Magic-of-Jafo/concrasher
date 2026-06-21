@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Box, Button, CircularProgress, Typography, Alert, Card, CardMedia } from '@mui/material';
 import { useDropzone } from 'react-dropzone';
+import { usePasteImage } from '@/hooks/usePasteImage';
 
 interface ImageUploadInputProps {
   onUploadComplete: (url: string) => void;
@@ -75,6 +76,9 @@ const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
     disabled: disabled || uploading,
   });
 
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  usePasteImage((file) => onDrop([file]), { targetRef: containerRef });
+
   const handleRemove = async () => {
     const imageUrlToDelete = preview; // The current image URL being displayed
     setPreview(null);
@@ -134,7 +138,7 @@ const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
   }
 
   return (
-    <Box sx={{ mb: 2 }}>
+    <Box ref={containerRef} sx={{ mb: 2 }}>
       <Box
         {...getRootProps()}
         sx={{

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import {
   Box,
   Button,
@@ -34,6 +35,8 @@ export default function ImageUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -103,7 +106,7 @@ export default function ImageUpload({
   };
 
   return (
-    <Box>
+    <Box ref={containerRef}>
       <label htmlFor={label.replace(/\s+/g, '-').toLowerCase() + '-input'} style={{ display: 'none' }}>{label}</label>
       <input
         id={label.replace(/\s+/g, '-').toLowerCase() + '-input'}
