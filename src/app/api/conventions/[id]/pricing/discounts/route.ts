@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { PriceDiscountSchema } from '@/lib/validators';
@@ -32,6 +34,25 @@ export async function PUT(
 
   if (!conventionId) {
     return NextResponse.json({ message: 'Convention ID is required' }, { status: 400 });
+  }
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const conv = await prisma.convention.findUnique({
+    where: { id: conventionId },
+    select: { id: true, series: { select: { organizerUserId: true } } },
+  });
+  if (!conv) {
+    return NextResponse.json({ message: 'Convention not found' }, { status: 404 });
+  }
+
+  const isAdmin = (session.user as any).roles?.includes('ADMIN');
+  const isOwner = conv.series?.organizerUserId === session.user.id;
+  if (!isAdmin && !isOwner) {
+    return NextResponse.json({ message: 'You must be the organizer or an admin for this convention.' }, { status: 403 });
   }
 
   try {
