@@ -41,6 +41,7 @@ const CREATES = {
     'MAGiCon 2027': { name: 'MAGiCon', slug: 'cs-magicon' },
     'Magic Festival Dreamfactory 2026': { name: 'Magic Festival Dreamfactory', slug: 'cs-magic-festival-dreamfactory' },
     'Magic in Orlando': { name: 'Daytona Magic', slug: 'cs-daytona-magic' },
+    'Magic in Orlando 2026': { name: 'Daytona Magic', slug: 'cs-daytona-magic' }, // prod variant (has year)
     'New England Magicians Conference 2027': { name: 'New England Magicians Conference', slug: 'cs-new-england-magicians-conference' },
     'S.A.M. National Convention 2026': { name: 'S.A.M. National Convention', slug: 'cs-sam' },
 };
