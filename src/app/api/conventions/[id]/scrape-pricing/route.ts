@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (!text.trim() && !images.length) {
-        return NextResponse.json({ error: 'Couldn\'t read that source. Try a different page, a PDF, or the pricing image.' }, { status: 422 });
+        return NextResponse.json({ error: 'We couldn\'t read anything from that page — its content is likely built with JavaScript (common for Wix, Squarespace, Eventbrite, and OvationTix), which this tool can\'t read directly. Take a screenshot of the pricing and use the Image option — you can paste it straight from your clipboard.' }, { status: 422 });
     }
 
     // ── extract: text first, image(s) as fallback ──

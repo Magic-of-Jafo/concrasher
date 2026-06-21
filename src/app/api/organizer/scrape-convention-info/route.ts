@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!text.trim() && !images.length) {
-        return NextResponse.json({ error: 'Couldn\'t read that source. Try a different page, a PDF, or an image.' }, { status: 422 });
+        return NextResponse.json({ error: 'We couldn\'t read anything from that page — its content is likely built with JavaScript (common for Wix, Squarespace, and Eventbrite), which this tool can\'t read directly. Take a screenshot of the page and use the Image option — you can paste it straight from your clipboard.' }, { status: 422 });
     }
 
     // ── extract: text first, image(s) as fallback ──

@@ -131,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (!text.trim() && !images.length) {
-        return NextResponse.json({ error: 'Couldn\'t find readable text or images at that source. Try a different page, a PDF, or the schedule image directly.' }, { status: 422 });
+        return NextResponse.json({ error: 'We couldn\'t read anything from that page — its content is likely built with JavaScript (common for Wix, Squarespace, and Eventbrite), which this tool can\'t read directly. Take a screenshot of the schedule and use the Image option — you can paste it straight from your clipboard.' }, { status: 422 });
     }
 
     // ── festival branch: extract SHOWS with their performances ──
