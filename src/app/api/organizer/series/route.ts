@@ -14,13 +14,12 @@ export async function GET() {
       );
     }
 
+    // Admins manage every series (e.g. reassigning a convention's series);
+    // organizers only see their own.
+    const isAdmin = (session.user as any).roles?.includes('ADMIN');
     const series = await prisma.conventionSeries.findMany({
-      where: {
-        organizerUserId: session.user.id
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
+      where: isAdmin ? {} : { organizerUserId: session.user.id },
+      orderBy: isAdmin ? { name: 'asc' } : { updatedAt: 'desc' },
     });
 
     return NextResponse.json({ series });

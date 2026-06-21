@@ -411,6 +411,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           value={basicInfoData}
           onFormChange={handleBasicInfoFormChange}
           isEditing={isEditing}
+          conventionId={conventionId}
         />
       </TabPanel>
 

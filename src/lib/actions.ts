@@ -2293,6 +2293,26 @@ export async function setConventionType(conventionId: string, type: ConventionTy
   }
 }
 
+/** Reassign a convention to a different series. Admin-only (used to fix up the
+ *  imported conventions that landed without a series). */
+export async function setConventionSeries(conventionId: string, seriesId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!((session.user as User & { roles: Role[] }).roles?.includes(Role.ADMIN))) {
+    return { success: false, error: 'Only admins can change a convention\'s series.' };
+  }
+  try {
+    const series = await db.conventionSeries.findUnique({ where: { id: seriesId }, select: { id: true, name: true } });
+    if (!series) return { success: false, error: 'Series not found.' };
+    await db.convention.update({ where: { id: conventionId }, data: { seriesId } });
+    revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    return { success: true, seriesName: series.name };
+  } catch (error) {
+    console.error('Error setting convention series:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
 export async function getProductionsForConvention(conventionId: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return { success: false, error: 'Authentication required.', data: [] as any[] };

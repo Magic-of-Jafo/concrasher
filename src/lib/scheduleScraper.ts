@@ -579,3 +579,94 @@ export async function applyScrapedFestival(
 
     return { shows: shows.length, performances: createdPerf, venues: createdVenues, talent: talentIds.size };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Basic info — extract a convention's listing fields (name, dates, location,
+// description, links) from a source. Preview-only: the organizer reviews these
+// in the editor form and Saves, so there is no apply-to-DB here.
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ScrapedBasicInfo {
+    name: string | null;
+    startDate: string | null;   // YYYY-MM-DD
+    endDate: string | null;     // YYYY-MM-DD
+    isOneDayEvent: boolean;
+    city: string | null;
+    stateName: string | null;
+    country: string | null;
+    websiteUrl: string | null;
+    registrationUrl: string | null;
+    descriptionShort: string | null;
+    descriptionMain: string | null;
+}
+
+function basicInfoSystemPrompt(): string {
+    return `You extract a magic convention's basic listing information from the provided text or image into JSON.
+
+Respond ONLY as JSON with exactly these keys:
+{"name":"...","startDate":"YYYY-MM-DD|null","endDate":"YYYY-MM-DD|null","city":"...","stateName":"...","country":"...","websiteUrl":"...","registrationUrl":"...","descriptionShort":"...","descriptionMain":"..."}
+
+Rules:
+- "name": the event's name.
+- "startDate"/"endDate": the event's first and last calendar day (YYYY-MM-DD). For a single-day
+  event, make them equal. Use null if a date isn't stated.
+- "city"/"stateName"/"country": the host location. "stateName" is the state/province/region if
+  applicable (e.g. a US state), otherwise "". "country" is the full country name.
+- "websiteUrl": the event's official website. "registrationUrl": where to register or buy tickets,
+  only if it's a different link; otherwise "".
+- "descriptionShort": a one or two sentence summary.
+- "descriptionMain": a fuller description — one to three short paragraphs of plain text.
+- If the source is in another language, translate the name and descriptions into natural English;
+  keep proper names. Use null or "" for anything not present. Do not invent details.`;
+}
+
+function shapeBasicInfo(content: string): ScrapedBasicInfo {
+    let p: any = {};
+    try { p = JSON.parse(content); } catch { /* fall through to empties */ }
+    const str = (v: any) => (v && String(v).trim() ? String(v).trim() : null);
+    const date = (v: any) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim()) ? String(v).trim() : null);
+    const startDate = date(p.startDate);
+    const endDate = date(p.endDate);
+    return {
+        name: str(p.name),
+        startDate,
+        endDate,
+        isOneDayEvent: !!startDate && startDate === endDate,
+        city: str(p.city),
+        stateName: str(p.stateName),
+        country: str(p.country),
+        websiteUrl: str(p.websiteUrl),
+        registrationUrl: str(p.registrationUrl),
+        descriptionShort: str(p.descriptionShort),
+        descriptionMain: str(p.descriptionMain),
+    };
+}
+
+export async function extractBasicInfoFromText(
+    text: string,
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedBasicInfo> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return shapeBasicInfo('{}');
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: basicInfoSystemPrompt() },
+        { role: 'user', content: `Source text:\n${trimmed}` },
+    ]);
+    return shapeBasicInfo(content);
+}
+
+export async function extractBasicInfoFromImages(
+    images: string[],
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedBasicInfo> {
+    if (!images.length) return shapeBasicInfo('{}');
+    const userParts: any[] = [
+        { type: 'text', text: 'The convention details are in the following image(s). Read them and return the JSON.' },
+        ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: basicInfoSystemPrompt() },
+        { role: 'user', content: userParts },
+    ]);
+    return shapeBasicInfo(content);
+}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, TextField, Typography, Switch, FormControlLabel, Paper, Autocomplete, Button, Chip, Grid } from '@mui/material';
+import { Box, TextField, Typography, Switch, FormControlLabel, Paper, Autocomplete, Button, Chip, Grid, Snackbar, Alert } from '@mui/material';
+import { useSession } from 'next-auth/react';
+import { setConventionSeries } from '@/lib/actions';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -9,6 +11,8 @@ import { ZodError } from 'zod';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import { FuzzyStateInput } from '@/components/ui/FuzzyStateInput';
 import TagEditor from './TagEditor';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import BasicInfoHelperDialog, { type BasicInfoResult } from './BasicInfoHelperDialog';
 
 const COUNTRIES = [
   { label: 'United States', code: 'US' },
@@ -221,14 +225,45 @@ interface BasicInfoTabProps {
   onFormChange: (field: keyof BasicInfoFormData, value: any) => void;
   errors?: Record<string, string>;
   isEditing: boolean;
+  conventionId?: string;
 }
+
+interface SeriesOption { id: string; name: string; }
 
 export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   value,
   onFormChange,
   errors = {},
-  isEditing
+  isEditing,
+  conventionId
 }) => {
+  const { data: session } = useSession();
+  const isAdmin = !!(session?.user?.roles?.includes('ADMIN'));
+
+  const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
+  const [seriesToast, setSeriesToast] = useState<string | null>(null);
+
+  // Admins can reassign a convention's series (to fix imported conventions).
+  useEffect(() => {
+    if (!isAdmin || !conventionId) return;
+    let cancelled = false;
+    fetch('/api/organizer/series')
+      .then((r) => (r.ok ? r.json() : { series: [] }))
+      .then((d) => { if (!cancelled) setSeriesList(d.series || []); })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [isAdmin, conventionId]);
+
+  const handleSeriesChange = async (_e: any, option: SeriesOption | null) => {
+    if (!conventionId || !option) return;
+    const res = await setConventionSeries(conventionId, option.id);
+    if (res.success) {
+      onFormChange('seriesId', option.id);
+      setSeriesToast(`Series set to "${res.seriesName}".`);
+    } else {
+      setSeriesToast(res.error || 'Could not change the series.');
+    }
+  };
 
 
 
@@ -239,6 +274,35 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   const endDateValue = useMemo(() => {
     return value.endDate ? new Date(value.endDate) : null;
   }, [value.endDate]);
+
+  const [helperOpen, setHelperOpen] = useState(false);
+
+  // Parse "YYYY-MM-DD" into a local-midnight Date (matches how DatePicker stores
+  // a hand-picked day, so helper-filled dates behave identically).
+  const parseYMD = (s: string | null): Date | null => {
+    const parts = (s || '').split('-').map(Number);
+    return parts.length === 3 && parts[0] ? new Date(parts[0], parts[1] - 1, parts[2]) : null;
+  };
+
+  // Fill the form from a Listing Helper result (only the fields it found).
+  const applyHelperInfo = (info: BasicInfoResult) => {
+    if (info.name) {
+      onFormChange('name', info.name);
+      onFormChange('slug', slugify(info.name, { lower: true, strict: true }));
+    }
+    const sd = parseYMD(info.startDate);
+    const ed = parseYMD(info.endDate);
+    if (sd) onFormChange('startDate', sd.toISOString());
+    if (ed) onFormChange('endDate', ed.toISOString());
+    if (info.isOneDayEvent) onFormChange('isOneDayEvent', true);
+    if (info.city) onFormChange('city', info.city);
+    if (info.country) onFormChange('country', info.country);
+    if (info.stateName) onFormChange('stateName', info.stateName);
+    if (info.websiteUrl) onFormChange('websiteUrl', info.websiteUrl);
+    if (info.registrationUrl) onFormChange('registrationUrl', info.registrationUrl);
+    if (info.descriptionShort) onFormChange('descriptionShort', info.descriptionShort);
+    if (info.descriptionMain) onFormChange('descriptionMain', info.descriptionMain);
+  };
 
   const handleTextChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value: fieldValue } = event.target;
@@ -296,6 +360,28 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="outlined" startIcon={<AutoAwesomeIcon />} onClick={() => setHelperOpen(true)}>
+            Import convention information from your website
+          </Button>
+        </Box>
+
+        {isAdmin && conventionId && (
+          <Paper elevation={1} sx={{ p: 2, borderLeft: '4px solid', borderColor: 'warning.main' }}>
+            <Typography variant="subtitle2" gutterBottom>Admin · Convention Series</Typography>
+            <Autocomplete
+              options={seriesList}
+              getOptionLabel={(o) => o.name}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+              value={seriesList.find((s) => s.id === value.seriesId) || null}
+              onChange={handleSeriesChange}
+              sx={{ maxWidth: 480 }}
+              renderInput={(params) => (
+                <TextField {...params} label="Series" helperText="Reassign this convention to a different series — saved immediately." />
+              )}
+            />
+          </Paper>
+        )}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 300px', minWidth: 300 }}>
             <Paper elevation={1} sx={{ p: 2, width: '100%' }}>
@@ -377,6 +463,23 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
           </Paper>
         </Box>
       </Box>
+
+      <BasicInfoHelperDialog
+        open={helperOpen}
+        onClose={() => setHelperOpen(false)}
+        onApplied={applyHelperInfo}
+      />
+
+      <Snackbar
+        open={!!seriesToast}
+        autoHideDuration={3000}
+        onClose={() => setSeriesToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="info" onClose={() => setSeriesToast(null)} sx={{ width: '100%' }}>
+          {seriesToast}
+        </Alert>
+      </Snackbar>
     </LocalizationProvider>
   );
 };
