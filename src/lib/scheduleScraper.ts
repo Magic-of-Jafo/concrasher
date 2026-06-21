@@ -670,3 +670,83 @@ export async function extractBasicInfoFromImages(
     ]);
     return shapeBasicInfo(content);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pricing — extract a convention's ticket price table(s) from a source. Ports
+// the proven enrich-conventions pricing model (one or more independent tables,
+// optional two-column channel pricing). Preview-only: fills the Pricing tab.
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ScrapedPriceTier { label: string; amount: number; amountSecondary: number | null; }
+export interface ScrapedPriceTable {
+    name: string | null;          // tab name when there are multiple tables
+    primaryLabel: string | null;  // main column label (dearer channel for two-column)
+    secondaryLabel: string | null;// second column label (cheaper channel)
+    tiers: ScrapedPriceTier[];
+}
+export interface ScrapedPricing { currency: string | null; tables: ScrapedPriceTable[]; }
+
+function pricingSystemPrompt(): string {
+    return `You extract a magic convention's ticket PRICING from the provided text or image into JSON.
+
+Model the pricing as one or more independent tables:
+- ONE table, single price column: every ticket has one price. Set "secondaryLabel" null and each tier's "amountSecondary" null.
+- ONE table, TWO price columns: the SAME tickets are sold at two prices by channel (e.g. cheaper online, dearer at the door). Put the DEARER price in "amount" and the cheaper in "amountSecondary"; set "primaryLabel" (e.g. "At the Door") and "secondaryLabel" (e.g. "Online"). Do NOT make two tables for this.
+- MULTIPLE tables: the event sells genuinely different ticket SETS with different categories (e.g. a full-week "All Access" set and a separate "Daily" set). One table per set, each with its own "name" and its own tiers.
+
+Each tier: { "label": category name, "amount": number, "amountSecondary": number|null }.
+Amounts are plain numbers — no currency symbols, no thousands separators (e.g. 280000, not "₩280,000").
+"currency" is the ISO code if determinable (e.g. "USD", "KRW", "EUR"), else null.
+If the source is in another language, translate the category labels into natural English; keep amounts as-is.
+Use null/empty when unsure rather than guessing. If there is no pricing, return an empty "tables" array.
+
+Respond ONLY as JSON:
+{"currency":"KRW","tables":[{"name":null,"primaryLabel":null,"secondaryLabel":null,"tiers":[{"label":"3-Day Pass","amount":280000,"amountSecondary":null}]}]}`;
+}
+
+function shapePricing(content: string): ScrapedPricing {
+    let p: any = {};
+    try { p = JSON.parse(content); } catch { return { currency: null, tables: [] }; }
+    const num = (v: any) => (typeof v === 'number' && isFinite(v) ? v : (typeof v === 'string' && v.trim() !== '' && isFinite(Number(v.replace(/[^0-9.]/g, ''))) ? Number(v.replace(/[^0-9.]/g, '')) : null));
+    const str = (v: any) => (v && String(v).trim() ? String(v).trim() : null);
+    const tables: ScrapedPriceTable[] = (Array.isArray(p.tables) ? p.tables : [])
+        .map((t: any) => ({
+            name: str(t.name),
+            primaryLabel: str(t.primaryLabel),
+            secondaryLabel: str(t.secondaryLabel),
+            tiers: (Array.isArray(t.tiers) ? t.tiers : [])
+                .map((tier: any) => ({ label: String(tier.label || '').trim(), amount: num(tier.amount), amountSecondary: num(tier.amountSecondary) }))
+                .filter((tier: any) => tier.label && tier.amount != null),
+        }))
+        .filter((t: ScrapedPriceTable) => t.tiers.length);
+    return { currency: str(p.currency), tables };
+}
+
+export async function extractPricingFromText(
+    text: string,
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedPricing> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return { currency: null, tables: [] };
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: pricingSystemPrompt() },
+        { role: 'user', content: `Source text:\n${trimmed}` },
+    ]);
+    return shapePricing(content);
+}
+
+export async function extractPricingFromImages(
+    images: string[],
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedPricing> {
+    if (!images.length) return { currency: null, tables: [] };
+    const userParts: any[] = [
+        { type: 'text', text: 'The ticket pricing is in the following image(s). Read it and return the JSON.' },
+        ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: pricingSystemPrompt() },
+        { role: 'user', content: userParts },
+    ]);
+    return shapePricing(content);
+}

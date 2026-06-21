@@ -23,6 +23,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { PriceTier, PriceDiscount, PricingTabData, PricingTabSchema } from '@/lib/validators';
 import { z } from 'zod';
 import { useSnackbar } from 'notistack';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import PricingHelperDialog, { type PriceTableResult } from './PricingHelperDialog';
 
 export interface TabSettings {
   baseChannelLabel: string;
@@ -399,8 +401,68 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
 
   const allTiersSaved = value.priceTiers.length > 0 && value.priceTiers.every(t => t.id);
 
+  const [helperOpen, setHelperOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  // Remove the convention's entire pricing table. Saving an empty set isn't
+  // otherwise reachable (Save needs >=1 valid tier), so this is the one way to
+  // delete a table outright. The tiers endpoint treats an empty array as "clear".
+  const handleClearPricing = async () => {
+    if (!conventionId) return;
+    if (!window.confirm('Remove the entire pricing table for this convention? This deletes all categories and their early-bird dates.')) return;
+    setIsClearing(true);
+    try {
+      const res = await fetch(`/api/conventions/${conventionId}/pricing/tiers`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priceTiers: [] }),
+      });
+      if (!res.ok) throw new Error('clear failed');
+      onChange({ ...value, priceTiers: [], priceDiscounts: [] });
+      setTiersSaved(false);
+      enqueueSnackbar('Pricing table removed.', { variant: 'success' });
+    } catch {
+      enqueueSnackbar('Failed to remove the pricing table.', { variant: 'error' });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  // Fill the Pricing tab from a Pricing Helper result (flatten tables -> tiers).
+  const applyPricing = (tables: PriceTableResult[], _currency: string | null) => {
+    const tiers: PriceTier[] = [];
+    let primaryLabel = '';
+    let secondaryLabel = '';
+    tables.forEach((table) => {
+      const tab = table.name || '';
+      table.tiers.forEach((t, i) => {
+        tiers.push({ label: t.label, amount: t.amount, amountSecondary: t.amountSecondary ?? null, tab, order: i } as PriceTier);
+      });
+      if (table.secondaryLabel) { primaryLabel = table.primaryLabel || 'At the Door'; secondaryLabel = table.secondaryLabel; }
+    });
+    onChange({ ...value, priceTiers: tiers, priceDiscounts: [] });
+    if (secondaryLabel && onTabSettingsChange) {
+      onTabSettingsChange({ baseChannelLabel: primaryLabel, secondaryChannelLabel: secondaryLabel });
+    }
+    setTiersSaved(false);
+    enqueueSnackbar(`Imported ${tiers.length} categor${tiers.length === 1 ? 'y' : 'ies'}. Review, then click Save Pricing Tiers.`, { variant: 'info' });
+  };
+
   return (
     <Box>
+      {conventionId && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button variant="outlined" startIcon={<AutoAwesomeIcon />} onClick={() => setHelperOpen(true)} disabled={disabled}>
+            Import pricing from a website or image
+          </Button>
+        </Box>
+      )}
+      {conventionId && (
+        <PricingHelperDialog
+          open={helperOpen}
+          onClose={() => setHelperOpen(false)}
+          conventionId={conventionId}
+          onApplied={applyPricing}
+        />
+      )}
       {/* Pricing tables (tabs) manager */}
       <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'action.hover' }}>
         <Typography variant="h6" gutterBottom>Pricing Tables</Typography>
@@ -565,7 +627,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTier} disabled={disabled} sx={{ mt: 1 }}>Add Category</Button>
       {errors.global && <FormHelperText error sx={{ mt: 1, textAlign: 'center' }}>{errors.global}</FormHelperText>}
 
-      <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+      <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+        {conventionId && value.priceTiers.length > 0 && (
+          <Button variant="text" color="error" size="small" onClick={handleClearPricing} disabled={isClearing || disabled}>
+            {isClearing ? 'Removing…' : 'Clear pricing'}
+          </Button>
+        )}
         <Button variant="contained" color="primary" onClick={handleSaveTiers} disabled={!canSaveTiers || isSavingTiers || !conventionId}>
           {isSavingTiers ? 'Saving Tiers...' : 'Save Pricing Tiers'}
         </Button>
