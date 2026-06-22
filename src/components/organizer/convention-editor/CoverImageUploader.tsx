@@ -361,12 +361,17 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
     }, [imageSrc]);
 
     return (
-        <Box ref={containerRef}>
+        <Box
+            ref={containerRef}
+            tabIndex={0}
+            sx={{ borderRadius: 1, '&:focus-visible': { outline: '2px solid', outlineColor: (theme) => theme.palette.primary.main, outlineOffset: '2px' } }}
+        >
             <Typography variant="h6" gutterBottom>
                 Cover Image
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
                 Upload a cover image for your convention (851×315px). The image will be displayed as a banner.
+                You can also click here and paste an image from your clipboard (Ctrl/Cmd+V).
             </Typography>
 
             {error && (

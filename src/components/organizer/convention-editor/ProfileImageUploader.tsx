@@ -345,12 +345,17 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     }, [imageSrc]);
 
     return (
-        <Box ref={containerRef}>
+        <Box
+            ref={containerRef}
+            tabIndex={0}
+            sx={{ borderRadius: 1, '&:focus-visible': { outline: '2px solid', outlineColor: (theme) => theme.palette.primary.main, outlineOffset: '2px' } }}
+        >
             <Typography variant="h6" gutterBottom>
                 Profile Image
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
                 Upload a profile image for your convention (400×400px). The image will be displayed as an avatar.
+                You can also click here and paste an image from your clipboard (Ctrl/Cmd+V).
             </Typography>
 
             {error && (
