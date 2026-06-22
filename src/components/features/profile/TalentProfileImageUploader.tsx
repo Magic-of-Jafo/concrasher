@@ -53,7 +53,7 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
 
     const TARGET_WIDTH = 400;
     const TARGET_HEIGHT = 400;
-    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -62,7 +62,7 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
         setError(null);
 
         if (file.size > MAX_FILE_SIZE) {
-            setError('File size must be less than 3MB');
+            setError('File size must be less than 5MB');
             return;
         }
 
@@ -292,7 +292,7 @@ const TalentProfileImageUploader: React.FC<TalentProfileImageUploaderProps> = ({
                         Upload Image
                     </Button>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                        Profile Image Size:<br />400x400 - Max 3MB
+                        Profile Image Size:<br />400x400 - Max 5MB
                     </Typography>
                 </Box>
             )}

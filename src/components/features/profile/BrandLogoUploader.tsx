@@ -83,9 +83,9 @@ const BrandLogoUploader: React.FC<BrandLogoUploaderProps> = ({
             return;
         }
 
-        // Validate file size (3MB limit)
-        if (file.size > 3 * 1024 * 1024) {
-            setError('File size must be less than 3MB');
+        // Validate file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            setError('File size must be less than 5MB');
             return;
         }
 
@@ -277,7 +277,7 @@ const BrandLogoUploader: React.FC<BrandLogoUploaderProps> = ({
                         Upload Logo
                     </Button>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                        Brand Logo Size:<br />400x400 - Max 3MB
+                        Brand Logo Size:<br />400x400 - Max 5MB
                     </Typography>
                 </Box>
             )}

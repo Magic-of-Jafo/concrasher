@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
+import ImageDropZone from '@/components/ui/ImageDropZone';
 import {
     Box,
     Typography,
@@ -14,7 +15,7 @@ import {
     Link,
     Slider
 } from '@mui/material';
-import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { getS3ImageUrl } from '@/lib/defaults';
@@ -43,9 +44,25 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
     usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
+    // Fit the loaded image to the CROP BOX height (the lighter band), not the whole
+    // canvas: scale so the rendered image height equals the crop box height. The
+    // width then overhangs (wide images) or gaps (narrow); the user zooms in from there.
+    const [fitZoom, setFitZoom] = useState(1);
+    const mediaSizeRef = useRef<{ width: number; height: number } | null>(null);
+    const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
+    const fitToCropHeight = useCallback(() => {
+        const m = mediaSizeRef.current;
+        const c = cropSizeRef.current;
+        if (m && c && m.height > 0) {
+            const z = c.height / m.height;
+            setFitZoom(z);
+            setZoom(z);
+        }
+    }, []);
+
     const TARGET_WIDTH = 851;
     const TARGET_HEIGHT = 315;
-    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -55,7 +72,7 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            setError('File size must be less than 3MB');
+            setError('File size must be less than 5MB');
             return;
         }
 
@@ -76,69 +93,17 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
             setSelectedFile(file);
 
             try {
-                // Check if aspect ratio is > 2.7:1 (TARGET_WIDTH/TARGET_HEIGHT)
-                const aspectRatio = img.width / img.height;
-                const targetAspectRatio = TARGET_WIDTH / TARGET_HEIGHT; // 851/315 = ~2.7
-
-                if (aspectRatio > targetAspectRatio) {
-                    // Preprocess: Create a square canvas with the original image centered
-                    // This prevents cropper viewport issues with very wide images
-                    const maxDimension = Math.max(img.width, img.height);
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    if (!ctx) {
-                        throw new Error('Failed to create canvas context');
-                    }
-
-                    // Set canvas to be square with the larger dimension
-                    canvas.width = maxDimension;
-                    canvas.height = maxDimension;
-
-                    // Clear canvas (transparent background)
-                    ctx.clearRect(0, 0, maxDimension, maxDimension);
-
-                    // Calculate position to center the image
-                    const xOffset = (maxDimension - img.width) / 2;
-                    const yOffset = (maxDimension - img.height) / 2;
-
-                    // Draw the original image centered on the square canvas
-                    ctx.drawImage(img, xOffset, yOffset, img.width, img.height);
-
-                    // Convert canvas to blob with minimal compression
-                    const processedBlob = await new Promise<Blob>((resolve, reject) => {
-                        canvas.toBlob(
-                            (blob) => {
-                                if (blob) {
-                                    resolve(blob);
-                                } else {
-                                    reject(new Error('Failed to create processed image blob'));
-                                }
-                            },
-                            'image/png',
-                            0.95 // Minimal compression for quality
-                        );
-                    });
-
-                    // Create object URL for the processed square image
-                    const processedImageUrl = URL.createObjectURL(processedBlob);
-
-                    setImageSrc(processedImageUrl);
-                    console.log(`[CoverImageUploader] Original dimensions: ${img.width}x${img.height}, aspect ratio: ${aspectRatio.toFixed(2)}`);
-                    console.log(`[CoverImageUploader] Processed to square: ${maxDimension}x${maxDimension}`);
-                    console.log(`[CoverImageUploader] Target dimensions: ${TARGET_WIDTH}x${TARGET_HEIGHT}`);
+                // Load the original image as-is. The cropper uses objectFit="cover",
+                // so a wide banner fills the crop frame top-to-bottom with the ends
+                // overhanging — no letterbox bars, no pre-squaring needed.
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setZoom(1);
+                    setFitZoom(1);
+                    setImageSrc(e.target?.result as string);
                     setShowCropDialog(true);
-
-                } else {
-                    // Aspect ratio is <= 2.7:1, use original image without preprocessing
-                    console.log(`[CoverImageUploader] Using original image - aspect ratio: ${aspectRatio.toFixed(2)} (target: ${targetAspectRatio.toFixed(2)})`);
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        setImageSrc(e.target?.result as string);
-                        setShowCropDialog(true);
-                    };
-                    reader.readAsDataURL(file);
-                }
+                };
+                reader.readAsDataURL(file);
 
             } catch (error) {
                 console.error('Error preprocessing image:', error);
@@ -361,17 +326,12 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
     }, [imageSrc]);
 
     return (
-        <Box
-            ref={containerRef}
-            tabIndex={0}
-            sx={{ borderRadius: 1, '&:focus-visible': { outline: '2px solid', outlineColor: (theme) => theme.palette.primary.main, outlineOffset: '2px' } }}
-        >
+        <Box ref={containerRef}>
             <Typography variant="h6" gutterBottom>
                 Cover Image
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
                 Upload a cover image for your convention (851×315px). The image will be displayed as a banner.
-                You can also click here and paste an image from your clipboard (Ctrl/Cmd+V).
             </Typography>
 
             {error && (
@@ -380,54 +340,44 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                 </Alert>
             )}
 
-            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                {currentImageUrl ? (
-                    <Box>
-                        <Box sx={{ mb: 2 }}>
-                            <img
-                                src={getS3ImageUrl(currentImageUrl)}
-                                alt="Cover Image"
-                                style={{
-                                    width: '100%',
-                                    maxWidth: '400px',
-                                    height: 'auto',
-                                    aspectRatio: '851/315',
-                                    objectFit: 'contain',
-                                    borderRadius: '4px',
-                                }}
-                            />
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Link
-                                component="button"
-                                variant="body2"
-                                color="error"
-                                onClick={() => setShowRemoveDialog(true)}
-                            >
-                                Remove Cover Image (Permanent)
-                            </Link>
-                        </Box>
+            {currentImageUrl ? (
+                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                    <Box sx={{ mb: 2 }}>
+                        <img
+                            src={getS3ImageUrl(currentImageUrl)}
+                            alt="Cover Image"
+                            style={{
+                                width: '100%',
+                                maxWidth: '400px',
+                                height: 'auto',
+                                aspectRatio: '851/315',
+                                objectFit: 'contain',
+                                borderRadius: '4px',
+                            }}
+                        />
                     </Box>
-                ) : (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                        <Typography variant="h6" gutterBottom>
-                            No Cover Image
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Add a cover image to showcase your convention
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            startIcon={<UploadIcon />}
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isProcessing}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Link
+                            component="button"
+                            variant="body2"
+                            color="error"
+                            onClick={() => setShowRemoveDialog(true)}
                         >
-                            Upload Cover Image
-                        </Button>
+                            Remove Cover Image (Permanent)
+                        </Link>
                     </Box>
-                )}
-            </Paper>
+                </Paper>
+            ) : (
+                <Box sx={{ mb: 2 }}>
+                    <ImageDropZone
+                        onPick={() => fileInputRef.current?.click()}
+                        onFile={(f) => fileToInput(fileInputRef.current, f)}
+                        label="Add a cover image"
+                        hint="Click, drag an image here, or paste (Ctrl/Cmd+V) · 851×315"
+                        disabled={isProcessing}
+                    />
+                </Box>
+            )}
 
             <input
                 ref={fileInputRef}
@@ -453,9 +403,14 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                                 crop={crop}
                                 zoom={zoom}
                                 aspect={TARGET_WIDTH / TARGET_HEIGHT}
+                                objectFit="contain"
+                                minZoom={fitZoom}
+                                restrictPosition={false}
                                 onCropChange={setCrop}
                                 onZoomChange={setZoom}
                                 onCropComplete={onCropComplete}
+                                onMediaLoaded={(m) => { mediaSizeRef.current = { width: m.width, height: m.height }; fitToCropHeight(); }}
+                                onCropSizeChange={(c) => { cropSizeRef.current = c; fitToCropHeight(); }}
                             />
                         )}
                     </Box>
@@ -465,9 +420,9 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                         </Typography>
                         <Slider
                             value={zoom}
-                            min={1}
-                            max={3}
-                            step={0.1}
+                            min={fitZoom}
+                            max={Math.max(3, fitZoom * 3)}
+                            step={0.01}
                             aria-labelledby="zoom-slider"
                             onChange={(_, value) => setZoom(value as number)}
                             disabled={isProcessing}

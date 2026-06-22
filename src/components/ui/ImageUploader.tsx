@@ -175,6 +175,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [crop, setCrop] = useState<Crop | undefined>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | undefined>();
 
@@ -425,8 +426,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   }, [initialImageUrl, handleImageValidation, enableCropping, onCropComplete, autoUpload, uploadFile, uploadMultipleFiles, multiple]);
 
-  // Paste an image from the clipboard when no file is selected yet.
-  usePasteImage((f) => onDrop([f]), { enabled: !file });
+  // Paste an image from the clipboard when no file is selected yet. Scoped to
+  // this uploader's container so multiple upload boxes on one screen (cover,
+  // profile, gallery) don't all grab the same paste.
+  usePasteImage((f) => onDrop([f]), { enabled: !file, targetRef: containerRef });
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -610,7 +613,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, maxWidth: enableCropping ? '100%' : undefined }}>
+    <Paper ref={containerRef} variant="outlined" sx={{ p: 2, maxWidth: enableCropping ? '100%' : undefined }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
         <Typography variant="subtitle1" gutterBottom sx={{ mb: 0 }}>{label}</Typography>
         {(recommendedWidth || minWidth || (enableCropping ? cropAspect : aspectRatio) || maxFileSizeMB || (enableCropping && finalImageTargetSize)) && (

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
+import ImageDropZone from '@/components/ui/ImageDropZone';
 import {
     Box,
     Typography,
@@ -14,7 +15,7 @@ import {
     Link,
     Slider
 } from '@mui/material';
-import { CloudUpload as UploadIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import Cropper from 'react-easy-crop';
 import { Point, Area } from 'react-easy-crop';
 import { getS3ImageUrl } from '@/lib/defaults';
@@ -45,7 +46,26 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 
     const TARGET_WIDTH = 400;
     const TARGET_HEIGHT = 400;
-    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+    // Fit the loaded image to the CROP BOX by its LONGER natural dimension: a
+    // portrait image fits its height to the box (sides fall short), a landscape
+    // image fits its width (top/bottom fall short). Either way the whole image is
+    // visible and the user zooms in from there to crop.
+    const [fitZoom, setFitZoom] = useState(1);
+    const mediaSizeRef = useRef<{ width: number; height: number; naturalWidth: number; naturalHeight: number } | null>(null);
+    const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
+    const fitToCropBox = useCallback(() => {
+        const m = mediaSizeRef.current;
+        const c = cropSizeRef.current;
+        if (!m || !c) return;
+        const portrait = m.naturalHeight >= m.naturalWidth;
+        const z = portrait
+            ? (m.height > 0 ? c.height / m.height : 1)
+            : (m.width > 0 ? c.width / m.width : 1);
+        setFitZoom(z);
+        setZoom(z);
+    }, []);
 
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -55,7 +75,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            setError('File size must be less than 3MB');
+            setError('File size must be less than 5MB');
             return;
         }
 
@@ -76,53 +96,18 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
             setSelectedFile(file);
 
             try {
-                // Preprocess: Create a square canvas with the original image centered
-                const maxDimension = Math.max(img.width, img.height);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                if (!ctx) {
-                    throw new Error('Failed to create canvas context');
-                }
-
-                // Set canvas to be square with the larger dimension
-                canvas.width = maxDimension;
-                canvas.height = maxDimension;
-
-                // Clear canvas (transparent background)
-                ctx.clearRect(0, 0, maxDimension, maxDimension);
-
-                // Calculate position to center the image
-                const xOffset = (maxDimension - img.width) / 2;
-                const yOffset = (maxDimension - img.height) / 2;
-
-                // Draw the original image centered on the square canvas
-                ctx.drawImage(img, xOffset, yOffset, img.width, img.height);
-
-                // Convert canvas to blob with minimal compression
-                const processedBlob = await new Promise<Blob>((resolve, reject) => {
-                    canvas.toBlob(
-                        (blob) => {
-                            if (blob) {
-                                resolve(blob);
-                            } else {
-                                reject(new Error('Failed to create processed image blob'));
-                            }
-                        },
-                        'image/png',
-                        0.95 // Minimal compression for quality
-                    );
-                });
-
-                // Create object URL for the processed square image
-                const processedImageUrl = URL.createObjectURL(processedBlob);
-
-                setImageSrc(processedImageUrl);
-                console.log(`[ProfileImageUploader] Original dimensions: ${img.width}x${img.height}`);
-                console.log(`[ProfileImageUploader] Processed dimensions: ${maxDimension}x${maxDimension}`);
-                console.log(`[ProfileImageUploader] Target dimensions: ${TARGET_WIDTH}x${TARGET_HEIGHT}`);
-                setShowCropDialog(true);
-
+                // Load the original image as-is. onMediaLoaded/onCropSizeChange then
+                // fit it to the crop box by its longer dimension (see fitToCropBox).
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setZoom(1);
+                    setFitZoom(1);
+                    mediaSizeRef.current = null;
+                    cropSizeRef.current = null;
+                    setImageSrc(e.target?.result as string);
+                    setShowCropDialog(true);
+                };
+                reader.readAsDataURL(file);
             } catch (error) {
                 console.error('Error preprocessing image:', error);
                 setError('Failed to process image');
@@ -345,17 +330,12 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     }, [imageSrc]);
 
     return (
-        <Box
-            ref={containerRef}
-            tabIndex={0}
-            sx={{ borderRadius: 1, '&:focus-visible': { outline: '2px solid', outlineColor: (theme) => theme.palette.primary.main, outlineOffset: '2px' } }}
-        >
+        <Box ref={containerRef}>
             <Typography variant="h6" gutterBottom>
                 Profile Image
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
                 Upload a profile image for your convention (400×400px). The image will be displayed as an avatar.
-                You can also click here and paste an image from your clipboard (Ctrl/Cmd+V).
             </Typography>
 
             {error && (
@@ -364,53 +344,43 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                 </Alert>
             )}
 
-            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                {currentImageUrl ? (
-                    <Box>
-                        <Box sx={{ mb: 2 }}>
-                            <img
-                                src={getS3ImageUrl(currentImageUrl)}
-                                alt="Profile Image"
-                                style={{
-                                    width: '200px',
-                                    height: '200px',
-                                    objectFit: 'contain',
-                                    borderRadius: '4px',
-                                    border: '1px solid #e0e0e0',
-                                }}
-                            />
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Link
-                                component="button"
-                                variant="body2"
-                                color="error"
-                                onClick={() => setShowRemoveDialog(true)}
-                            >
-                                Remove Profile Image (Permanent)
-                            </Link>
-                        </Box>
+            {currentImageUrl ? (
+                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                    <Box sx={{ mb: 2 }}>
+                        <img
+                            src={getS3ImageUrl(currentImageUrl)}
+                            alt="Profile Image"
+                            style={{
+                                width: '200px',
+                                height: '200px',
+                                objectFit: 'contain',
+                                borderRadius: '4px',
+                                border: '1px solid #e0e0e0',
+                            }}
+                        />
                     </Box>
-                ) : (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                        <Typography variant="h6" gutterBottom>
-                            No Profile Image
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                            Add a profile image to represent your convention
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            startIcon={<UploadIcon />}
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isProcessing}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Link
+                            component="button"
+                            variant="body2"
+                            color="error"
+                            onClick={() => setShowRemoveDialog(true)}
                         >
-                            Upload Profile Image
-                        </Button>
+                            Remove Profile Image (Permanent)
+                        </Link>
                     </Box>
-                )}
-            </Paper>
+                </Paper>
+            ) : (
+                <Box sx={{ mb: 2 }}>
+                    <ImageDropZone
+                        onPick={() => fileInputRef.current?.click()}
+                        onFile={(f) => fileToInput(fileInputRef.current, f)}
+                        label="Add a profile image"
+                        hint="Click, drag an image here, or paste (Ctrl/Cmd+V) · 400×400"
+                        disabled={isProcessing}
+                    />
+                </Box>
+            )}
 
             <input
                 ref={fileInputRef}
@@ -436,12 +406,21 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                                 crop={crop}
                                 zoom={zoom}
                                 aspect={1} // Square aspect ratio
+                                objectFit="contain"
                                 onCropChange={setCrop}
                                 onZoomChange={setZoom}
                                 onCropComplete={onCropComplete}
+                                onMediaLoaded={(m) => {
+                                    mediaSizeRef.current = { width: m.width, height: m.height, naturalWidth: m.naturalWidth, naturalHeight: m.naturalHeight };
+                                    fitToCropBox();
+                                }}
+                                onCropSizeChange={(c) => {
+                                    cropSizeRef.current = c;
+                                    fitToCropBox();
+                                }}
                                 restrictPosition={false}
-                                minZoom={0.1}
-                                maxZoom={3}
+                                minZoom={fitZoom}
+                                maxZoom={Math.max(3, fitZoom * 3)}
                                 showGrid={false}
                             />
                         )}
@@ -452,9 +431,9 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
                         </Typography>
                         <Slider
                             value={zoom}
-                            min={1}
-                            max={3}
-                            step={0.1}
+                            min={fitZoom}
+                            max={Math.max(3, fitZoom * 3)}
+                            step={0.01}
                             aria-labelledby="zoom-slider"
                             onChange={(_, value) => setZoom(value as number)}
                             disabled={isProcessing}
