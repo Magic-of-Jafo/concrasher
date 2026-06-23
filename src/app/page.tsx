@@ -3,6 +3,12 @@ import { db } from "@/lib/db";
 import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
 
+// Render against live data on each request. Without this, Next.js statically
+// renders the home page at build time and freezes the convention list (and their
+// image URLs) until the next deploy — so images uploaded on the live site after a
+// deploy never appear on the cards.
+export const dynamic = 'force-dynamic';
+
 async function getPublishedConventions() {
   try {
     const conventions = await db.convention.findMany({
