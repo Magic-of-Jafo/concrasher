@@ -222,9 +222,16 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                 <Box
                     sx={{
                         width: '100%',
-                        height: { xs: 200, md: 300 },
+                        // Banner holds the canonical Facebook cover aspect (851×315).
+                        // The image is centered and contained, so a too-narrow cover
+                        // shows white side bars from THIS container (not transparent
+                        // pixels baked into the file), and a correctly-shaped cover
+                        // fills edge to edge.
+                        aspectRatio: '851 / 315',
+                        backgroundColor: '#fff',
                         backgroundImage: `url(${coverImageUrl})`,
-                        backgroundSize: 'cover',
+                        backgroundSize: 'contain',
+                        backgroundRepeat: 'no-repeat',
                         backgroundPosition: 'center',
                         position: 'relative',
                     }}

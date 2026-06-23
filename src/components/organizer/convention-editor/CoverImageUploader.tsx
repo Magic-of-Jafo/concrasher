@@ -44,9 +44,11 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
     usePasteImage((file) => fileToInput(fileInputRef.current, file), { targetRef: containerRef });
 
-    // Fit the loaded image to the CROP BOX height (the lighter band), not the whole
-    // canvas: scale so the rendered image height equals the crop box height. The
-    // width then overhangs (wide images) or gaps (narrow); the user zooms in from there.
+    // Scale the loaded image so its HEIGHT matches the CROP BOX height (the white
+    // rectangle), NOT the whole editing canvas. A narrower image then leaves gaps on
+    // the sides inside the crop box; the user can zoom in from there. The saved file
+    // is clamped to real pixels (no transparent padding); the display banner centers
+    // a too-narrow image so any side bars come from the container, not the file.
     const [fitZoom, setFitZoom] = useState(1);
     const mediaSizeRef = useRef<{ width: number; height: number } | null>(null);
     const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -60,6 +62,7 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
         }
     }, []);
 
+    // Canonical Facebook cover spec (851×315, ~2.7:1).
     const TARGET_WIDTH = 851;
     const TARGET_HEIGHT = 315;
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -93,9 +96,8 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
             setSelectedFile(file);
 
             try {
-                // Load the original image as-is. The cropper uses objectFit="cover",
-                // so a wide banner fills the crop frame top-to-bottom with the ends
-                // overhanging — no letterbox bars, no pre-squaring needed.
+                // Load the original image as-is; onMediaLoaded/onCropSizeChange then
+                // scale it so its height matches the crop-box height (fitToCropHeight).
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     setZoom(1);
@@ -135,19 +137,33 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
 
         return new Promise((resolve, reject) => {
             image.onload = () => {
-                canvas.width = TARGET_WIDTH;
-                canvas.height = TARGET_HEIGHT;
+                // The crop box can extend past the image sides (narrower image fit by
+                // height), which would bake transparent bars into the PNG. Clamp the
+                // source rect to the real image pixels and size the canvas to match, so
+                // the saved file is only real pixels — no transparent padding, no
+                // distortion. The display banner centers it; side bars come from there.
+                const scale = TARGET_WIDTH / cropArea.width; // aspect-locked: == TARGET_HEIGHT / cropArea.height
+
+                const sx = Math.max(0, cropArea.x);
+                const sy = Math.max(0, cropArea.y);
+                const sRight = Math.min(image.naturalWidth, cropArea.x + cropArea.width);
+                const sBottom = Math.min(image.naturalHeight, cropArea.y + cropArea.height);
+                const sw = Math.max(1, sRight - sx);
+                const sh = Math.max(1, sBottom - sy);
+
+                canvas.width = Math.round(sw * scale);
+                canvas.height = Math.round(sh * scale);
 
                 ctx.drawImage(
                     image,
-                    cropArea.x,
-                    cropArea.y,
-                    cropArea.width,
-                    cropArea.height,
+                    sx,
+                    sy,
+                    sw,
+                    sh,
                     0,
                     0,
-                    TARGET_WIDTH,
-                    TARGET_HEIGHT
+                    canvas.width,
+                    canvas.height
                 );
 
                 canvas.toBlob(
