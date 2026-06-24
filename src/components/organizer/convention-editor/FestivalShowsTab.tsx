@@ -82,6 +82,7 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
     const [form, setForm] = useState<ProductionInput>(emptyForm);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [imageUrlInput, setImageUrlInput] = useState('');
     const [formError, setFormError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     // Paste a show poster while the add/edit dialog is open.
@@ -150,6 +151,29 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    // Re-host an image from a pasted URL (server fetches it, avoiding CORS/link-rot).
+    const handleUploadFromUrl = async () => {
+        const u = imageUrlInput.trim();
+        if (!u) return;
+        setUploading(true);
+        setFormError(null);
+        try {
+            const fd = new FormData();
+            fd.append('url', u);
+            fd.append('conventionId', conventionId);
+            fd.append('mediaType', 'production');
+            const res = await fetch('/api/upload', { method: 'POST', body: fd });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Could not fetch that image URL.');
+            setForm((prev) => ({ ...prev, coverImageUrl: data.url }));
+            setImageUrlInput('');
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Could not fetch that image URL.');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -312,6 +336,30 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
                                     </Button>
                                 )}
                                 <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleUpload} />
+
+                                <Box sx={{ display: 'flex', gap: 1, mt: 1.5, alignItems: 'flex-start' }}>
+                                    <TextField
+                                        size="small"
+                                        label="…or paste an image URL"
+                                        placeholder="https://…/poster.jpg"
+                                        value={imageUrlInput}
+                                        onChange={(e) => setImageUrlInput(e.target.value)}
+                                        disabled={uploading}
+                                        sx={{ flexGrow: 1, minWidth: 220 }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={handleUploadFromUrl}
+                                        disabled={uploading || !imageUrlInput.trim()}
+                                        sx={{ mt: 0.25 }}
+                                    >
+                                        Add
+                                    </Button>
+                                </Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    …or paste an image straight from your clipboard (Ctrl/Cmd+V).
+                                </Typography>
                             </Box>
                         </Box>
 

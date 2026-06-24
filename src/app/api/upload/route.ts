@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 
 // Configure S3 Client
 const s3Client = new S3Client({
@@ -45,20 +46,15 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
+    const imageUrl = ((formData.get('url') as string | null) || '').trim() || null;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if ((!file || typeof file === 'string') && !imageUrl) {
+      return NextResponse.json({ error: 'No file or url provided' }, { status: 400 });
     }
 
-    // Validate file size and type
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
-    }
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
-    if (!validTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type.' }, { status: 400 });
-    }
+    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
     const conventionId = formData.get('conventionId') as string;
     const userId = formData.get('userId') as string;
@@ -69,11 +65,89 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'conventionId, userId, or brandId, and mediaType are required' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // Acquire the image bytes from either the uploaded file or a remote URL.
+    let buffer: Buffer;
+    let contentType: string;
+    let sourceName: string;
+    if (file && typeof file !== 'string') {
+      if (file.size > MAX_BYTES) {
+        return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
+      }
+      if (!validTypes.includes(file.type)) {
+        return NextResponse.json({ error: 'Invalid file type.' }, { status: 400 });
+      }
+      buffer = Buffer.from(await file.arrayBuffer());
+      contentType = file.type;
+      sourceName = file.name;
+    } else {
+      let imgRes: Response;
+      try {
+        imgRes = await fetch(imageUrl!, {
+          redirect: 'follow',
+          signal: AbortSignal.timeout(15000),
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
+        });
+      } catch {
+        return NextResponse.json({ error: 'Could not fetch that image URL.' }, { status: 400 });
+      }
+      if (!imgRes.ok) {
+        return NextResponse.json({ error: `Could not fetch that image URL (HTTP ${imgRes.status}).` }, { status: 400 });
+      }
+      contentType = (imgRes.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      if (!validTypes.includes(contentType)) {
+        return NextResponse.json({ error: 'That URL is not a supported image (JPEG, PNG, GIF, WEBP, or AVIF).' }, { status: 400 });
+      }
+      const ab = await imgRes.arrayBuffer();
+      if (ab.byteLength > MAX_BYTES) {
+        return NextResponse.json({ error: 'Image must be less than 5MB' }, { status: 400 });
+      }
+      buffer = Buffer.from(ab);
+      let nameFromUrl = 'image';
+      try { nameFromUrl = new URL(imageUrl!).pathname.split('/').pop() || 'image'; } catch { /* keep default */ }
+      if (!/\.[a-z0-9]+$/i.test(nameFromUrl)) {
+        const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        nameFromUrl = `${nameFromUrl}.${ext}`;
+      }
+      sourceName = nameFromUrl;
+    }
 
-    // Sanitize filename and create a unique key for S3
-    const originalFilename = sanitizeFilename(file.name) || `upload-${uuidv4()}`;
+    // Downscale + compress so stored images stay web-friendly — pasted and remote
+    // images can be many MB at full resolution, which makes them slow to load.
+    // Keep PNG (and its transparency) for images with an alpha channel; convert
+    // opaque images to JPEG. Skip GIFs (may be animated) and fall back to the
+    // original bytes if processing fails for any reason.
+    const MAX_DIM = 1600;
+    if (contentType !== 'image/gif') {
+      try {
+        // Pasted images often carry an alpha channel even when fully opaque, so test
+        // actual transparency (isOpaque), not just whether an alpha channel exists.
+        let opaque: boolean;
+        try {
+          opaque = (await sharp(buffer, { failOn: 'none' }).stats()).isOpaque;
+        } catch {
+          const m = await sharp(buffer, { failOn: 'none' }).metadata();
+          opaque = !m.hasAlpha;
+        }
+        const resized = sharp(buffer, { failOn: 'none' })
+          .rotate() // honor EXIF orientation
+          .resize({ width: MAX_DIM, height: MAX_DIM, fit: 'inside', withoutEnlargement: true });
+        if (opaque) {
+          buffer = await resized.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+          contentType = 'image/jpeg';
+        } else {
+          buffer = await resized.png({ compressionLevel: 9 }).toBuffer();
+          contentType = 'image/png';
+        }
+      } catch (e) {
+        console.warn('[Upload] image processing skipped:', e);
+      }
+    }
+
+    // Sanitize filename and create a unique key for S3 (extension matches the
+    // final, possibly converted, format).
+    const forcedExt = contentType === 'image/png' ? 'png' : contentType === 'image/jpeg' ? 'jpg' : (contentType.split('/')[1] || 'img');
+    const baseName = sourceName.replace(/\.[^./]+$/, '') || 'image';
+    const originalFilename = sanitizeFilename(`${baseName}.${forcedExt}`) || `upload-${uuidv4()}.${forcedExt}`;
     let key: string;
 
     if (conventionId) {
@@ -95,7 +169,7 @@ export async function POST(request: Request) {
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
-      ContentType: file.type,
+      ContentType: contentType,
     });
 
     await s3Client.send(putCommand);
