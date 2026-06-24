@@ -155,6 +155,68 @@ const VenueForm: React.FC<VenueFormProps> = ({ venue, onChange, errors = {} }) =
           />
         </Grid>
 
+        {/* Room Booking — used when attendees stay at this venue (no separate hotel) */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Room Booking</Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+            Fill these in when attendees book rooms at this venue. They appear by the
+            “Book your room” button on the public listing.
+          </Typography>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Group Rate / Price"
+            name="groupPrice"
+            placeholder="e.g. $129/night"
+            value={venue.groupPrice || ''}
+            onChange={handleChange}
+            margin="dense"
+            error={!!errors?.groupPrice}
+            helperText={errors?.groupPrice || ''}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Booking Code"
+            name="groupRateOrBookingCode"
+            placeholder="e.g. MAGIC26"
+            value={venue.groupRateOrBookingCode || ''}
+            onChange={handleChange}
+            margin="dense"
+            error={!!errors?.groupRateOrBookingCode}
+            helperText={errors?.groupRateOrBookingCode || ''}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Booking Link"
+            name="bookingLink"
+            placeholder="https://…"
+            value={venue.bookingLink || ''}
+            onChange={handleChange}
+            margin="dense"
+            error={!!errors?.bookingLink}
+            helperText={errors?.bookingLink || ''}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Booking Cutoff Date"
+            name="bookingCutoffDate"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            value={venue.bookingCutoffDate ? new Date(venue.bookingCutoffDate).toISOString().slice(0, 10) : ''}
+            onChange={handleChange}
+            margin="dense"
+            error={!!errors?.bookingCutoffDate}
+            helperText={errors?.bookingCutoffDate || 'Last day to book at this rate'}
+          />
+        </Grid>
+
         {/* Address Fields */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>Address</Typography>

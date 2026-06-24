@@ -242,6 +242,10 @@ model Venue {
   country                   String?
   contactEmail              String?
   contactPhone              String?
+  groupRateOrBookingCode    String?
+  groupPrice                String?
+  bookingLink               String?
+  bookingCutoffDate         DateTime?
   amenities                 String[]
   parkingInfo               String?
   publicTransportInfo       String?

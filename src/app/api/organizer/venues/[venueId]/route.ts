@@ -43,7 +43,9 @@ export async function DELETE(
             return NextResponse.json({ error: "Could not verify venue ownership." }, { status: 500 });
         }
 
-        if (venue.convention.series.organizerUserId !== session.user.id) {
+        const isAdmin = (session.user as any).roles?.includes("ADMIN");
+        const isOwner = venue.convention.series.organizerUserId === session.user.id;
+        if (!isAdmin && !isOwner) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

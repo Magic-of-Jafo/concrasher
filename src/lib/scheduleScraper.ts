@@ -210,7 +210,14 @@ export async function pdfToText(data: ArrayBuffer | Uint8Array): Promise<string>
     return String(Array.isArray(text) ? text.join('\n') : text).slice(0, MAX_TEXT_CHARS);
 }
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; ConventionCrasherBot/0.1; +https://conventioncrasher.com)' };
+// Present as a real browser. Many event sites sit behind Cloudflare/WAFs that
+// 403 obvious bot User-Agents; a normal browser UA + Accept headers clears the
+// simple header-based blocks (full JS challenges still need the Image fallback).
+const UA = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+};
 
 /** Fetch a URL and return its text — auto-detecting HTML vs PDF. */
 export async function fetchUrlText(url: string): Promise<{ text: string; kind: 'html' | 'pdf' }> {
@@ -298,7 +305,16 @@ function candidateImageUrls(html: string, baseUrl: string): string[] {
  */
 export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image' | 'html'; text: string; images: string[] }> {
     const res = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(30000) });
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+        // Cloudflare / WAF bot challenges (a JS challenge we can't solve server-side)
+        // come back as 403/503 with a cloudflare server or a cf-mitigated header.
+        const server = (res.headers.get('server') || '').toLowerCase();
+        const challenged = res.headers.get('cf-mitigated') || server.includes('cloudflare') || res.status === 403 || res.status === 503;
+        if (challenged) {
+            throw new Error("This page is protected by a bot challenge (e.g. Cloudflare) that this tool can't read directly. Take a screenshot of the info and use the Image option — you can paste it straight from your clipboard.");
+        }
+        throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
+    }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/pdf') || /\.pdf(\?|$)/i.test(url)) {
         return { kind: 'pdf', text: await pdfToText(await res.arrayBuffer()), images: [] };
@@ -749,4 +765,145 @@ export async function extractPricingFromImages(
         { role: 'user', content: userParts },
     ]);
     return shapePricing(content);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Venue & Hotel — extract the event VENUE and the lodging HOTEL from a source.
+// Common case: the convention is held AT a hotel and attendees stay there
+// (sameLocation), so the booking details live on the venue. Otherwise a separate
+// host hotel is returned. Preview-only: fills the Venue/Hotel tab.
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ScrapedPlace {
+    name: string | null;
+    websiteUrl: string | null;
+    googleMapsUrl: string | null;
+    streetAddress: string | null;
+    city: string | null;
+    stateRegion: string | null;
+    postalCode: string | null;
+    country: string | null;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    description: string | null;
+    amenities: string[];
+    parkingInfo: string | null;
+    publicTransportInfo: string | null;
+    // Room-block booking (host hotel, or the venue when it doubles as the hotel)
+    groupPrice: string | null;
+    groupRateOrBookingCode: string | null;
+    bookingLink: string | null;
+    bookingCutoffDate: string | null; // YYYY-MM-DD
+}
+export interface ScrapedVenueHotel {
+    sameLocation: boolean | null; // do attendees stay where the events happen?
+    venue: ScrapedPlace | null;
+    hotel: ScrapedPlace | null;   // a separate host hotel, only when sameLocation === false
+}
+
+/** Build a universal, always-clickable Google Maps search link from a place's
+ *  name + address. No Maps API key needed. */
+export function buildGoogleMapsUrl(p: Partial<ScrapedPlace> | null | undefined): string | null {
+    if (!p) return null;
+    const parts = [p.name, p.streetAddress, p.city, p.stateRegion, p.postalCode, p.country]
+        .map((v) => (v ? String(v).trim() : '')).filter(Boolean);
+    if (!parts.length) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(', '))}`;
+}
+
+function venueHotelSystemPrompt(): string {
+    return `You extract a magic convention's event VENUE and lodging HOTEL details from the provided text or image into JSON.
+
+A convention has a VENUE where events take place, and lodging where attendees stay. VERY OFTEN the convention is held AT a hotel and attendees stay in that same hotel (sameLocation true). Sometimes events are at a separate venue and attendees stay at a different host hotel (sameLocation false).
+
+Respond ONLY as JSON with exactly these keys:
+{"sameLocation":true,"venue":{place},"hotel":null}
+
+A {place} object has exactly these keys:
+{"name":"...","websiteUrl":"...","googleMapsUrl":"...","streetAddress":"...","city":"...","stateRegion":"...","postalCode":"...","country":"...","contactEmail":"...","contactPhone":"...","description":"...","amenities":["..."],"parkingInfo":"...","publicTransportInfo":"...","groupPrice":"...","groupRateOrBookingCode":"...","bookingLink":"...","bookingCutoffDate":"YYYY-MM-DD"}
+
+Rules:
+- "venue": the place where events happen — name, address, contact, and a short plain-text description.
+- "sameLocation": true if attendees stay at the same place the events happen; false if there is a SEPARATE host hotel; null if unclear. When unsure, prefer true (it's the common case).
+- "hotel": fill ONLY when sameLocation is false AND a separate host hotel is named; otherwise null. When sameLocation is true, put the room-block booking details on the VENUE, not here.
+- Booking fields (on whichever place is the lodging): "groupPrice" = nightly rate as written (e.g. "$129/night"); "groupRateOrBookingCode" = the code/phrase to mention for the convention rate (e.g. "MAGIC26"); "bookingLink" = the direct booking URL; "bookingCutoffDate" = last day to book at that rate (YYYY-MM-DD).
+- "googleMapsUrl": only if an explicit Google Maps link is present in the source; otherwise null (we build one from the address).
+- "amenities": a short list if stated, else [].
+- If the source is in another language, translate descriptions/amenities into natural English; keep proper names, addresses, and codes. Use null or "" for anything not present. Do not invent details.`;
+}
+
+function shapePlace(p: any): ScrapedPlace | null {
+    if (!p || typeof p !== 'object') return null;
+    const str = (v: any) => (v && String(v).trim() ? String(v).trim() : null);
+    const date = (v: any) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim()) ? String(v).trim() : null);
+    const amenities = (Array.isArray(p.amenities) ? p.amenities : [])
+        .map((a: any) => String(a || '').trim()).filter(Boolean);
+    const place: ScrapedPlace = {
+        name: str(p.name),
+        websiteUrl: str(p.websiteUrl),
+        googleMapsUrl: str(p.googleMapsUrl),
+        streetAddress: str(p.streetAddress),
+        city: str(p.city),
+        stateRegion: str(p.stateRegion),
+        postalCode: str(p.postalCode),
+        country: str(p.country),
+        contactEmail: str(p.contactEmail),
+        contactPhone: str(p.contactPhone),
+        description: str(p.description),
+        amenities,
+        parkingInfo: str(p.parkingInfo),
+        publicTransportInfo: str(p.publicTransportInfo),
+        groupPrice: str(p.groupPrice),
+        groupRateOrBookingCode: str(p.groupRateOrBookingCode),
+        bookingLink: str(p.bookingLink),
+        bookingCutoffDate: date(p.bookingCutoffDate),
+    };
+    // A place is only meaningful if it at least has a name or an address line.
+    if (!place.name && !place.streetAddress && !place.city) return null;
+    // Construct a Maps link from the address when the source didn't supply one.
+    if (!place.googleMapsUrl) place.googleMapsUrl = buildGoogleMapsUrl(place);
+    return place;
+}
+
+function shapeVenueHotel(content: string): ScrapedVenueHotel {
+    let p: any = {};
+    try { p = JSON.parse(content); } catch { return { sameLocation: null, venue: null, hotel: null }; }
+    const venue = shapePlace(p.venue);
+    let hotel = shapePlace(p.hotel);
+    let sameLocation: boolean | null =
+        p.sameLocation === true ? true : p.sameLocation === false ? false : null;
+    // If the model said "separate hotel" but gave none, treat as same-location.
+    if (sameLocation === false && !hotel) sameLocation = true;
+    // Same-location: lodging is the venue, so there is no separate hotel.
+    if (sameLocation === true) hotel = null;
+    return { sameLocation, venue, hotel };
+}
+
+export async function extractVenueHotelFromText(
+    text: string,
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedVenueHotel> {
+    const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
+    if (!trimmed) return { sameLocation: null, venue: null, hotel: null };
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: venueHotelSystemPrompt() },
+        { role: 'user', content: `Source text:\n${trimmed}` },
+    ]);
+    return shapeVenueHotel(content);
+}
+
+export async function extractVenueHotelFromImages(
+    images: string[],
+    ctx: { apiKey: string; model: string },
+): Promise<ScrapedVenueHotel> {
+    if (!images.length) return { sameLocation: null, venue: null, hotel: null };
+    const userParts: any[] = [
+        { type: 'text', text: 'The venue / hotel details are in the following image(s). Read them and return the JSON.' },
+        ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ];
+    const content = await callOpenAI(ctx.apiKey, ctx.model, [
+        { role: 'system', content: venueHotelSystemPrompt() },
+        { role: 'user', content: userParts },
+    ]);
+    return shapeVenueHotel(content);
 }

@@ -18,6 +18,8 @@ import { v4 as uuidv4 } from 'uuid';
 import PrimaryVenueForm from './PrimaryVenueForm';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import VenueHotelHelperDialog, { type VenueHotelResult, type ScrapedPlaceResult } from './VenueHotelHelperDialog';
 
 interface VenueHotelTabProps {
   conventionId: string | null;
@@ -32,6 +34,8 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>(false);
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<{ originalIndex: number, displayIndex: number } | null>(null);
+  const [confirmDeletePrimary, setConfirmDeletePrimary] = useState(false);
+  const [helperOpen, setHelperOpen] = useState(false);
 
   const { primaryVenue, secondaryVenues } = useMemo(() => {
     const pVenue = value.primaryVenue ?? value.venues?.find((v: VenueData) => v.isPrimaryVenue) ?? createDefaultVenue(true);
@@ -67,6 +71,28 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
       setZodErrors(null);
     }
   }, [value, schema]);
+
+  // Clear the primary venue: delete the saved record (if any) and reset the form
+  // to a blank primary venue. The model always keeps exactly one primary venue.
+  const handleDeletePrimaryVenue = async () => {
+    const id = (primaryVenue as any)?.id;
+    if (id && conventionId) {
+      try {
+        const res = await fetch(`/api/organizer/venues/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error || 'Failed to delete venue');
+        }
+      } catch (err) {
+        console.error('Failed to delete primary venue:', err);
+      }
+    }
+    validateAndNotify({ ...value, primaryVenue: createDefaultVenue(true), secondaryVenues });
+    setConfirmDeletePrimary(false);
+  };
 
   const handleConfirmDeleteVenue = async () => {
     if (venueToDelete === null || !conventionId) return;
@@ -186,6 +212,53 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue, hotels });
   };
 
+  // Apply a scraped venue/hotel result from the helper. ADDITIVE: it only fills
+  // fields that are currently empty, so the organizer can run it once from a link
+  // and again from a screenshot (e.g. for the nightly rate) without losing what
+  // an earlier pass already captured. The stay-at-venue toggle only changes on a
+  // definitive read; an ambiguous result leaves the existing setting alone.
+  const applyVenueHotel = useCallback((r: VenueHotelResult) => {
+    const fill = (cur: any, val: any) => (cur != null && cur !== '' ? cur : val); // keep existing
+    const mergeInto = (base: any, p: ScrapedPlaceResult, nameKey: 'venueName' | 'hotelName') => {
+      const out: any = { ...base };
+      const fields: (keyof ScrapedPlaceResult)[] = [
+        'websiteUrl', 'googleMapsUrl', 'streetAddress', 'city', 'stateRegion', 'postalCode',
+        'country', 'contactEmail', 'contactPhone', 'description', 'parkingInfo',
+        'publicTransportInfo', 'groupPrice', 'groupRateOrBookingCode', 'bookingLink',
+      ];
+      for (const f of fields) out[f] = fill(base[f], (p as any)[f]);
+      out[nameKey] = fill(base[nameKey], p.name);
+      if ((!base.amenities || base.amenities.length === 0) && p.amenities?.length) out.amenities = p.amenities;
+      if (!base.bookingCutoffDate && p.bookingCutoffDate) out.bookingCutoffDate = new Date(p.bookingCutoffDate);
+      return out;
+    };
+    const mergePrimaryHotel = (hotels: HotelData[], p: ScrapedPlaceResult) => {
+      const idx = hotels.findIndex(h => h.isPrimaryHotel);
+      const base = idx >= 0 ? hotels[idx] : createDefaultHotel(true);
+      const merged = { ...mergeInto(base, p, 'hotelName'), isPrimaryHotel: true } as HotelData;
+      if (idx >= 0) hotels[idx] = merged; else hotels.unshift(merged);
+      return hotels;
+    };
+
+    const newPrimaryVenue = r.venue ? mergeInto(primaryVenue, r.venue, 'venueName') : primaryVenue;
+
+    let guests = value.guestsStayAtPrimaryVenue;
+    let hotels = [...(value.hotels || [])];
+    if (r.sameLocation === true) {
+      guests = true;
+      hotels = hotels.filter(h => !h.isPrimaryHotel);
+    } else if (r.sameLocation === false) {
+      guests = false;
+      if (r.hotel) hotels = mergePrimaryHotel(hotels, r.hotel);
+    } else if (r.hotel && hotels.some(h => h.isPrimaryHotel)) {
+      // Ambiguous read but a hotel was returned — additively top up the existing one.
+      hotels = mergePrimaryHotel(hotels, r.hotel);
+    }
+
+    validateAndNotify({ ...value, primaryVenue: newPrimaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: guests, hotels });
+    setExpandedAccordion('primaryVenue');
+  }, [value, primaryVenue, secondaryVenues, validateAndNotify]);
+
   const renderVenueForms = () => {
     if (!primaryVenue) return null; // Guard against undefined primary venue
 
@@ -203,6 +276,16 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
               errors={structuredErrors.venues[0]}
               isPrimary={true}
             />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+              <Button
+                startIcon={<DeleteIcon />}
+                onClick={() => setConfirmDeletePrimary(true)}
+                color="error"
+                disabled={disabled}
+              >
+                Delete Primary Venue
+              </Button>
+            </Box>
           </AccordionDetails>
         </Accordion>
 
@@ -356,9 +439,30 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>Venue Information</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="h5">Venue Information</Typography>
+        {conventionId && (
+          <Button
+            variant="outlined"
+            startIcon={<AutoAwesomeIcon />}
+            onClick={() => setHelperOpen(true)}
+            disabled={disabled}
+          >
+            Import venue &amp; hotel info from your website
+          </Button>
+        )}
+      </Box>
       {renderVenueForms()}
       {renderHotelForms()}
+
+      {conventionId && (
+        <VenueHotelHelperDialog
+          open={helperOpen}
+          onClose={() => setHelperOpen(false)}
+          conventionId={conventionId}
+          onApplied={applyVenueHotel}
+        />
+      )}
 
       <Dialog
         open={venueToDelete !== null}
@@ -373,6 +477,25 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
         <DialogActions>
           <Button onClick={() => setVenueToDelete(null)}>Cancel</Button>
           <Button onClick={handleConfirmDeleteVenue} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmDeletePrimary}
+        onClose={() => setConfirmDeletePrimary(false)}
+      >
+        <DialogTitle>Delete Primary Venue</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This clears the primary venue and removes its saved record. The form resets
+            to a blank primary venue. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeletePrimary(false)}>Cancel</Button>
+          <Button onClick={handleDeletePrimaryVenue} color="error" autoFocus>
             Delete
           </Button>
         </DialogActions>

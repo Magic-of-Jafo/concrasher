@@ -63,11 +63,11 @@ export default function VenueSection({ convention }: { convention: any }) {
             <Typography variant="h1" component="h2" gutterBottom sx={h1Styles}>
                 Venue
             </Typography>
-            {primaryVenue?.websiteUrl && (
+            {(primaryVenue?.bookingLink || primaryVenue?.websiteUrl) && (
                 <Button
                     variant="contained"
                     size="large"
-                    href={primaryVenue.websiteUrl}
+                    href={primaryVenue.bookingLink || primaryVenue.websiteUrl}
                     target="_blank"
                     sx={{ mb: 2 }}
                 >
@@ -75,6 +75,27 @@ export default function VenueSection({ convention }: { convention: any }) {
                         ? `Book your room at ${primaryVenue.venueName}`
                         : 'Venue website'}
                 </Button>
+            )}
+            {convention.guestsStayAtPrimaryVenue && primaryVenue &&
+                (primaryVenue.groupPrice || primaryVenue.groupRateOrBookingCode || primaryVenue.bookingCutoffDate) && (
+                <Box sx={{ mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1, maxWidth: 480 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        Convention Room Rate
+                    </Typography>
+                    {primaryVenue.groupPrice && (
+                        <Typography variant="body1">{primaryVenue.groupPrice}</Typography>
+                    )}
+                    {primaryVenue.groupRateOrBookingCode && (
+                        <Typography variant="body1">
+                            Booking code: <strong>{primaryVenue.groupRateOrBookingCode}</strong>
+                        </Typography>
+                    )}
+                    {primaryVenue.bookingCutoffDate && (
+                        <Typography variant="body1" color="warning.main">
+                            Book by {new Date(primaryVenue.bookingCutoffDate).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })} for this rate
+                        </Typography>
+                    )}
+                </Box>
             )}
             {primaryVenue && <VenueCard venue={primaryVenue} isCompact={false} />}
             {secondaryVenues.length > 0 && (
