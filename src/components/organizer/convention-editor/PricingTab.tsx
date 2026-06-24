@@ -426,8 +426,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
     }
   };
 
-  // Fill the Pricing tab from a Pricing Helper result (flatten tables -> tiers).
-  const applyPricing = (tables: PriceTableResult[], _currency: string | null) => {
+  // Fill the Pricing tab from a Pricing Helper result (flatten tables -> tiers)
+  // AND persist immediately, so accepting the proposal is the save — the organizer
+  // never has to remember to click Save and risk losing the import.
+  const applyPricing = async (tables: PriceTableResult[], _currency: string | null) => {
     const tiers: PriceTier[] = [];
     let primaryLabel = '';
     let secondaryLabel = '';
@@ -438,12 +440,60 @@ export const PricingTab: React.FC<PricingTabProps> = ({ conventionId, value, onC
       });
       if (table.secondaryLabel) { primaryLabel = table.primaryLabel || 'At the Door'; secondaryLabel = table.secondaryLabel; }
     });
+
+    // Show the imported table right away.
     onChange({ ...value, priceTiers: tiers, priceDiscounts: [] });
     if (secondaryLabel && onTabSettingsChange) {
       onTabSettingsChange({ baseChannelLabel: primaryLabel, secondaryChannelLabel: secondaryLabel });
     }
-    setTiersSaved(false);
-    enqueueSnackbar(`Imported ${tiers.length} categor${tiers.length === 1 ? 'y' : 'ies'}. Review, then click Save Pricing Tiers.`, { variant: 'info' });
+
+    const count = `${tiers.length} categor${tiers.length === 1 ? 'y' : 'ies'}`;
+    if (!conventionId) {
+      setTiersSaved(false);
+      enqueueSnackbar(`Imported ${count}. Review, then click Save Pricing Tiers.`, { variant: 'info' });
+      return;
+    }
+
+    // Persist the tiers (and channel labels) straight away.
+    setIsSavingTiers(true);
+    setErrors(p => { const { global, ...rest } = p; return rest; });
+    try {
+      const tiersToSave = tiers.filter(t => t.label.trim().length > 0).map(t => ({
+        ...t,
+        amount: Number(t.amount),
+        tab: (t as any).tab || '',
+        amountSecondary: (t as any).amountSecondary == null ? null : Number((t as any).amountSecondary),
+      }));
+      const response = await fetch(`/api/conventions/${conventionId}/pricing/tiers`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceTiers: tiersToSave }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to save price tiers');
+      }
+      const saved: PriceTier[] = await response.json();
+      onChange({ ...value, priceTiers: saved.map((t, i) => ({ ...t, order: t.order ?? i })), priceDiscounts: [] });
+      if (secondaryLabel) {
+        await fetch(`/api/organizer/conventions/${conventionId}/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseChannelLabel: primaryLabel,
+            secondaryChannelLabel: secondaryLabel,
+            channelOrder: tabSettings?.channelOrder || '',
+          }),
+        }).catch(() => { /* labels are secondary; tiers already saved */ });
+      }
+      setTiersSaved(true);
+      enqueueSnackbar(`Imported and saved ${count}.`, { variant: 'success' });
+    } catch (e) {
+      setTiersSaved(false);
+      enqueueSnackbar('Imported, but auto-save failed — review and click Save Pricing Tiers.', { variant: 'warning' });
+    } finally {
+      setIsSavingTiers(false);
+    }
   };
 
   return (

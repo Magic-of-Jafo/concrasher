@@ -201,7 +201,7 @@ export default function PricingHelperDialog({
 
                         <Divider sx={{ my: 1 }} />
                         <Alert severity="info">
-                            These will fill the Pricing tab. Review and edit, then click <strong>Save Pricing Tiers</strong>. (Currency is set in Settings; early-bird dates can be added after.)
+                            Clicking <strong>Use these prices</strong> saves them to the Pricing tab right away. You can still edit and re-save, or add early-bird dates, afterward. (Currency is set in Settings.)
                         </Alert>
                     </>
                 )}
