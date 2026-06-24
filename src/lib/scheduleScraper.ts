@@ -442,13 +442,27 @@ Respond ONLY as JSON:
 {"shows":[{"title":"...","performer":"...","venue":"...","ageRating":"...","performances":[{"date":"${year}-06-30","start":"10:45 AM","end":"11:30 AM"}]}]}`;
 }
 
+// Build the show's display title. At a performer festival the act type alone
+// ("Magician", "Mentalist") isn't useful — lead with the performer's name. Skip
+// when the title already names them, or the performer is a generic/non-act string.
+function festivalShowTitle(title: string, performer: string | null): string {
+    const t = (title || '').trim();
+    const p = (performer || '').trim();
+    if (!p || NON_TALENT.test(p)) return t || p;
+    if (!t) return p;
+    const tl = t.toLowerCase(), pl = p.toLowerCase();
+    if (tl.includes(pl)) return t;   // title already names the performer
+    if (pl.includes(tl)) return p;   // performer string already includes the title
+    return `${p} — ${t}`;            // lead with the performer (the headline)
+}
+
 function shapeFestival(content: string): ScrapedFestival {
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { return { shows: [] }; }
 
     const shows: ScrapedShow[] = (Array.isArray(parsed.shows) ? parsed.shows : [])
         .map((s: any) => ({
-            title: String(s.title || '').trim(),
+            title: festivalShowTitle(String(s.title || '').trim(), s.performer ? String(s.performer).trim() : null),
             performer: s.performer && String(s.performer).trim() ? String(s.performer).trim() : null,
             venue: s.venue && String(s.venue).trim() ? String(s.venue).trim() : null,
             ageRating: s.ageRating && String(s.ageRating).trim() ? String(s.ageRating).trim() : null,
