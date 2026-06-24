@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { setEventTalent } from '@/lib/talent';
+import { browserosRender } from '@/lib/browserosRender';
 
 /**
  * Schedule scraper core — turns a schedule source (web page, PDF, or a
@@ -311,6 +312,8 @@ export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image
         const server = (res.headers.get('server') || '').toLowerCase();
         const challenged = res.headers.get('cf-mitigated') || server.includes('cloudflare') || res.status === 403 || res.status === 503;
         if (challenged) {
+            const rendered = await browserosRender(url); // real-browser fallback (if configured)
+            if (rendered && rendered.trim()) return { kind: 'html', text: rendered, images: [] };
             throw new Error("This page is protected by a bot challenge (e.g. Cloudflare) that this tool can't read directly. Take a screenshot of the info and use the Image option — you can paste it straight from your clipboard.");
         }
         throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
@@ -324,12 +327,18 @@ export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image
         return { kind: 'image', text: '', images: [bufferToDataUrl(ct, buf)] };
     }
     const html = await res.text();
-    const text = htmlToText(html);
+    let text = htmlToText(html);
     const images: string[] = [];
     for (const u of candidateImageUrls(html, url)) {
         const d = await fetchImageAsDataUrl(u);
         if (d) images.push(d);
         if (images.length >= 4) break;
+    }
+    // JS-rendered shells (Wix, Squarespace, etc.) strip down to almost nothing.
+    // Re-render in a real browser if one is configured.
+    if (text.trim().length < 150) {
+        const rendered = await browserosRender(url);
+        if (rendered && rendered.trim().length > text.trim().length) text = rendered;
     }
     return { kind: 'html', text, images };
 }
