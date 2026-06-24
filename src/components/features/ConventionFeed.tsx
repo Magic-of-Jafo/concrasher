@@ -336,7 +336,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                   order: { xs: 2, lg: 2 }
                 }}
               >
-                {/* Coming Soon Header */}
+                {/* Upcoming Header */}
                 <Typography
                   variant="h3"
                   sx={{
@@ -348,7 +348,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
                     color: 'white'
                   }}
                 >
-                  Coming Soon
+                  Upcoming
                 </Typography>
                 {filteredSorted.slice(0, 3).map((con: any) => {
                   const statusText = getConventionStatusText(con.startDate, con.endDate);
@@ -407,7 +407,7 @@ export default function ConventionFeed({ conventions }: { conventions: any[] }) 
             color: 'text.primary'
           }}
         >
-          Coming Soon!
+          Upcoming
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {filteredSorted.slice(0, 3).map((con: any) => {
