@@ -36,7 +36,7 @@ export interface ScrapedPlaceResult {
 export interface VenueHotelResult {
     sameLocation: boolean | null;
     venue: ScrapedPlaceResult | null;
-    hotel: ScrapedPlaceResult | null;
+    hotels: ScrapedPlaceResult[];
 }
 
 const GEN_STAGES = [
@@ -133,9 +133,10 @@ export default function VenueHotelHelperDialog({
                 });
             }
             const data = await res.json();
+            const hotels = Array.isArray(data.hotels) ? data.hotels : (data.hotel ? [data.hotel] : []);
             if (!res.ok) setError(data.error || 'Could not read that source.');
-            else if (!data.venue && !data.hotel) setError('No venue or hotel details were found. Try the venue/travel page, a PDF, or an image.');
-            else setPreview({ source: data.source, sameLocation: data.sameLocation, venue: data.venue, hotel: data.hotel });
+            else if (!data.venue && !hotels.length) setError('No venue or hotel details were found. Try the venue/travel page, a PDF, or an image.');
+            else setPreview({ source: data.source, sameLocation: data.sameLocation, venue: data.venue, hotels });
         } catch (e: any) {
             if (e?.name !== 'AbortError') setError(e?.message || 'Request failed.');
         } finally {
@@ -220,7 +221,13 @@ export default function VenueHotelHelperDialog({
 
                         <Box sx={{ mt: 1.5 }}>
                             {preview.venue && <PlacePreview title="Venue" place={preview.venue} />}
-                            {preview.hotel && <PlacePreview title="Host hotel" place={preview.hotel} />}
+                            {preview.hotels.map((h, i) => (
+                                <PlacePreview
+                                    key={i}
+                                    title={preview.hotels.length === 1 ? 'Host hotel' : (i === 0 ? 'Primary hotel' : `Hotel ${i + 1}`)}
+                                    place={h}
+                                />
+                            ))}
                         </Box>
 
                         <Divider sx={{ my: 1 }} />
@@ -237,7 +244,7 @@ export default function VenueHotelHelperDialog({
                         {loading ? 'Reading…' : 'Generate preview'}
                     </Button>
                 ) : (
-                    <Button onClick={() => { onApplied({ sameLocation: preview.sameLocation, venue: preview.venue, hotel: preview.hotel }); close(); }} variant="contained">
+                    <Button onClick={() => { onApplied({ sameLocation: preview.sameLocation, venue: preview.venue, hotels: preview.hotels }); close(); }} variant="contained">
                         Use these details
                     </Button>
                 )}

@@ -232,27 +232,44 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
       if (!base.bookingCutoffDate && p.bookingCutoffDate) out.bookingCutoffDate = new Date(p.bookingCutoffDate);
       return out;
     };
-    const mergePrimaryHotel = (hotels: HotelData[], p: ScrapedPlaceResult) => {
-      const idx = hotels.findIndex(h => h.isPrimaryHotel);
-      const base = idx >= 0 ? hotels[idx] : createDefaultHotel(true);
-      const merged = { ...mergeInto(base, p, 'hotelName'), isPrimaryHotel: true } as HotelData;
-      if (idx >= 0) hotels[idx] = merged; else hotels.unshift(merged);
-      return hotels;
-    };
+    const mergeHotelInto = (base: HotelData, p: ScrapedPlaceResult, isPrimary: boolean) =>
+      ({ ...mergeInto(base, p, 'hotelName'), isPrimaryHotel: isPrimary } as HotelData);
 
     const newPrimaryVenue = r.venue ? mergeInto(primaryVenue, r.venue, 'venueName') : primaryVenue;
 
+    const scraped = r.hotels || [];
     let guests = value.guestsStayAtPrimaryVenue;
     let hotels = [...(value.hotels || [])];
+
+    // Split scraped hotels into the primary host hotel vs additional/overflow.
+    let primaryScraped: ScrapedPlaceResult | null = null;
+    let additional: ScrapedPlaceResult[] = scraped;
     if (r.sameLocation === true) {
       guests = true;
-      hotels = hotels.filter(h => !h.isPrimaryHotel);
+      hotels = hotels.filter(h => !h.isPrimaryHotel); // venue is the lodging; scraped hotels are overflow
     } else if (r.sameLocation === false) {
       guests = false;
-      if (r.hotel) hotels = mergePrimaryHotel(hotels, r.hotel);
-    } else if (r.hotel && hotels.some(h => h.isPrimaryHotel)) {
-      // Ambiguous read but a hotel was returned — additively top up the existing one.
-      hotels = mergePrimaryHotel(hotels, r.hotel);
+      primaryScraped = scraped[0] || null;
+      additional = scraped.slice(1);
+    } else if (scraped.length && !hotels.some(h => h.isPrimaryHotel)) {
+      // Ambiguous read, no primary set yet — make the first scraped hotel primary.
+      primaryScraped = scraped[0];
+      additional = scraped.slice(1);
+    }
+
+    if (primaryScraped) {
+      const idx = hotels.findIndex(h => h.isPrimaryHotel);
+      const base = idx >= 0 ? hotels[idx] : createDefaultHotel(true);
+      const merged = mergeHotelInto(base, primaryScraped, true);
+      if (idx >= 0) hotels[idx] = merged; else hotels.unshift(merged);
+    }
+
+    // Add/merge additional hotels, deduped by name so re-runs don't duplicate them.
+    for (const p of additional) {
+      const name = (p.name || '').trim().toLowerCase();
+      const exIdx = name ? hotels.findIndex(h => !h.isPrimaryHotel && (h.hotelName || '').trim().toLowerCase() === name) : -1;
+      if (exIdx >= 0) hotels[exIdx] = mergeHotelInto(hotels[exIdx], p, false);
+      else hotels.push(mergeHotelInto(createDefaultHotel(false), p, false));
     }
 
     validateAndNotify({ ...value, primaryVenue: newPrimaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: guests, hotels });

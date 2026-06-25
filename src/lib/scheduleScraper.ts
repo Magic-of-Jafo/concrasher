@@ -821,7 +821,7 @@ export interface ScrapedPlace {
 export interface ScrapedVenueHotel {
     sameLocation: boolean | null; // do attendees stay where the events happen?
     venue: ScrapedPlace | null;
-    hotel: ScrapedPlace | null;   // a separate host hotel, only when sameLocation === false
+    hotels: ScrapedPlace[];       // lodging hotels separate from the venue — host/primary first, then overflow
 }
 
 /** Build a universal, always-clickable Google Maps search link from a place's
@@ -840,15 +840,16 @@ function venueHotelSystemPrompt(): string {
 A convention has a VENUE where events take place, and lodging where attendees stay. VERY OFTEN the convention is held AT a hotel and attendees stay in that same hotel (sameLocation true). Sometimes events are at a separate venue and attendees stay at a different host hotel (sameLocation false).
 
 Respond ONLY as JSON with exactly these keys:
-{"sameLocation":true,"venue":{place},"hotel":null}
+{"sameLocation":true,"venue":{place},"hotels":[]}
 
 A {place} object has exactly these keys:
 {"name":"...","websiteUrl":"...","googleMapsUrl":"...","streetAddress":"...","city":"...","stateRegion":"...","postalCode":"...","country":"...","contactEmail":"...","contactPhone":"...","description":"...","amenities":["..."],"parkingInfo":"...","publicTransportInfo":"...","groupPrice":"...","groupRateOrBookingCode":"...","bookingLink":"...","bookingCutoffDate":"YYYY-MM-DD"}
 
 Rules:
 - "venue": the place where events happen — name, address, contact, and a short plain-text description.
-- "sameLocation": true if attendees stay at the same place the events happen; false if there is a SEPARATE host hotel; null if unclear. When unsure, prefer true (it's the common case).
-- "hotel": fill ONLY when sameLocation is false AND a separate host hotel is named; otherwise null. When sameLocation is true, put the room-block booking details on the VENUE, not here.
+- "sameLocation": true if attendees stay at the same place the events happen (the venue IS the host hotel); false if there is a SEPARATE host hotel; null if unclear. When unsure, prefer true.
+- "hotels": an array of lodging hotels that are SEPARATE from the venue — do NOT repeat the venue here. List EVERY hotel mentioned, in the order shown, as {place} objects. When sameLocation is false, the FIRST hotel is the main/host hotel and the rest are additional/overflow hotels. When sameLocation is true, the venue holds the host room block and this array holds any ADDITIONAL/overflow hotels (often empty). A page may list one main hotel plus several overflow hotels — capture them ALL.
+- When the venue is also where attendees stay (sameLocation true), put that host room-block booking on the VENUE.
 - Booking fields (on whichever place is the lodging): "groupPrice" = nightly rate as written (e.g. "$129/night"); "groupRateOrBookingCode" = the code/phrase to mention for the convention rate (e.g. "MAGIC26"); "bookingLink" = the direct booking URL; "bookingCutoffDate" = last day to book at that rate (YYYY-MM-DD).
 - "googleMapsUrl": only if an explicit Google Maps link is present in the source; otherwise null (we build one from the address).
 - "amenities": a short list if stated, else [].
@@ -890,16 +891,16 @@ function shapePlace(p: any): ScrapedPlace | null {
 
 function shapeVenueHotel(content: string): ScrapedVenueHotel {
     let p: any = {};
-    try { p = JSON.parse(content); } catch { return { sameLocation: null, venue: null, hotel: null }; }
+    try { p = JSON.parse(content); } catch { return { sameLocation: null, venue: null, hotels: [] }; }
     const venue = shapePlace(p.venue);
-    let hotel = shapePlace(p.hotel);
+    // Accept "hotels" (array) or a legacy single "hotel".
+    const rawHotels = Array.isArray(p.hotels) ? p.hotels : (p.hotel ? [p.hotel] : []);
+    const hotels = rawHotels.map(shapePlace).filter((h: ScrapedPlace | null): h is ScrapedPlace => !!h);
     let sameLocation: boolean | null =
         p.sameLocation === true ? true : p.sameLocation === false ? false : null;
-    // If the model said "separate hotel" but gave none, treat as same-location.
-    if (sameLocation === false && !hotel) sameLocation = true;
-    // Same-location: lodging is the venue, so there is no separate hotel.
-    if (sameLocation === true) hotel = null;
-    return { sameLocation, venue, hotel };
+    // If the model said "separate hotel" but listed none, treat as same-location.
+    if (sameLocation === false && hotels.length === 0) sameLocation = true;
+    return { sameLocation, venue, hotels };
 }
 
 export async function extractVenueHotelFromText(
@@ -907,7 +908,7 @@ export async function extractVenueHotelFromText(
     ctx: { apiKey: string; model: string },
 ): Promise<ScrapedVenueHotel> {
     const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
-    if (!trimmed) return { sameLocation: null, venue: null, hotel: null };
+    if (!trimmed) return { sameLocation: null, venue: null, hotels: [] };
     const content = await callOpenAI(ctx.apiKey, ctx.model, [
         { role: 'system', content: venueHotelSystemPrompt() },
         { role: 'user', content: `Source text:\n${trimmed}` },
@@ -919,7 +920,7 @@ export async function extractVenueHotelFromImages(
     images: string[],
     ctx: { apiKey: string; model: string },
 ): Promise<ScrapedVenueHotel> {
-    if (!images.length) return { sameLocation: null, venue: null, hotel: null };
+    if (!images.length) return { sameLocation: null, venue: null, hotels: [] };
     const userParts: any[] = [
         { type: 'text', text: 'The venue / hotel details are in the following image(s). Read them and return the JSON.' },
         ...images.map((url) => ({ type: 'image_url', image_url: { url } })),

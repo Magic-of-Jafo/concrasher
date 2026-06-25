@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // ── extract: text first, image(s) as fallback ──
-    const hasPlace = (r: ScrapedVenueHotel | null) => !!(r && (r.venue || r.hotel));
+    const hasPlace = (r: ScrapedVenueHotel | null) => !!(r && (r.venue || (r.hotels && r.hotels.length)));
     let result: ScrapedVenueHotel | null = null;
     try {
         if (text.trim()) result = await extractVenueHotelFromText(text, { apiKey, model });
@@ -119,22 +119,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         }, { status: 422 });
     }
 
-    // If the organizer pasted a booking page (it has room-block details but no
+    // If the organizer pasted a single booking page (room-block details but no
     // explicit booking link), use that page URL as the booking link — the page
-    // they pasted IS where attendees reserve (e.g. a Passkey / Cvent link).
-    const fillBookingLink = (pl: any) => {
-        if (pl && pageUrl && !pl.bookingLink && (pl.groupRateOrBookingCode || pl.groupPrice || pl.bookingCutoffDate)) {
-            pl.bookingLink = pageUrl;
-        }
-    };
-    fillBookingLink(result!.venue);
-    fillBookingLink(result!.hotel);
+    // they pasted IS where attendees reserve (e.g. a Passkey / Cvent link). Skip
+    // this for multi-hotel list pages, where the URL isn't one hotel's booking link.
+    const lodgingCount = (result!.venue && result!.sameLocation === true ? 1 : 0) + result!.hotels.length;
+    if (lodgingCount <= 1) {
+        const fillBookingLink = (pl: any) => {
+            if (pl && pageUrl && !pl.bookingLink && (pl.groupRateOrBookingCode || pl.groupPrice || pl.bookingCutoffDate)) {
+                pl.bookingLink = pageUrl;
+            }
+        };
+        fillBookingLink(result!.venue);
+        fillBookingLink(result!.hotels[0]);
+    }
 
     return NextResponse.json({
         success: true,
         source,
         sameLocation: result!.sameLocation,
         venue: result!.venue,
-        hotel: result!.hotel,
+        hotels: result!.hotels,
     });
 }
