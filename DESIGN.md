@@ -13,6 +13,10 @@ colors:
   countdown-blue: "#004d7a"
   ink: "#212121"
   paper: "#ffffff"
+  major-crimson: "#B3122E"
+  major-cobalt: "#1D4ED8"
+  major-violet: "#6D28D9"
+  major-emerald: "#047857"
   surface-gray: "#f5f5f5"
   border-gray: "#e0e0e0"
   legacy-mui-blue: "#1976d2"
@@ -58,7 +62,7 @@ components:
   button-cta:
     backgroundColor: "{colors.gold-spot}"
     textColor: "{colors.blue-wash}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.pill}"
     padding: "12px 48px"
   button-cta-hover:
     backgroundColor: "{colors.gold-spot-warm}"
@@ -190,6 +194,16 @@ Elevation doctrine is **deliberately unsettled** pending the planned redesign; t
 
 ### Pricing Table (signature)
 Dark header cells (near-black on the emphasized channel column), alternating row tints, and the *deal* price set larger and bolder (1.25rem bold vs 1.1rem/500) beside the Deal chip. This is PRODUCT.md's price-anchoring principle in component form — preserve the psychology even as the skin changes.
+
+### Homepage signature elements (normative — the "House Lights Down" language made visible)
+These are the brand's owned visual moves, introduced on the homepage and available to any public surface:
+
+- **The Stage Scene.** The hero background is crafted stage light: a soft-edged beam (cream at ≤0.11 alpha) crossing diagonally behind the headline, a warm pool where it lands on the "stage floor," and a black-alpha vignette on the far side. All light is built from House Cream alphas — **never gold** (the Gold Spot Rule keeps gold for the CTA). A background video may later sit *under* the light overlays; the scene doubles as its fallback so the hero can never go flat.
+- **Stage Tiles.** The imageless-convention placeholder is the same scene in miniature: Blue Wash gradient, one cream spotlight, monogram in cream. The spot's position and wash angle vary deterministically per convention name (5 stagings) so lists never render as identical tiles.
+- **The Featured Marquee.** The first convention in a feed gets a split card — artwork left, auditorium panel right (Blue Wash Deep catching a little stage light), countdown as the kicker, name at display weight. Hierarchy first, phonebook second; exactly one marquee per feed.
+- **The Big Four Plaques.** The four marquee conventions (S.A.M., I.B.M., MAGIC Live, Blackpool) as Paper cards straddling the hero/island seam, each wearing engraved Victorian scrollwork (inline SVG acanthus tile) in its own hue at ~0.13 opacity — the antique-playing-card language with zero suit pips. Hues (AA-safe as kicker text on Paper): crimson #B3122E (S.A.M.), cobalt #1D4ED8 (I.B.M.), violet #6D28D9 (MAGIC Live), emerald #047857 (Blackpool). These hues belong to the plaques only; they are not general accents. Hover wakes the scrollwork (opacity ~0.22) and lifts the card. Cards bind to their next listed edition dynamically and degrade to a static descriptor when none is upcoming.
+- *(Retired: the Magic Words Strip. Its slot above the closing beat is reserved for the planned organizer-curated event ticker.)*
+- **Load choreography.** Hero content rises (`home-rise`: 14px translate + fade, 0.7s cubic-bezier(0.22,1,0.36,1), ~90ms stagger) while the light blooms (`home-bloom`, 1.6s). Keyframes live in globals.css; reduced-motion disables both. This is the page's one orchestrated moment — don't add scroll-reveals to every section.
 
 ## 6. Do's and Don'ts
 

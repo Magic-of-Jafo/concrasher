@@ -1,7 +1,9 @@
-import ConventionFeed from "@/components/features/ConventionFeed";
 import { db } from "@/lib/db";
 import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
+import HomePage from "@/components/home/HomePage";
+import { HomeConvention, countryToRegion } from "@/components/home/home-types";
+import { pickHeroMessage } from "@/components/home/headlines";
 
 // Render against live data on each request. Without this, Next.js statically
 // renders the home page at build time and freezes the convention list (and their
@@ -9,16 +11,18 @@ import { Metadata } from 'next';
 // deploy never appear on the cards.
 export const dynamic = 'force-dynamic';
 
-async function getPublishedConventions() {
+async function getUpcomingConventions(): Promise<{
+  conventions: HomeConvention[];
+  loadFailed: boolean;
+}> {
   try {
-    const conventions = await db.convention.findMany({
+    const rows = await db.convention.findMany({
       where: {
         status: ConventionStatus.PUBLISHED,
         deletedAt: null,
+        startDate: { not: null },
       },
-      orderBy: {
-        startDate: 'asc',
-      },
+      orderBy: { startDate: 'asc' },
       select: {
         id: true,
         name: true,
@@ -31,21 +35,40 @@ async function getPublishedConventions() {
         country: true,
         coverImageUrl: true,
         profileImageUrl: true,
-        tags: true,
-        series: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          }
-        }
-      }
+      },
     });
-    return conventions;
+
+    // Keep events that haven't ended yet (server-side; no client gate).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const conventions: HomeConvention[] = rows
+      .filter((row) => {
+        const end = row.endDate ?? row.startDate;
+        if (!end) return false;
+        const endDay = new Date(end);
+        endDay.setHours(0, 0, 0, 0);
+        return endDay.getTime() >= today.getTime();
+      })
+      .map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        city: row.city,
+        stateAbbreviation: row.stateAbbreviation,
+        stateName: row.stateName,
+        country: row.country,
+        startDate: row.startDate ? row.startDate.toISOString() : null,
+        endDate: row.endDate ? row.endDate.toISOString() : null,
+        imageUrl: row.profileImageUrl || row.coverImageUrl || null,
+        region: countryToRegion(row.country),
+      }));
+
+    return { conventions, loadFailed: false };
   } catch (error) {
     console.error("Failed to fetch conventions:", error);
-    // In case of a database error, return an empty array to prevent the page from crashing.
-    return [];
+    // Surface an honest error state instead of masquerading as an empty list.
+    return { conventions: [], loadFailed: true };
   }
 }
 
@@ -75,6 +98,9 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const conventions = await getPublishedConventions();
-  return <ConventionFeed conventions={conventions} />;
+  const { conventions, loadFailed } = await getUpcomingConventions();
+  // Server-side pick: each request (the page is force-dynamic) gets one of the
+  // objection-answering hero messages at random.
+  const heroMessage = pickHeroMessage();
+  return <HomePage conventions={conventions} loadFailed={loadFailed} heroMessage={heroMessage} />;
 }
