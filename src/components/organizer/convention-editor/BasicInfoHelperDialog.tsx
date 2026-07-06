@@ -130,7 +130,7 @@ export default function BasicInfoHelperDialog({
                 {!preview ? (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Point the helper at the event&apos;s page — paste a link, or upload a flyer/PDF — and it&apos;ll pull out the name, dates, location, description, and links. You&apos;ll review everything before it fills the form.
+                            Point the helper at the event&apos;s page (paste a link, or upload a flyer/PDF) and it&apos;ll pull out the name, dates, location, description, and links. You&apos;ll review everything before it fills the form.
                         </Typography>
 
                         <ToggleButtonGroup exclusive fullWidth size="small" value={sourceType} onChange={(_, v) => v && setSourceType(v)} sx={{ mb: 2 }}>

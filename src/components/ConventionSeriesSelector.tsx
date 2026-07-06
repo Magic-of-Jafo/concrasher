@@ -176,7 +176,7 @@ export default function ConventionSeriesSelector({
 
       {/* Toggler Button and Title Logic */}
       <Box sx={{ my: 2, textAlign: 'center' }}>
-        {series.length > 0 && !isCreatingNew && <Typography>— OR —</Typography>}
+        {series.length > 0 && !isCreatingNew && <Typography>or</Typography>}
 
         {series.length > 0 && (
           <Button variant="outlined" onClick={handleToggleCreateNew} sx={{ mt: 1 }}>

@@ -377,7 +377,7 @@ export const BasicInfoTab: React.FC<BasicInfoTabProps> = ({
               onChange={handleSeriesChange}
               sx={{ maxWidth: 480 }}
               renderInput={(params) => (
-                <TextField {...params} label="Series" helperText="Reassign this convention to a different series — saved immediately." />
+                <TextField {...params} label="Series" helperText="Reassign this convention to a different series. Saved immediately." />
               )}
             />
           </Paper>

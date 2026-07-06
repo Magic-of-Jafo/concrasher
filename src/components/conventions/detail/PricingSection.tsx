@@ -148,7 +148,7 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
                                         {secondary === null ? (
-                                            <Typography variant="body1" sx={{ color: 'text.disabled' }}>—</Typography>
+                                            <Typography variant="body1" sx={{ color: 'text.disabled' }}>–</Typography>
                                         ) : (
                                             renderChannelCell(secondary, primary)
                                         )}
@@ -228,7 +228,7 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                     return (
                                         <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.50', py: 2.5, px: 2 }}>
                                             <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'text.disabled' : 'inherit' }}>
-                                                {cellPrice === null ? '—' : formatPrice(cellPrice, currencySymbol, currencyCode)}
+                                                {cellPrice === null ? '–' : formatPrice(cellPrice, currencySymbol, currencyCode)}
                                             </Typography>
                                         </TableCell>
                                     );
@@ -407,7 +407,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                 sx={{ display: 'block', mt: 1.5, mx: 'auto', maxWidth: 520, textAlign: 'center', fontStyle: 'italic' }}
             >
                 {hasRegistrationUrl ? (
-                    'Click above to register or to see the most current event pricing. Prices here are a guide and may change — the official event page is always the final word.'
+                    'Click above to register or to see the most current event pricing. Prices here are a guide and may change; the official event page is always the final word.'
                 ) : officialPricingUrl ? (
                     <>
                         Prices here are a guide and may change. If anything differs from the{' '}

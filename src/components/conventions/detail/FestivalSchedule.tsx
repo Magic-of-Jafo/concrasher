@@ -139,7 +139,7 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
                                         {typeof p.startTimeMinutes === 'number' ? ` · ${fmtMins(p.startTimeMinutes)}` : ''}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        {[p.venue?.venueName, p.locationName].filter(Boolean).join(' — ')}
+                                        {[p.venue?.venueName, p.locationName].filter(Boolean).join(' · ')}
                                     </Typography>
                                 </Box>
                             ))}

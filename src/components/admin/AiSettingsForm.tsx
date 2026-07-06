@@ -127,7 +127,7 @@ export default function AiSettingsForm() {
                         value={model}
                         onChange={e => setModel(e.target.value)}
                         helperText={modelsError
-                            ? `Couldn't load the model list (${modelsError}) — enter a model name manually.`
+                            ? `Couldn't load the model list (${modelsError}). Enter a model name manually.`
                             : 'Save a valid API key to load the model list from your OpenAI account.'}
                     />
                 )}
