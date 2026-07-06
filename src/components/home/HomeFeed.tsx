@@ -11,7 +11,7 @@ import {
   monthKey,
   monthLabel,
 } from './home-types';
-import { ListCard, FeaturedCard } from './HomeConventionCard';
+import { ListCard } from './HomeConventionCard';
 
 const HORIZON_DAYS = 120;
 
@@ -39,10 +39,8 @@ export default function HomeFeed({ conventions }: { conventions: HomeConvention[
     return { nearGroups: group(near), laterGroups: group(later) };
   }, [conventions]);
 
-  // The feed's very first convention gets the marquee treatment; everything
-  // after it stays a scannable phonebook row.
-  const renderGroups = (groups: [string, HomeConvention[]][], featureFirst = false) =>
-    groups.map(([key, items], groupIdx) => (
+  const renderGroups = (groups: [string, HomeConvention[]][]) =>
+    groups.map(([key, items]) => (
       <Box key={key} component="section" sx={{ mb: 5 }}>
         <Box
           sx={{
@@ -73,13 +71,9 @@ export default function HomeFeed({ conventions }: { conventions: HomeConvention[
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {items.map((c, i) =>
-            featureFirst && groupIdx === 0 && i === 0 ? (
-              <FeaturedCard key={c.id} convention={c} />
-            ) : (
-              <ListCard key={c.id} convention={c} />
-            ),
-          )}
+          {items.map((c) => (
+            <ListCard key={c.id} convention={c} />
+          ))}
         </Box>
       </Box>
     ));
@@ -131,7 +125,7 @@ export default function HomeFeed({ conventions }: { conventions: HomeConvention[
         </Typography>
       ) : (
         <>
-          {renderGroups(nearGroups, true)}
+          {renderGroups(nearGroups)}
           {laterGroups.length > 0 &&
             (showLater ? (
               renderGroups(laterGroups)
