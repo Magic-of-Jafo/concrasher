@@ -8,6 +8,8 @@ import {
     fetchImageAsDataUrl,
     bufferToDataUrl,
     pdfToText,
+    pdfToImages,
+    PDF_TEXT_MIN_CHARS,
     extractVenueHotelFromText,
     extractVenueHotelFromImages,
     type ScrapedVenueHotel,
@@ -68,8 +70,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let pageUrl = ''; // the explicitly-pasted page URL — used as the booking link below
     try {
         if (sourceType === 'pdf' && pdfData) {
-            text = await pdfToText(pdfData);
+            text = await pdfToText(pdfData.slice(0));
             source = 'Uploaded PDF';
+            // No text layer (scan / flattened design export): render the pages
+            // and read them with the vision model instead.
+            if (text.trim().length < PDF_TEXT_MIN_CHARS) {
+                images = await pdfToImages(pdfData);
+                if (images.length) source = 'Uploaded PDF (pages read as images)';
+            }
         } else if (sourceType === 'image' && imageData) {
             images = [bufferToDataUrl(imageMime, Buffer.from(imageData))];
             source = 'Uploaded image';
@@ -92,7 +100,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (!text.trim() && !images.length) {
-        return NextResponse.json({ error: 'We couldn\'t read anything from that page — its content is likely built with JavaScript (common for Wix, Squarespace, Eventbrite, and OvationTix), which this tool can\'t read directly. Take a screenshot of the venue/hotel info and use the Image option — you can paste it straight from your clipboard.' }, { status: 422 });
+        const error = sourceType === 'pdf'
+            ? 'This PDF doesn\'t contain readable text. It was likely exported as a scan or a flattened design, so the pages are pictures rather than text. Take a screenshot of the venue/hotel info and use the Image option; you can paste it straight from your clipboard.'
+            : 'We couldn\'t read anything from that page. Its content is likely built with JavaScript (common for Wix, Squarespace, Eventbrite, and OvationTix), which this tool can\'t read directly. Take a screenshot of the venue/hotel info and use the Image option; you can paste it straight from your clipboard.';
+        return NextResponse.json({ error }, { status: 422 });
     }
 
     // ── extract: text first, image(s) as fallback ──
@@ -114,7 +125,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         const likelyJsApp = !images.length && text.trim().length < 1500;
         return NextResponse.json({
             error: likelyJsApp
-                ? 'We couldn\'t read venue details from that page. Many event sites build their content with JavaScript that this tool can\'t see. Take a screenshot of the venue/hotel info and use the Image option — you can paste it straight from your clipboard.'
+                ? 'We couldn\'t read venue details from that page. Many event sites build their content with JavaScript that this tool can\'t see. Take a screenshot of the venue/hotel info and use the Image option; you can paste it straight from your clipboard.'
                 : 'Couldn\'t find venue or hotel details in that source. Try the venue/travel page or a clearer image.',
         }, { status: 422 });
     }

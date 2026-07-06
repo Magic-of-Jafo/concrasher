@@ -8,6 +8,10 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Native module (ships a .node binary webpack can't bundle): load it from
+    // node_modules at runtime instead. Used by the scraper helpers to render
+    // scanned PDFs for the vision model.
+    serverComponentsExternalPackages: ['@napi-rs/canvas'],
   },
   eslint: {
     // Completely disable ESLint during builds
@@ -19,6 +23,14 @@ const nextConfig = {
   },
   // Additional webpack config to ensure ESLint is bypassed
   webpack: (config, { isServer, dev }) => {
+    // @napi-rs/canvas ships a native .node binary webpack can't parse; resolve
+    // it from node_modules at runtime (belt-and-suspenders alongside
+    // experimental.serverComponentsExternalPackages above).
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('@napi-rs/canvas');
+    }
+
     // Disable ESLint webpack plugin
     const eslintPlugin = config.plugins.find(
       (plugin) => plugin.constructor.name === 'ESLintWebpackPlugin'

@@ -11,6 +11,8 @@ import {
     fetchImageAsDataUrl,
     bufferToDataUrl,
     pdfToText,
+    pdfToImages,
+    PDF_TEXT_MIN_CHARS,
     applyScrapedSchedule,
     extractFestivalFromText,
     extractFestivalFromImages,
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Festivals carry their own dates in the programme and the helper sets them
     // on apply; regular schedules are anchored to a pre-set start date.
     if (!festival && !conv.startDate) {
-        return NextResponse.json({ error: "Set the convention's start date first — the schedule is anchored to it." }, { status: 400 });
+        return NextResponse.json({ error: "Set the convention's start date first; the schedule is anchored to it." }, { status: 400 });
     }
     const festivalYear = conv.startDate ? new Date(conv.startDate).getUTCFullYear() : new Date().getUTCFullYear();
 
@@ -101,8 +103,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let source = '';
     try {
         if (sourceType === 'pdf' && pdfData) {
-            text = await pdfToText(pdfData);
+            text = await pdfToText(pdfData.slice(0));
             source = 'Uploaded PDF';
+            // No text layer (scan / flattened design export): render the pages
+            // and read them with the vision model instead.
+            if (text.trim().length < PDF_TEXT_MIN_CHARS) {
+                images = await pdfToImages(pdfData);
+                if (images.length) source = 'Uploaded PDF (pages read as images)';
+            }
         } else if (sourceType === 'image' && imageData) {
             images = [bufferToDataUrl(imageMime, Buffer.from(imageData))];
             source = 'Uploaded image';
@@ -131,7 +139,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     if (!text.trim() && !images.length) {
-        return NextResponse.json({ error: 'We couldn\'t read anything from that page — its content is likely built with JavaScript (common for Wix, Squarespace, and Eventbrite), which this tool can\'t read directly. Take a screenshot of the schedule and use the Image option — you can paste it straight from your clipboard.' }, { status: 422 });
+        const error = sourceType === 'pdf'
+            ? 'This PDF doesn\'t contain readable text. It was likely exported as a scan or a flattened design, so the pages are pictures rather than text. Take a screenshot of the schedule and use the Image option; you can paste it straight from your clipboard.'
+            : 'We couldn\'t read anything from that page. Its content is likely built with JavaScript (common for Wix, Squarespace, and Eventbrite), which this tool can\'t read directly. Take a screenshot of the schedule and use the Image option; you can paste it straight from your clipboard.';
+        return NextResponse.json({ error }, { status: 422 });
     }
 
     // ── festival branch: extract SHOWS with their performances ──

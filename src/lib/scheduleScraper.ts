@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 import { EVENT_TYPES } from '@/lib/eventTypes';
 import { setEventTalent } from '@/lib/talent';
-import { browserosRender } from '@/lib/browserosRender';
+import { browserosRender, browserosRenderRich } from '@/lib/browserosRender';
 
 /**
  * Schedule scraper core — turns a schedule source (web page, PDF, or a
@@ -211,6 +211,43 @@ export async function pdfToText(data: ArrayBuffer | Uint8Array): Promise<string>
     return String(Array.isArray(text) ? text.join('\n') : text).slice(0, MAX_TEXT_CHARS);
 }
 
+// A PDF whose extracted text is shorter than this is treated as having no real
+// text layer (scans, flattened design exports) and gets rendered for vision.
+export const PDF_TEXT_MIN_CHARS = 100;
+
+/**
+ * Render a PDF's pages to PNG data URLs for the vision model. The fallback for
+ * PDFs with no text layer. Uses @napi-rs/canvas under the hood (via unpdf);
+ * returns as many pages as rendered successfully, up to maxPages.
+ */
+export async function pdfToImages(
+    data: ArrayBuffer | Uint8Array,
+    { maxPages = 4, scale = 2 }: { maxPages?: number; scale?: number } = {},
+): Promise<string[]> {
+    const { getDocumentProxy, renderPageAsImage } = await import('unpdf');
+    // Copy the bytes: the caller's buffer may already have been consumed by
+    // pdfToText, and pdf.js can transfer ownership of what it's given.
+    const bytes = data instanceof Uint8Array ? new Uint8Array(data) : new Uint8Array(data.slice(0));
+    const pdf = await getDocumentProxy(bytes);
+    const pages = Math.min(pdf.numPages, maxPages);
+    const images: string[] = [];
+    for (let p = 1; p <= pages; p++) {
+        try {
+            const dataUrl = await renderPageAsImage(pdf, p, {
+                // webpackIgnore: the package ships a native .node binary that
+                // webpack must never try to bundle; Node resolves it at runtime.
+                canvasImport: () => import(/* webpackIgnore: true */ '@napi-rs/canvas'),
+                scale,
+                toDataURL: true,
+            });
+            if (dataUrl) images.push(dataUrl);
+        } catch (e: any) {
+            console.error(`pdfToImages: page ${p} render failed:`, e?.message || e);
+        }
+    }
+    return images;
+}
+
 // Present as a real browser. Many event sites sit behind Cloudflare/WAFs that
 // 403 obvious bot User-Agents; a normal browser UA + Accept headers clears the
 // simple header-based blocks (full JS challenges still need the Image fallback).
@@ -312,15 +349,24 @@ export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image
         const server = (res.headers.get('server') || '').toLowerCase();
         const challenged = res.headers.get('cf-mitigated') || server.includes('cloudflare') || res.status === 403 || res.status === 503;
         if (challenged) {
-            const rendered = await browserosRender(url); // real-browser fallback (if configured)
-            if (rendered && rendered.trim()) return { kind: 'html', text: rendered, images: [] };
-            throw new Error("This page is protected by a bot challenge (e.g. Cloudflare) that this tool can't read directly. Take a screenshot of the info and use the Image option — you can paste it straight from your clipboard.");
+            // Real-browser fallback (if configured): returns page text AND a full-page
+            // screenshot, so even if text extraction fails the vision path can read it.
+            const rendered = await browserosRenderRich(url);
+            const shot = rendered.image ? [rendered.image] : [];
+            if ((rendered.text && rendered.text.trim()) || shot.length) {
+                return { kind: 'html', text: rendered.text || '', images: shot };
+            }
+            throw new Error("This page is protected by a bot challenge (e.g. Cloudflare) that this tool can't read directly. Take a screenshot of the info and use the Image option; you can paste it straight from your clipboard.");
         }
         throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
     }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/pdf') || /\.pdf(\?|$)/i.test(url)) {
-        return { kind: 'pdf', text: await pdfToText(await res.arrayBuffer()), images: [] };
+        const ab = await res.arrayBuffer();
+        const text = await pdfToText(ab.slice(0));
+        // Scanned / flattened PDFs have no text layer: render pages for vision.
+        const images = text.trim().length >= PDF_TEXT_MIN_CHARS ? [] : await pdfToImages(ab);
+        return { kind: 'pdf', text, images };
     }
     if (ct.startsWith('image/') || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url)) {
         const buf = Buffer.from(await res.arrayBuffer());
@@ -335,10 +381,12 @@ export async function gatherFromUrl(url: string): Promise<{ kind: 'pdf' | 'image
         if (images.length >= 4) break;
     }
     // JS-rendered shells (Wix, Squarespace, etc.) strip down to almost nothing.
-    // Re-render in a real browser if one is configured.
+    // Re-render in a real browser if one is configured, and keep its screenshot as
+    // a vision fallback for content our text extraction can't reach (iframes, etc.).
     if (text.trim().length < 150) {
-        const rendered = await browserosRender(url);
-        if (rendered && rendered.trim().length > text.trim().length) text = rendered;
+        const rendered = await browserosRenderRich(url);
+        if (rendered.text && rendered.text.trim().length > text.trim().length) text = rendered.text;
+        if (rendered.image) images.push(rendered.image);
     }
     return { kind: 'html', text, images };
 }
@@ -930,4 +978,117 @@ export async function extractVenueHotelFromImages(
         { role: 'user', content: userParts },
     ]);
     return shapeVenueHotel(content);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Site link discovery — given a convention's main website URL, find the
+// sub-pages the wizard's later steps need (schedule, pricing/registration,
+// hotel/venue, talent). Keyword heuristics over the page's links; no LLM call.
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface DiscoveredLinks {
+    schedule: string | null;
+    pricing: string | null;
+    hotel: string | null;
+    talent: string | null;
+}
+
+// Scored keyword patterns per section. A link's href path scores double; its
+// visible text scores single. Highest score wins the section.
+const LINK_PATTERNS: Record<keyof DiscoveredLinks, RegExp> = {
+    schedule: /\b(schedule|program(me)?s?|agenda|events?|timetable|line-?up)\b/i,
+    pricing: /\b(regist(er|ration)?|tickets?|pric(e|es|ing)|fees?|attend|book(ing)?|join)\b/i,
+    hotel: /\b(hotels?|venue|travel|stay|accommodat\w*|lodging|location|getting[- ]there)\b/i,
+    talent: /\b(artists?|performers?|talent|guests?|stars?|magicians?|lecturers?|speakers?|line-?up|who'?s[- ]coming)\b/i,
+};
+
+// Off-site hosts that ARE the section page for many conventions (room-block
+// booking engines, ticketing platforms). A host match is the strongest signal.
+const EXTERNAL_HOSTS: Partial<Record<keyof DiscoveredLinks, RegExp>> = {
+    hotel: /(?:^|\.)(passkey\.com|cvent\.com|hilton\.com|marriott\.com|hyatt\.com|ihg\.com|wyndhamhotels\.com|choicehotels\.com|bestwestern\.com)$/i,
+    pricing: /(?:^|\.)(eventbrite\.[a-z.]+|ovationtix\.com|ticketleap\.com|showclix\.com|universe\.com|ti\.to|tickettailor\.com|brownpapertickets\.com|regfox\.com|eventzilla\.net)$/i,
+};
+
+/** Extract [text, absoluteUrl] pairs from raw HTML anchors or markdown links. */
+function extractLinks(content: string, baseUrl: string): Array<{ text: string; url: string }> {
+    const out: Array<{ text: string; url: string }> = [];
+    const push = (href: string, text: string) => {
+        try {
+            const abs = new URL(href, baseUrl);
+            if (!/^https?:$/.test(abs.protocol)) return;
+            abs.hash = '';
+            out.push({ text: (text || '').replace(/\s+/g, ' ').trim(), url: abs.toString() });
+        } catch { /* unparseable href */ }
+    };
+    // HTML anchors
+    const aRe = /<a\b[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = aRe.exec(content))) push(m[1], m[2].replace(/<[^>]+>/g, ' '));
+    // Markdown links (BrowserOS renders pages as markdown)
+    const mdRe = /\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g;
+    while ((m = mdRe.exec(content))) push(m[2], m[1]);
+    return out;
+}
+
+/**
+ * Discover a convention site's section pages from its main URL. Fetches the
+ * page (falling back to a real-browser render for bot-challenged / JS-shell
+ * sites), then classifies same-host links by keyword. Best-effort: sections
+ * without a confident match come back null and the organizer pastes that
+ * section's URL manually on its wizard step.
+ */
+export async function discoverSiteLinks(url: string): Promise<DiscoveredLinks> {
+    const none: DiscoveredLinks = { schedule: null, pricing: null, hotel: null, talent: null };
+
+    let content = '';
+    let finalUrl = url;
+    try {
+        const res = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(30000) });
+        if (res.ok) {
+            finalUrl = res.url || url;
+            content = await res.text();
+            // JS shells have markup but no real anchor text; still parseable, so keep it.
+        }
+        if (!res.ok || extractLinks(content, finalUrl).length < 3) {
+            const rendered = await browserosRender(url);
+            if (rendered) content = content + '\n' + rendered;
+        }
+    } catch {
+        const rendered = await browserosRender(url);
+        if (!rendered) return none;
+        content = rendered;
+    }
+    if (!content) return none;
+
+    let host = '';
+    try { host = new URL(finalUrl).host.replace(/^www\./, ''); } catch { return none; }
+
+    const allLinks = extractLinks(content, finalUrl);
+    const hostOf = (u: string) => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
+    const sameHostLinks = allLinks.filter((l) => hostOf(l.url) === host);
+
+    const result: DiscoveredLinks = { ...none };
+    for (const section of Object.keys(LINK_PATTERNS) as Array<keyof DiscoveredLinks>) {
+        const re = LINK_PATTERNS[section];
+        const externalRe = EXTERNAL_HOSTS[section];
+        let best: { url: string; score: number } | null = null;
+        // Same-host pages: path match beats text match.
+        for (const l of sameHostLinks) {
+            let path = '';
+            try { path = decodeURIComponent(new URL(l.url).pathname); } catch { /* keep '' */ }
+            const score = (re.test(path) ? 2 : 0) + (re.test(l.text) ? 1 : 0);
+            if (score > 0 && (!best || score > best.score)) best = { url: l.url, score };
+        }
+        // Known external booking/ticketing hosts: the strongest signal there is.
+        if (externalRe) {
+            for (const l of allLinks) {
+                const h = hostOf(l.url);
+                if (h && h !== host && externalRe.test(h)) { best = { url: l.url, score: 3 }; break; }
+            }
+        }
+        result[section] = best?.url ?? null;
+    }
+    // The same page often serves venue+hotel or schedule+talent; that's fine —
+    // each step's helper reads whatever its page contains.
+    return result;
 }
