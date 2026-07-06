@@ -26,6 +26,7 @@ import {
   Publish as PublishIcon,
   RestoreFromTrash as RestoreIcon,
   Visibility as ViewIcon,
+  AutoAwesome as WizardIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -66,6 +67,11 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
   const handleEdit = () => {
     handleMenuClose();
     router.push(`/organizer/conventions/${convention?.id}/edit`);
+  };
+
+  const handleWizard = () => {
+    handleMenuClose();
+    router.push(`/organizer/conventions/${convention?.id}/wizard`);
   };
 
   const duplicateMutation = useMutation({
@@ -253,11 +259,17 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
               </ListItemIcon>
               <ListItemText>View</ListItemText>
             </MenuItem>,
+            <MenuItem key="wizard" onClick={handleWizard}>
+              <ListItemIcon>
+                <WizardIcon fontSize="small" color="primary" />
+              </ListItemIcon>
+              <ListItemText>Continue in wizard</ListItemText>
+            </MenuItem>,
             <MenuItem key="edit" onClick={handleEdit}>
               <ListItemIcon>
                 <EditIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>Edit</ListItemText>
+              <ListItemText>Edit (advanced)</ListItemText>
             </MenuItem>,
             <MenuItem key="duplicate" onClick={handleDuplicate}>
               <ListItemIcon>

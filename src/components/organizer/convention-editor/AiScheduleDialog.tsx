@@ -50,16 +50,18 @@ const GEN_STAGES = [
 ];
 
 export default function AiScheduleDialog({
-    open, onClose, conventionId, hasExistingEvents, onApplied,
+    open, onClose, conventionId, hasExistingEvents, onApplied, initialUrl,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
     hasExistingEvents: boolean;
     onApplied: (summary: { days: number; events: number; talent: number }) => void;
+    /** Pre-fill the URL field (e.g. a page the wizard discovered). */
+    initialUrl?: string;
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
-    const [url, setUrl] = useState('');
+    const [url, setUrl] = useState(initialUrl || '');
     const [file, setFile] = useState<File | null>(null);
     const [replace, setReplace] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -174,7 +176,7 @@ export default function AiScheduleDialog({
                 {!preview ? (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Point the helper at your schedule — paste a link, scan the website, or upload a PDF — and it'll pull out the events, times, and performers for you. You'll preview everything before anything is saved.
+                            Point the helper at your schedule (paste a link, scan the website, or upload a PDF) and it'll pull out the events, times, and performers for you. You'll preview everything before anything is saved.
                         </Typography>
 
                         <ToggleButtonGroup

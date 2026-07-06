@@ -76,15 +76,17 @@ function PlacePreview({ title, place }: { title: string; place: ScrapedPlaceResu
 }
 
 export default function VenueHotelHelperDialog({
-    open, onClose, conventionId, onApplied,
+    open, onClose, conventionId, onApplied, initialUrl,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
     onApplied: (result: VenueHotelResult) => void;
+    /** Pre-fill the URL field (e.g. a page the wizard discovered). */
+    initialUrl?: string;
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
-    const [url, setUrl] = useState('');
+    const [url, setUrl] = useState(initialUrl || '');
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

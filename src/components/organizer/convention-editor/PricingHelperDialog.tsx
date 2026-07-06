@@ -32,15 +32,17 @@ const GEN_STAGES = [
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 export default function PricingHelperDialog({
-    open, onClose, conventionId, onApplied,
+    open, onClose, conventionId, onApplied, initialUrl,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
     onApplied: (tables: PriceTableResult[], currency: string | null) => void;
+    /** Pre-fill the URL field (e.g. a page the wizard discovered). */
+    initialUrl?: string;
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
-    const [url, setUrl] = useState('');
+    const [url, setUrl] = useState(initialUrl || '');
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

@@ -47,16 +47,18 @@ const GEN_STAGES = [
 ];
 
 export default function FestivalHelperDialog({
-    open, onClose, conventionId, hasExistingShows, onApplied,
+    open, onClose, conventionId, hasExistingShows, onApplied, initialUrl,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
     hasExistingShows: boolean;
     onApplied: (summary: { shows: number; performances: number; venues: number; talent: number }) => void;
+    /** Pre-fill the URL field (e.g. a page the wizard discovered). */
+    initialUrl?: string;
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
-    const [url, setUrl] = useState('');
+    const [url, setUrl] = useState(initialUrl || '');
     const [file, setFile] = useState<File | null>(null);
     const [replace, setReplace] = useState(false);
     const [loading, setLoading] = useState(false);

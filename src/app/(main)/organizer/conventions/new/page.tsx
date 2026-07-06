@@ -14,6 +14,7 @@ import {
 import ConventionSeriesSelector from '@/components/ConventionSeriesSelector';
 import ConventionEditorTabs, { type ConventionDataForEditor } from '@/components/organizer/convention-editor/ConventionEditorTabs';
 import { type BasicInfoFormData } from '@/lib/validators';
+import { slugify } from '@/lib/utils';
 
 // Define ConventionSeries interface locally
 interface ConventionSeries {
@@ -36,7 +37,7 @@ export default function NewConventionPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
 
-  const [currentStep, setCurrentStep] = useState<'selectSeries' | 'editDetails'>('selectSeries');
+  const [currentStep, setCurrentStep] = useState<'selectSeries' | 'nameIt' | 'editDetails'>('selectSeries');
   // This state will hold the seriesId and any other top-level data not in BasicInfoTab
   const [topLevelConventionData, setTopLevelConventionData] = useState<Partial<BasicInfoFormData>>(pageInitialConventionData);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,15 +53,39 @@ export default function NewConventionPage() {
     }
   }, [sessionStatus, session, router]);
 
-  const handleExistingSeriesSelected = (selectedSeriesId: string | null) => {
-    if (selectedSeriesId) {
-      setTopLevelConventionData(prevData => ({
-        ...prevData,
-        seriesId: selectedSeriesId,
-      }));
-      setCurrentStep('editDetails');
-      setSeriesError(null);
+  // Once a series is chosen, create the DRAFT immediately and jump into the
+  // wizard — no name step. The wizard adopts the real name from the website
+  // import (and the organizer can rename inline anytime). A placeholder name +
+  // random slug keeps the row valid until then.
+  const createDraftAndGoToWizard = async (seriesId: string, suggestedName?: string) => {
+    setIsSaving(true);
+    setError(null);
+    setSeriesError(null);
+    const name = (suggestedName && suggestedName.trim()) || 'Untitled convention';
+    const create = async (slug: string) =>
+      fetch('/api/organizer/conventions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, seriesId, isTBD: true, isOneDayEvent: false }),
+      });
+    try {
+      const rand = () => Math.random().toString(36).slice(2, 8);
+      let response = await create(`${slugify(name)}-${rand()}`);
+      if (response.status === 409) response = await create(`${slugify(name)}-${rand()}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create convention');
+      }
+      const newConvention = await response.json();
+      router.push(`/organizer/conventions/${newConvention.id}/wizard`);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.');
+      setIsSaving(false);
     }
+  };
+
+  const handleExistingSeriesSelected = (selectedSeriesId: string | null) => {
+    if (selectedSeriesId) createDraftAndGoToWizard(selectedSeriesId);
   };
 
   const handleNewSeriesCreated = async (newSeriesData: NewSeriesData) => {
@@ -72,22 +97,16 @@ export default function NewConventionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSeriesData),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to create new series');
       }
       const responseData = await response.json();
-      const createdSeries: ConventionSeries = responseData.series; // Extract the series from the wrapper
-
-      setTopLevelConventionData(prevData => ({
-        ...prevData,
-        seriesId: createdSeries.id,
-      }));
-      setCurrentStep('editDetails');
+      const createdSeries: ConventionSeries = responseData.series;
+      // Seed the draft's name from the series name (nicer starting point).
+      await createDraftAndGoToWizard(createdSeries.id, createdSeries.name);
     } catch (err: any) {
       setSeriesError(err.message || 'An unexpected error occurred while creating the series.');
-    } finally {
       setIsSaving(false);
     }
   };
@@ -165,10 +184,18 @@ export default function NewConventionPage() {
             Every convention must belong to a series. Select an existing series or create a new one to begin.
           </Typography>
           {seriesError && <Alert severity="error" sx={{ mb: 2 }}>{seriesError}</Alert>}
-          <ConventionSeriesSelector
-            onSeriesSelect={handleExistingSeriesSelected}
-            onNewSeriesCreate={handleNewSeriesCreated}
-          />
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {isSaving ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 4 }}>
+              <CircularProgress size={22} />
+              <Typography color="text.secondary">Setting up your convention…</Typography>
+            </Box>
+          ) : (
+            <ConventionSeriesSelector
+              onSeriesSelect={handleExistingSeriesSelected}
+              onNewSeriesCreate={handleNewSeriesCreated}
+            />
+          )}
         </Paper>
       ) : (
         <Paper elevation={2} sx={{ p: { xs: 2, md: 4 } }}>
