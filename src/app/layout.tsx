@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono, Montserrat } from "next/font/google";
+import { Inter, Roboto_Mono, Montserrat, Open_Sans } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/providers/session-provider";
 import QueryProvider from "@/components/providers/query-provider";
@@ -31,6 +31,15 @@ const montserrat = Montserrat({
   subsets: ['latin'],
   variable: '--font-montserrat',
   weight: ['400', '700', '800'],
+  display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'arial'],
+});
+
+const openSans = Open_Sans({
+  subsets: ['latin'],
+  variable: '--font-open-sans',
+  weight: ['400', '600', '700'],
   display: 'swap',
   preload: true,
   fallback: ['system-ui', 'arial'],
@@ -73,8 +82,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
+    <html lang="en" className={`${inter.variable} ${montserrat.variable} ${openSans.variable}`} suppressHydrationWarning>
       <head>
+        {/* House Lights theme: apply the saved choice before first paint so the
+            page never flashes the wrong theme. Dark ("house lights down") is
+            the default; only an explicit "light" choice is persisted. */}
+        <Script id="house-lights-init" strategy="beforeInteractive">
+          {`try { if (localStorage.getItem('cc-house-lights') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}`}
+        </Script>
         {/* Preconnect to external domains for performance */}
         <link rel="preconnect" href="https://www.clarity.ms" />
         <link rel="preconnect" href="https://www.googletagmanager.com" />

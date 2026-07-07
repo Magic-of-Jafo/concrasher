@@ -17,6 +17,23 @@ colors:
   major-cobalt: "#1D4ED8"
   major-violet: "#6D28D9"
   major-emerald: "#047857"
+  night-bg: "#14032b"
+  night-ink: "#f3ecff"
+  night-muted: "#c9b6ea"
+  night-soft: "#8f7bb1"
+  neon-magenta: "#ff2e88"
+  neon-cyan: "#29e6ff"
+  marquee-gold: "#ffd76a"
+  marquee-gold-ink: "#2b1150"
+  night-live: "#6dffb0"
+  day-bg: "#f7f4fc"
+  day-ink: "#1d1035"
+  day-muted: "#4b3a6e"
+  day-soft: "#6b5c8f"
+  day-magenta: "#c40e63"
+  day-violet: "#6d28d9"
+  day-gold: "#f2c04b"
+  day-live: "#0a7a43"
   surface-gray: "#f5f5f5"
   border-gray: "#e0e0e0"
   legacy-mui-blue: "#1976d2"
@@ -125,6 +142,9 @@ A dark theatrical wash with a single precious accent: deep stage-light blue, hit
 - **House Cream** (#f5f5dc): display text on Blue Wash only (the hero headline). Never a background; never body text.
 - **Surface Gray** (#f5f5f5) / **Border Gray** (#e0e0e0): quiet fills and hairlines in organizer tooling.
 - **Legacy MUI Blue** (#1976d2): the untouched Material-UI default `primary.main`, still inherited by chips, links, and buttons. **Placeholder. Prohibited in new work**; it is the single biggest reason the site currently reads two-brained. The redesign retires it in favor of Blue Wash roles.
+
+### Electric Night (the 2026-07 front-page system — normative for the new homepage)
+The redesigned front page ("the Anchor layout") runs on its own two-theme palette, defined as CSS variables (`--cc-*`) in globals.css and toggled by the **House Lights** switch (`data-theme` on `<html>`; dark is default). Dark: Night BG #14032b drench, Night Ink #f3ecff, Neon Magenta #ff2e88 (kickers/countdowns) + Neon Cyan #29e6ff (links/section heads) with glow text-shadows, Marquee Gold #ffd76a rectangles for CTAs (ink #2b1150), Night Live #6dffb0. Light ("house lights up"): Day BG #f7f4fc, Day Ink #1d1035, glows retired, accents deepened for AA (Day Magenta #c40e63, Day Violet #6d28d9 takes the cyan role, Day Gold #f2c04b, Day Live #0a7a43). Low-alpha tints of these hues (panels, hairlines, gradient fields) are tonal ramps of this system. Headers Montserrat, body Open Sans (interim, user-chosen). **Buttons are rectangles (4-8px radius), never pills** (see Do's and Don'ts).
 
 ### Named Rules
 **The Gold Spot Rule.** Gold is the spotlight: it hits one thing per screen, and that thing is the action we most want taken. Two gold elements on one screen means neither is the spotlight. Never use gold decoratively.

@@ -1,9 +1,8 @@
 import { db } from "@/lib/db";
 import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
-import HomePage from "@/components/home/HomePage";
+import FrontPage from "@/components/frontpage/FrontPage";
 import { HomeConvention, countryToRegion } from "@/components/home/home-types";
-import { pickHeroMessage } from "@/components/home/headlines";
 
 // Render against live data on each request. Without this, Next.js statically
 // renders the home page at build time and freezes the convention list (and their
@@ -35,6 +34,7 @@ async function getUpcomingConventions(): Promise<{
         country: true,
         coverImageUrl: true,
         profileImageUrl: true,
+        descriptionShort: true,
       },
     });
 
@@ -61,6 +61,7 @@ async function getUpcomingConventions(): Promise<{
         startDate: row.startDate ? row.startDate.toISOString() : null,
         endDate: row.endDate ? row.endDate.toISOString() : null,
         imageUrl: row.profileImageUrl || row.coverImageUrl || null,
+        descriptionShort: row.descriptionShort,
         region: countryToRegion(row.country),
       }));
 
@@ -99,8 +100,5 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const { conventions, loadFailed } = await getUpcomingConventions();
-  // Server-side pick: each request (the page is force-dynamic) gets one of the
-  // objection-answering hero messages at random.
-  const heroMessage = pickHeroMessage();
-  return <HomePage conventions={conventions} loadFailed={loadFailed} heroMessage={heroMessage} />;
+  return <FrontPage conventions={conventions} loadFailed={loadFailed} />;
 }

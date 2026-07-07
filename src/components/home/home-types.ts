@@ -12,6 +12,7 @@ export interface HomeConvention {
   startDate: string | null; // ISO
   endDate: string | null; // ISO
   imageUrl: string | null;
+  descriptionShort: string | null;
   region: Region;
 }
 

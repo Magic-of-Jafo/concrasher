@@ -78,6 +78,62 @@ a {
   text-decoration: none;
 }
 
+/* ── Electric Night: the front-page design system (2026-07 redesign) ──
+   Two themes driven by one variable set. Dark ("house lights down") is the
+   default; [data-theme="light"] is the same brand in daylight: glows retired,
+   accents deepened for AA contrast on the lavender-white ground. The toggle
+   lives in the page topline; the no-flash script in layout.tsx applies the
+   saved choice before first paint. */
+:root {
+  --cc-bg: #14032b;
+  --cc-panel: rgba(122, 44, 240, 0.14);
+  --cc-panel-border: rgba(122, 44, 240, 0.5);
+  --cc-hairline: rgba(122, 44, 240, 0.3);
+  --cc-ink: #f3ecff;
+  --cc-muted: #c9b6ea;
+  --cc-soft: #8f7bb1;
+  --cc-magenta: #ff2e88;
+  --cc-cyan: #29e6ff;
+  --cc-gold: #ffd76a;
+  --cc-gold-ink: #2b1150;
+  --cc-live: #6dffb0;
+  --cc-majors-bg: linear-gradient(160deg, rgba(255, 46, 136, 0.14), rgba(122, 44, 240, 0.16));
+  --cc-majors-border: rgba(255, 46, 136, 0.4);
+  --cc-glow-magenta: 0 0 8px rgba(255, 46, 136, 0.8), 0 0 26px rgba(255, 46, 136, 0.5);
+  --cc-glow-cyan: 0 0 12px rgba(41, 230, 255, 0.6);
+  --cc-glow-live: 0 0 10px rgba(109, 255, 176, 0.7);
+  --cc-glow-gold: 0 0 20px rgba(255, 215, 106, 0.35);
+  --cc-glow-art: 0 0 22px rgba(243, 236, 255, 0.45);
+  --cc-glow-logo: drop-shadow(0 0 16px rgba(255, 46, 136, 0.5));
+  --cc-field:
+    radial-gradient(ellipse 75% 34% at 50% -4%, rgba(122, 44, 240, 0.55), transparent 65%),
+    radial-gradient(ellipse 40% 22% at 88% 20%, rgba(255, 46, 136, 0.16), transparent 70%);
+}
+
+[data-theme="light"] {
+  --cc-bg: #f7f4fc;
+  --cc-panel: rgba(109, 40, 217, 0.06);
+  --cc-panel-border: rgba(109, 40, 217, 0.3);
+  --cc-hairline: rgba(109, 40, 217, 0.22);
+  --cc-ink: #1d1035;
+  --cc-muted: #4b3a6e;
+  --cc-soft: #6b5c8f;
+  --cc-magenta: #c40e63;
+  --cc-cyan: #6d28d9;
+  --cc-gold: #f2c04b;
+  --cc-gold-ink: #2b1150;
+  --cc-live: #0a7a43;
+  --cc-majors-bg: linear-gradient(160deg, rgba(196, 14, 99, 0.07), rgba(109, 40, 217, 0.08));
+  --cc-majors-border: rgba(196, 14, 99, 0.35);
+  --cc-glow-magenta: none;
+  --cc-glow-cyan: none;
+  --cc-glow-live: none;
+  --cc-glow-gold: 0 2px 0 rgba(43, 17, 80, 0.25);
+  --cc-glow-art: none;
+  --cc-glow-logo: none;
+  --cc-field: radial-gradient(ellipse 75% 30% at 50% -4%, rgba(122, 44, 240, 0.12), transparent 65%);
+}
+
 /* Homepage hero load choreography ("House Lights Down"): content rises as the
    light blooms. Pure CSS keyframes on render (no class gating), so the final
    state always lands even in headless/paused contexts. */

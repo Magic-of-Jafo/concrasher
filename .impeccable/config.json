@@ -1,0 +1,50 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "reason": "User chose Montserrat for all headers (2026-07-07 homepage redesign)",
+        "createdAt": "2026-07-07T18:07:36.856Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "open sans",
+        "reason": "User chose Open Sans for body text (2026-07-07 homepage redesign)",
+        "createdAt": "2026-07-07T18:07:36.933Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 46, 136, 0.14)",
+        "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
+        "createdAt": "2026-07-07T18:43:44.307Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(122, 44, 240, 0.55)",
+        "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
+        "createdAt": "2026-07-07T18:43:44.380Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 46, 136, 0.16)",
+        "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
+        "createdAt": "2026-07-07T18:43:44.464Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(196, 14, 99, 0.07)",
+        "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
+        "createdAt": "2026-07-07T18:43:44.544Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(122, 44, 240, 0.12)",
+        "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
+        "createdAt": "2026-07-07T18:43:44.629Z"
+      }
+    ]
+  }
+}
