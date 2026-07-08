@@ -3,6 +3,7 @@ import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
 import FrontPage from "@/components/frontpage/FrontPage";
 import { HomeConvention, countryToRegion } from "@/components/home/home-types";
+import { pickHeroMessage } from "@/components/home/headlines";
 
 // Render against live data on each request. Without this, Next.js statically
 // renders the home page at build time and freezes the convention list (and their
@@ -100,5 +101,8 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const { conventions, loadFailed } = await getUpcomingConventions();
-  return <FrontPage conventions={conventions} loadFailed={loadFailed} />;
+  // Server-side pick: each request (the page is force-dynamic) gets one of the
+  // objection-answering hero messages at random.
+  const heroMessage = pickHeroMessage();
+  return <FrontPage conventions={conventions} loadFailed={loadFailed} heroMessage={heroMessage} />;
 }

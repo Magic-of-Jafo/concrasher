@@ -111,6 +111,25 @@ a {
   --cc-field:
     radial-gradient(ellipse 75% 34% at 50% -4%, rgba(115, 95, 50, 0.55), transparent 65%),
     radial-gradient(ellipse 40% 22% at 88% 20%, rgba(198, 151, 73, 0.12), transparent 70%);
+  /* The site header: deliberately its own surface, distinct from the page.
+     Dark = lifted slate panel over the black stage, gold hairline underneath. */
+  --cc-header-bg: #14161d;
+  --cc-header-ink: #e3e3e3;
+  --cc-header-border: rgba(198, 151, 73, 0.35);
+  /* Hero band placeholder scene (until admin-uploaded rotating images exist):
+     gold spotlight pools + faint bokeh over a lifted black stage, plus a scrim
+     so the rotating headline always reads. */
+  --cc-hero-scene:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%),
+    radial-gradient(ellipse 45% 90% at 12% -10%, rgba(198, 151, 73, 0.4), transparent 70%),
+    radial-gradient(ellipse 40% 80% at 88% -10%, rgba(198, 151, 73, 0.28), transparent 70%),
+    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(115, 95, 50, 0.35), transparent 65%),
+    radial-gradient(circle at 22% 38%, rgba(198, 151, 73, 0.2) 0 2px, transparent 3px),
+    radial-gradient(circle at 71% 62%, rgba(198, 151, 73, 0.16) 0 2px, transparent 3px),
+    linear-gradient(180deg, #0b0c11, #06060a);
+  --cc-hero-bokeh-size: auto, auto, auto, auto, 90px 70px, 110px 90px, auto;
+  --cc-hero-ink: #f2ede3;
+  --cc-hero-sub: rgba(242, 237, 227, 0.82);
 }
 
 /* Light ("house lights up"): Abyss daylight — pale teal-white, deep indigo
@@ -137,6 +156,23 @@ a {
   --cc-glow-art: none;
   --cc-glow-logo: none;
   --cc-field: radial-gradient(ellipse 75% 30% at 50% -4%, rgba(71, 139, 141, 0.14), transparent 65%);
+  /* Light header: Abyss navy bar, strongly distinct from the pale page. */
+  --cc-header-bg: #294669;
+  --cc-header-ink: #f1f6f5;
+  --cc-header-border: rgba(16, 20, 67, 0.35);
+  /* Light hero scene: navy/teal light pools on a deep navy stage (the band
+     stays dark in both themes so the headline art always has drama). */
+  --cc-hero-scene:
+    linear-gradient(180deg, rgba(16, 20, 67, 0.1) 0%, rgba(16, 20, 67, 0.5) 100%),
+    radial-gradient(ellipse 45% 90% at 12% -10%, rgba(71, 139, 141, 0.55), transparent 70%),
+    radial-gradient(ellipse 40% 80% at 88% -10%, rgba(71, 139, 141, 0.4), transparent 70%),
+    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(41, 70, 105, 0.6), transparent 65%),
+    radial-gradient(circle at 22% 38%, rgba(228, 211, 41, 0.22) 0 2px, transparent 3px),
+    radial-gradient(circle at 71% 62%, rgba(228, 211, 41, 0.16) 0 2px, transparent 3px),
+    linear-gradient(180deg, #1a2b4a, #101443);
+  --cc-hero-bokeh-size: auto, auto, auto, auto, 90px 70px, 110px 90px, auto;
+  --cc-hero-ink: #f1f6f5;
+  --cc-hero-sub: rgba(241, 246, 245, 0.85);
 }
 
 /* Homepage hero load choreography ("House Lights Down"): content rises as the

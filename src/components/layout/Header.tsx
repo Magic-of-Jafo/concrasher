@@ -96,7 +96,17 @@ export default function Header() {
   };
 
   return (
-    <AppBar position="static" sx={{ backgroundColor: '#01264b' }}>
+    <AppBar
+      position="static"
+      elevation={0}
+      sx={{
+        // House Lights tokens: its own distinct surface in both themes
+        // (lifted slate panel w/ gold hairline in the dark; Abyss navy in the light).
+        backgroundColor: 'var(--cc-header-bg, #01264b)',
+        color: 'var(--cc-header-ink, #ffffff)',
+        borderBottom: '1px solid var(--cc-header-border, transparent)',
+      }}
+    >
       <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 4 } }}>
         <Box component={Toolbar} disableGutters>
           <Box sx={{ flexGrow: 1, py: '10px' }}>
@@ -120,7 +130,7 @@ export default function Header() {
                   {imageUrl ? (
                     <Avatar alt="Profile" src={getS3ImageUrl(imageUrl)} sx={{ width: 32, height: 32 }} />
                   ) : (
-                    <AccountCircle sx={{ color: 'white', fontSize: 32 }} />
+                    <AccountCircle sx={{ color: 'var(--cc-header-ink, #ffffff)', fontSize: 32 }} />
                   )}
                 </IconButton>
               )}
@@ -152,7 +162,7 @@ export default function Header() {
                     {imageUrl ? (
                       <Avatar alt="Profile" src={getS3ImageUrl(imageUrl)} />
                     ) : (
-                      <AccountCircle sx={{ color: 'white', fontSize: 40 }} />
+                      <AccountCircle sx={{ color: 'var(--cc-header-ink, #ffffff)', fontSize: 40 }} />
                     )}
                   </IconButton>
 
@@ -174,7 +184,7 @@ export default function Header() {
                   <Button color="inherit" component={Link} href="/login" sx={{ mr: 1 }}>
                     Sign in/Sign Up
                   </Button>
-                  <AccountCircle sx={{ color: 'white', fontSize: 40 }} />
+                  <AccountCircle sx={{ color: 'var(--cc-header-ink, #ffffff)', fontSize: 40 }} />
                 </>
               )}
             </Box>

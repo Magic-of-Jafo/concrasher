@@ -11,6 +11,7 @@ import {
     monthLabel,
 } from '../home/home-types';
 import { DISPLAY, BODY } from './FrontPage';
+import FrontThumb from './FrontThumb';
 
 // "The next 100 days": every listed convention inside the horizon, grouped by
 // month in newspaper-free columns. Time-based on purpose; region grouping was
@@ -91,34 +92,38 @@ export default function Front100Days({ conventions }: { conventions: HomeConvent
                                     component={Link}
                                     href={`/conventions/${c.slug || c.id}`}
                                     sx={{
-                                        display: 'block', textDecoration: 'none', py: 1.5, px: 0.25,
+                                        display: 'flex', alignItems: 'center', gap: 1.25,
+                                        textDecoration: 'none', py: 1.5, px: 0.25,
                                         borderBottom: '1px solid var(--cc-hairline)',
                                         transition: 'background-color 0.15s ease-out',
                                         '&:hover': { backgroundColor: 'var(--cc-panel)' },
                                         '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '-3px' },
                                     }}
                                 >
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                                        <Typography suppressHydrationWarning sx={{ fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--cc-soft)' }}>
-                                            {shortRange(c)}
+                                    <FrontThumb convention={c} size={44} />
+                                    <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                                            <Typography suppressHydrationWarning sx={{ fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--cc-soft)' }}>
+                                                {shortRange(c)}
+                                            </Typography>
+                                            <Typography
+                                                suppressHydrationWarning
+                                                sx={{
+                                                    fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
+                                                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                                                    color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
+                                                }}
+                                            >
+                                                {cd.kind === 'happening' ? '● Live' : cd.kind === 'future' ? cd.text.replace('In ', '') : cd.text}
+                                            </Typography>
+                                        </Box>
+                                        <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.95rem', fontWeight: 800, lineHeight: 1.3, color: 'var(--cc-ink)', mt: 0.25 }}>
+                                            {c.name}
                                         </Typography>
-                                        <Typography
-                                            suppressHydrationWarning
-                                            sx={{
-                                                fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
-                                                letterSpacing: '0.08em', textTransform: 'uppercase',
-                                                color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
-                                            }}
-                                        >
-                                            {cd.kind === 'happening' ? '● Live' : cd.kind === 'future' ? cd.text.replace('In ', '') : cd.text}
+                                        <Typography sx={{ fontFamily: BODY, fontSize: '0.78rem', color: 'var(--cc-muted)' }}>
+                                            {formatLocation(c)}
                                         </Typography>
                                     </Box>
-                                    <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.95rem', fontWeight: 800, lineHeight: 1.3, color: 'var(--cc-ink)', mt: 0.25 }}>
-                                        {c.name}
-                                    </Typography>
-                                    <Typography sx={{ fontFamily: BODY, fontSize: '0.78rem', color: 'var(--cc-muted)' }}>
-                                        {formatLocation(c)}
-                                    </Typography>
                                 </Box>
                             );
                         })}

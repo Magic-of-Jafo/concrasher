@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import Link from 'next/link';
 import { HomeConvention } from '../home/home-types';
+import type { HeroMessage } from '../home/headlines';
+import FrontHero from './FrontHero';
 import FrontMajors from './FrontMajors';
 import FrontBilling from './FrontBilling';
 import Front100Days from './Front100Days';
@@ -226,9 +228,11 @@ function FrontFooter() {
 export default function FrontPage({
     conventions,
     loadFailed,
+    heroMessage,
 }: {
     conventions: HomeConvention[];
     loadFailed: boolean;
+    heroMessage: HeroMessage;
 }) {
     return (
         <Box component="main" id="main-content" sx={{ backgroundColor: 'var(--cc-bg)', minHeight: '100vh' }}>
@@ -236,6 +240,7 @@ export default function FrontPage({
                 <Box sx={{ maxWidth: 1080, mx: 'auto', px: { xs: 2.5, md: 6 }, pt: 3, pb: 5 }}>
                     <TopLine />
                     <Masthead />
+                    <FrontHero message={heroMessage} />
                     <FrontMajors conventions={conventions} />
 
                     {loadFailed ? (

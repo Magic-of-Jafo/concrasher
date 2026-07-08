@@ -84,11 +84,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable} ${openSans.variable}`} suppressHydrationWarning>
       <head>
-        {/* House Lights theme: apply the saved choice before first paint so the
-            page never flashes the wrong theme. Dark ("house lights down") is
-            the default; only an explicit "light" choice is persisted. */}
+        {/* House Lights theme: apply before first paint so the page never
+            flashes the wrong theme. Explicit visitor choice wins; otherwise
+            follow the OS preference; failing detection, default to dark. */}
         <Script id="house-lights-init" strategy="beforeInteractive">
-          {`try { if (localStorage.getItem('cc-house-lights') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}`}
+          {`try {
+            var saved = localStorage.getItem('cc-house-lights');
+            var light = saved ? saved === 'light'
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (light) document.documentElement.dataset.theme = 'light';
+          } catch (e) {}`}
         </Script>
         {/* Preconnect to external domains for performance */}
         <link rel="preconnect" href="https://www.clarity.ms" />

@@ -34,6 +34,7 @@ colors:
   day-teal: "#2e6b6e"
   day-navy: "#294669"
   day-teal-border: "#478b8d"
+  day-chartreuse: "#e4d329"
   day-live: "#0a7a43"
   surface-gray: "#f5f5f5"
   border-gray: "#e0e0e0"

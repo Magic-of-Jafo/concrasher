@@ -7,6 +7,7 @@ import { getS3ImageUrl } from '@/lib/defaults';
 import { HomeConvention, formatDateRange, formatLocation, getCountdown } from '../home/home-types';
 import { DISPLAY, BODY, GoldButton } from './FrontPage';
 import { isMajorName } from './FrontMajors';
+import FrontThumb from './FrontThumb';
 
 // Top Billing (the anchor story) + the Happening/Up Next rail, at matching
 // height. The rail always owns the next three chronological conventions (the
@@ -65,8 +66,8 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background:
-                                'radial-gradient(ellipse 70% 60% at 50% 110%, rgba(255,46,136,.28), transparent 65%), radial-gradient(ellipse 60% 50% at 50% -10%, rgba(41,230,255,.14), transparent 60%), var(--cc-panel)',
+                            background: 'var(--cc-hero-scene)',
+                            backgroundSize: 'var(--cc-hero-bokeh-size)',
                         }}
                     >
                         {billing.imageUrl ? (
@@ -90,7 +91,7 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                         )}
                     </Box>
                     <Typography
-                        component="h1"
+                        component="h2"
                         sx={{
                             fontFamily: DISPLAY, fontWeight: 800,
                             fontSize: 'clamp(1.75rem, 3.6vw, 2.6rem)', lineHeight: 1.08,
@@ -140,7 +141,7 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                             href={`/conventions/${c.slug || c.id}`}
                             sx={{
                                 flex: 1,
-                                display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 0.25,
+                                display: 'flex', alignItems: 'center', gap: 1.5,
                                 textDecoration: 'none',
                                 borderBottom: '1px solid var(--cc-hairline)',
                                 py: 1.75, px: 0.25,
@@ -150,23 +151,26 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                                 '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '-3px' },
                             }}
                         >
-                            <Typography
-                                suppressHydrationWarning
-                                sx={{
-                                    fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
-                                    letterSpacing: '0.12em', textTransform: 'uppercase',
-                                    color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
-                                    textShadow: cd.kind === 'happening' ? 'var(--cc-glow-live)' : 'none',
-                                }}
-                            >
-                                {cd.kind === 'happening' ? '● Happening now' : cd.text}
-                            </Typography>
-                            <Typography sx={{ fontFamily: DISPLAY, fontSize: '1.1rem', fontWeight: 800, lineHeight: 1.25, color: 'var(--cc-ink)' }}>
-                                {c.name}
-                            </Typography>
-                            <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
-                                {formatLocation(c)} · {formatDateRange(c.startDate, c.endDate)}
-                            </Typography>
+                            <FrontThumb convention={c} size={56} />
+                            <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                <Typography
+                                    suppressHydrationWarning
+                                    sx={{
+                                        fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
+                                        letterSpacing: '0.12em', textTransform: 'uppercase',
+                                        color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
+                                        textShadow: cd.kind === 'happening' ? 'var(--cc-glow-live)' : 'none',
+                                    }}
+                                >
+                                    {cd.kind === 'happening' ? '● Happening now' : cd.text}
+                                </Typography>
+                                <Typography sx={{ fontFamily: DISPLAY, fontSize: '1.1rem', fontWeight: 800, lineHeight: 1.25, color: 'var(--cc-ink)' }}>
+                                    {c.name}
+                                </Typography>
+                                <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
+                                    {formatLocation(c)} · {formatDateRange(c.startDate, c.endDate)}
+                                </Typography>
+                            </Box>
                         </Box>
                     );
                 })}

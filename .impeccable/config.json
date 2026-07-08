@@ -76,6 +76,24 @@
         "value": "rgba(71, 139, 141, 0.14)",
         "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
         "createdAt": "2026-07-08T20:08:00.930Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(228, 211, 41, 0.22)",
+        "reason": "Hero scene tint (Abyss chartreuse bokeh / navy ramp, chosen theme)",
+        "createdAt": "2026-07-08T20:23:26.508Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(228, 211, 41, 0.16)",
+        "reason": "Hero scene tint (Abyss chartreuse bokeh / navy ramp, chosen theme)",
+        "createdAt": "2026-07-08T20:23:26.627Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1a2b4a",
+        "reason": "Hero scene tint (Abyss chartreuse bokeh / navy ramp, chosen theme)",
+        "createdAt": "2026-07-08T20:23:26.734Z"
       }
     ]
   }
