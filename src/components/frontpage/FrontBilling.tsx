@@ -31,12 +31,15 @@ export function pickFeatured(conventions: HomeConvention[]): HomeConvention | nu
     return pool.find((c) => isMajorName(c.name)) ?? pool.find((c) => c.imageUrl) ?? pool[0];
 }
 
+// Plain and true: say what's happening, where, and when. (An earlier draft
+// used "turns its house lights down", which read as shows-only and confused
+// more than it sold. Conventions are more than shows.)
 function billingHeadline(c: HomeConvention): string {
     const when = c.startDate
         ? new Date(c.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })
         : null;
-    if (c.city && when) return `${c.city} turns its house lights down ${when}.`;
-    if (when) return `${c.name} takes the stage ${when}.`;
+    if (c.city && when) return `${c.name} comes to ${c.city}, ${when}.`;
+    if (when) return `${c.name} starts ${when}.`;
     return c.name;
 }
 
