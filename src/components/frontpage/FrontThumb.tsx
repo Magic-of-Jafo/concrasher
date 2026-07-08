@@ -2,9 +2,27 @@
 
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import 'flag-icons/css/flag-icons.min.css';
 import { getS3ImageUrl } from '@/lib/defaults';
-import { HomeConvention } from '../home/home-types';
+import { HomeConvention, countryToFlagCode } from '../home/home-types';
 import { DISPLAY } from './FrontPage';
+
+/** 4x3 flat country flag pinned to a card's lower-right corner (approved
+ *  treatment: no border, no rounding, ~20x15). Parent needs position:relative. */
+export function FlagCorner({ country }: { country: string | null }) {
+    const code = countryToFlagCode(country);
+    if (!code) return null;
+    return (
+        <Box
+            component="span"
+            className={`fi fi-${code}`}
+            role="img"
+            aria-label={country ?? undefined}
+            title={country ?? undefined}
+            sx={{ position: 'absolute', bottom: 10, right: 10, width: 20, height: 15 }}
+        />
+    );
+}
 
 // Small convention artwork for list rows: the profile/cover image on a white
 // backing (transparent-PNG logos theme inconsistently otherwise), or a gold

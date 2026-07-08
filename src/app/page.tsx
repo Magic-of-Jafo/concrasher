@@ -1,3 +1,5 @@
+import { readdir } from "fs/promises";
+import path from "path";
 import { db } from "@/lib/db";
 import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
@@ -99,10 +101,33 @@ export const metadata: Metadata = {
   },
 };
 
+// Hero rotation, admin-lite edition: any image dropped into /public/hero joins
+// the per-request random rotation immediately. Returns null (the designed
+// stage-light scene renders instead) when the folder is empty or missing.
+// The proper admin upload UI replaces this later.
+async function pickHeroImage(): Promise<string | null> {
+  try {
+    const dir = path.join(process.cwd(), "public", "hero");
+    const files = (await readdir(dir)).filter((f) => /\.(jpe?g|png|webp|avif)$/i.test(f));
+    if (files.length === 0) return null;
+    return `/hero/${files[Math.floor(Math.random() * files.length)]}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Home() {
   const { conventions, loadFailed } = await getUpcomingConventions();
-  // Server-side pick: each request (the page is force-dynamic) gets one of the
-  // objection-answering hero messages at random.
+  // Server-side picks: each request (the page is force-dynamic) gets one of
+  // the objection-answering hero messages and one rotation image at random.
   const heroMessage = pickHeroMessage();
-  return <FrontPage conventions={conventions} loadFailed={loadFailed} heroMessage={heroMessage} />;
+  const heroImage = await pickHeroImage();
+  return (
+    <FrontPage
+      conventions={conventions}
+      loadFailed={loadFailed}
+      heroMessage={heroMessage}
+      heroImage={heroImage}
+    />
+  );
 }

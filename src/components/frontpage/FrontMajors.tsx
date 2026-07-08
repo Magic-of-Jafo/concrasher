@@ -3,8 +3,10 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import Link from 'next/link';
+import { getS3ImageUrl } from '@/lib/defaults';
 import { HomeConvention, formatLocation, getCountdown } from '../home/home-types';
 import { DISPLAY, BODY } from './FrontPage';
+import { FlagCorner } from './FrontThumb';
 
 // The majors strip: the four conventions everyone in the community talks
 // about, deliberately unlabeled (the audience knows). Each tile binds to its
@@ -83,18 +85,54 @@ export default function FrontMajors({ conventions }: { conventions: HomeConventi
                         component={Link}
                         href={convention ? `/conventions/${convention.slug || convention.id}` : '/conventions'}
                         sx={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
                             textAlign: 'center',
                             textDecoration: 'none',
                             px: 1.25,
-                            py: 1.75,
+                            py: 2,
                             borderRadius: '8px',
                             background: 'var(--cc-majors-bg)',
                             border: '1px solid var(--cc-majors-border)',
-                            transition: 'border-color 0.18s ease-out',
-                            '&:hover': { borderColor: 'var(--cc-cyan)' },
+                            transition: 'border-color 0.18s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                            '&:hover': { borderColor: 'var(--cc-cyan)', transform: 'translateY(-2px)' },
                             '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '2px' },
+                            '@media (prefers-reduced-motion: reduce)': {
+                                transition: 'border-color 0.18s',
+                                '&:hover': { transform: 'none' },
+                            },
                         }}
                     >
+                        {/* The artwork leads; the eye lands here first, then spills
+                            onto the text below. */}
+                        {convention?.imageUrl ? (
+                            <Box
+                                component="img"
+                                src={getS3ImageUrl(convention.imageUrl)}
+                                alt=""
+                                loading="lazy"
+                                sx={{
+                                    width: 84, height: 84, objectFit: 'cover',
+                                    backgroundColor: '#ffffff', borderRadius: '8px',
+                                    border: '1px solid var(--cc-panel-border)', mb: 1.25,
+                                }}
+                            />
+                        ) : (
+                            <Box
+                                aria-hidden
+                                sx={{
+                                    width: 84, height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    borderRadius: '8px', border: '1px solid var(--cc-panel-border)',
+                                    backgroundColor: 'var(--cc-panel)', mb: 1.25,
+                                }}
+                            >
+                                <Typography component="span" sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '1.5rem', color: 'var(--cc-magenta)' }}>
+                                    {major.short.replace(/[^A-Za-z]/g, '').slice(0, 2)}
+                                </Typography>
+                            </Box>
+                        )}
                         <Typography
                             suppressHydrationWarning
                             sx={{
@@ -111,6 +149,7 @@ export default function FrontMajors({ conventions }: { conventions: HomeConventi
                         <Typography sx={{ fontFamily: BODY, fontSize: '0.72rem', color: 'var(--cc-muted)' }}>
                             {convention ? formatLocation(convention) : major.descriptor}
                         </Typography>
+                        <FlagCorner country={convention?.country ?? null} />
                     </Box>
                 );
             })}

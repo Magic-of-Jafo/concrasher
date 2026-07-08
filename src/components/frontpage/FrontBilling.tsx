@@ -7,17 +7,26 @@ import { getS3ImageUrl } from '@/lib/defaults';
 import { HomeConvention, formatDateRange, formatLocation, getCountdown } from '../home/home-types';
 import { DISPLAY, BODY, GoldButton } from './FrontPage';
 import { isMajorName } from './FrontMajors';
-import FrontThumb from './FrontThumb';
+import FrontThumb, { FlagCorner } from './FrontThumb';
 
-// Top Billing (the anchor story) + the Happening/Up Next rail, at matching
-// height. The rail always owns the next three chronological conventions (the
-// doctrine's hero trio). Top Billing auto-picks from everything AFTER the
-// trio, preferring a major, then a convention with artwork, so the slot never
-// duplicates the rail and never sits empty. A curated/paid FeaturedBilling
-// queue replaces the auto-pick later (see memory: homepage-redesign-direction).
+// Featured (the anchor story) + the Happening/Up Next rail. The rail owns the
+// next three chronological conventions (the doctrine's hero trio) and they
+// appear ONLY here (excluded from the 100-days list; redundancy is the enemy).
+// Featured picks past the trio so the two never overlap.
 
-function pickBilling(conventions: HomeConvention[]): HomeConvention | null {
+// Interim editorial control until the admin FeaturedBilling queue exists:
+// name-matched overrides, first match wins. Currently Abbott's (historical
+// significance; MAGIC Live is sold out, so featuring it sells nothing).
+const EDITORIAL_PICKS: RegExp[] = [/abbott/i];
+
+/** The featured convention: editorial override first, then auto-pick from
+ *  everything after the rail trio (majors first, then artwork, then nearest). */
+export function pickFeatured(conventions: HomeConvention[]): HomeConvention | null {
     const pool = conventions.slice(3);
+    for (const re of EDITORIAL_PICKS) {
+        const hit = pool.find((c) => re.test(c.name)) ?? conventions.find((c) => re.test(c.name));
+        if (hit) return hit;
+    }
     if (pool.length === 0) return conventions[0] ?? null;
     return pool.find((c) => isMajorName(c.name)) ?? pool.find((c) => c.imageUrl) ?? pool[0];
 }
@@ -31,9 +40,13 @@ function billingHeadline(c: HomeConvention): string {
     return c.name;
 }
 
-export default function FrontBilling({ conventions }: { conventions: HomeConvention[] }) {
-    const rail = conventions.slice(0, 3);
-    const billing = pickBilling(conventions);
+export default function FrontBilling({
+    billing,
+    rail,
+}: {
+    billing: HomeConvention | null;
+    rail: HomeConvention[];
+}) {
     if (!billing && rail.length === 0) {
         return (
             <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)', textAlign: 'center', py: 6 }}>
@@ -54,10 +67,11 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                             color: 'var(--cc-magenta)', textShadow: 'var(--cc-glow-magenta)', mb: 1.5,
                         }}
                     >
-                        Top Billing
+                        Featured
                     </Typography>
                     <Box
                         sx={{
+                            position: 'relative',
                             aspectRatio: '16 / 8.5',
                             borderRadius: '12px',
                             border: '1px solid var(--cc-panel-border)',
@@ -89,6 +103,7 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                                 {billing.name}
                             </Typography>
                         )}
+                        <FlagCorner country={billing.country} />
                     </Box>
                     <Typography
                         component="h2"
@@ -120,60 +135,70 @@ export default function FrontBilling({ conventions }: { conventions: HomeConvent
                 </Box>
             )}
 
-            <Box component="aside" sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Box component="aside">
                 <Typography
                     component="h2"
                     sx={{
                         fontFamily: DISPLAY, fontSize: '0.72rem', fontWeight: 800,
                         letterSpacing: '0.2em', textTransform: 'uppercase',
                         color: 'var(--cc-cyan)', textShadow: 'var(--cc-glow-cyan)',
-                        borderBottom: '1px solid var(--cc-panel-border)', pb: 1, m: 0,
+                        borderBottom: '1px solid var(--cc-panel-border)', pb: 1, mb: 1.5, mt: 0,
                     }}
                 >
                     Happening / Up next
                 </Typography>
-                {rail.map((c) => {
-                    const cd = getCountdown(c.startDate, c.endDate);
-                    return (
-                        <Box
-                            key={c.id}
-                            component={Link}
-                            href={`/conventions/${c.slug || c.id}`}
-                            sx={{
-                                flex: 1,
-                                display: 'flex', alignItems: 'center', gap: 1.5,
-                                textDecoration: 'none',
-                                borderBottom: '1px solid var(--cc-hairline)',
-                                py: 1.75, px: 0.25,
-                                transition: 'background-color 0.15s ease-out',
-                                '&:hover': { backgroundColor: 'var(--cc-panel)' },
-                                '&:last-child': { borderBottom: 'none' },
-                                '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '-3px' },
-                            }}
-                        >
-                            <FrontThumb convention={c} size={56} />
-                            <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                                <Typography
-                                    suppressHydrationWarning
-                                    sx={{
-                                        fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
-                                        letterSpacing: '0.12em', textTransform: 'uppercase',
-                                        color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
-                                        textShadow: cd.kind === 'happening' ? 'var(--cc-glow-live)' : 'none',
-                                    }}
-                                >
-                                    {cd.kind === 'happening' ? '● Happening now' : cd.text}
-                                </Typography>
-                                <Typography sx={{ fontFamily: DISPLAY, fontSize: '1.1rem', fontWeight: 800, lineHeight: 1.25, color: 'var(--cc-ink)' }}>
-                                    {c.name}
-                                </Typography>
-                                <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
-                                    {formatLocation(c)} · {formatDateRange(c.startDate, c.endDate)}
-                                </Typography>
+                {/* The trio: tight stack of prominent cards; these three appear
+                    nowhere else on the page. */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                    {rail.map((c) => {
+                        const cd = getCountdown(c.startDate, c.endDate);
+                        return (
+                            <Box
+                                key={c.id}
+                                component={Link}
+                                href={`/conventions/${c.slug || c.id}`}
+                                sx={{
+                                    position: 'relative',
+                                    display: 'flex', alignItems: 'center', gap: 1.5,
+                                    textDecoration: 'none',
+                                    backgroundColor: 'var(--cc-panel)',
+                                    border: '1px solid var(--cc-panel-border)',
+                                    borderRadius: '8px',
+                                    p: 1.5,
+                                    transition: 'border-color 0.18s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                                    '&:hover': { borderColor: 'var(--cc-cyan)', transform: 'translateY(-2px)' },
+                                    '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '2px' },
+                                    '@media (prefers-reduced-motion: reduce)': {
+                                        transition: 'border-color 0.18s',
+                                        '&:hover': { transform: 'none' },
+                                    },
+                                }}
+                            >
+                                <FrontThumb convention={c} size={64} />
+                                <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.25, pr: 3 }}>
+                                    <Typography
+                                        suppressHydrationWarning
+                                        sx={{
+                                            fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
+                                            letterSpacing: '0.12em', textTransform: 'uppercase',
+                                            color: cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)',
+                                            textShadow: cd.kind === 'happening' ? 'var(--cc-glow-live)' : 'none',
+                                        }}
+                                    >
+                                        {cd.kind === 'happening' ? '● Happening now' : cd.text}
+                                    </Typography>
+                                    <Typography sx={{ fontFamily: DISPLAY, fontSize: '1.05rem', fontWeight: 800, lineHeight: 1.25, color: 'var(--cc-ink)' }}>
+                                        {c.name}
+                                    </Typography>
+                                    <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
+                                        {formatLocation(c)} · {formatDateRange(c.startDate, c.endDate)}
+                                    </Typography>
+                                </Box>
+                                <FlagCorner country={c.country} />
                             </Box>
-                        </Box>
-                    );
-                })}
+                        );
+                    })}
+                </Box>
             </Box>
         </Box>
     );

@@ -11,7 +11,7 @@ import {
     monthLabel,
 } from '../home/home-types';
 import { DISPLAY, BODY } from './FrontPage';
-import FrontThumb from './FrontThumb';
+import FrontThumb, { FlagCorner } from './FrontThumb';
 
 // "The next 100 days": every listed convention inside the horizon, grouped by
 // month in newspaper-free columns. Time-based on purpose; region grouping was
@@ -32,18 +32,27 @@ function shortRange(c: HomeConvention): string {
     })}`;
 }
 
-export default function Front100Days({ conventions }: { conventions: HomeConvention[] }) {
+export default function Front100Days({
+    conventions,
+    excludeIds,
+}: {
+    conventions: HomeConvention[];
+    /** Conventions already shown above (rail trio + featured); never repeat them. */
+    excludeIds?: string[];
+}) {
     const groups = useMemo(() => {
         const horizon = Date.now() + HORIZON_DAYS * 86400000;
+        const skip = new Set(excludeIds ?? []);
         const map = new Map<string, HomeConvention[]>();
         for (const c of conventions) {
+            if (skip.has(c.id)) continue;
             if (!c.startDate || new Date(c.startDate).getTime() > horizon) continue;
             const key = monthKey(c.startDate);
             if (!map.has(key)) map.set(key, []);
             map.get(key)!.push(c);
         }
         return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-    }, [conventions]);
+    }, [conventions, excludeIds]);
 
     if (groups.length === 0) return null;
 
@@ -92,6 +101,7 @@ export default function Front100Days({ conventions }: { conventions: HomeConvent
                                     component={Link}
                                     href={`/conventions/${c.slug || c.id}`}
                                     sx={{
+                                        position: 'relative',
                                         display: 'flex', alignItems: 'center', gap: 1.25,
                                         textDecoration: 'none', py: 1.5, px: 0.25,
                                         borderBottom: '1px solid var(--cc-hairline)',
@@ -100,6 +110,7 @@ export default function Front100Days({ conventions }: { conventions: HomeConvent
                                         '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '-3px' },
                                     }}
                                 >
+                                    <FlagCorner country={c.country} />
                                     <FrontThumb convention={c} size={44} />
                                     <Box sx={{ minWidth: 0, flexGrow: 1 }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>

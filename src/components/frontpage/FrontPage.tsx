@@ -7,7 +7,7 @@ import { HomeConvention } from '../home/home-types';
 import type { HeroMessage } from '../home/headlines';
 import FrontHero from './FrontHero';
 import FrontMajors from './FrontMajors';
-import FrontBilling from './FrontBilling';
+import FrontBilling, { pickFeatured } from './FrontBilling';
 import Front100Days from './Front100Days';
 import PaletteTester from './PaletteTester';
 
@@ -229,18 +229,26 @@ export default function FrontPage({
     conventions,
     loadFailed,
     heroMessage,
+    heroImage,
 }: {
     conventions: HomeConvention[];
     loadFailed: boolean;
     heroMessage: HeroMessage;
+    heroImage: string | null;
 }) {
+    // The rail trio and the featured pick appear only in their own sections;
+    // the 100-days list skips them (no duplicate listings on the page).
+    const rail = conventions.slice(0, 3);
+    const billing = pickFeatured(conventions);
+    const excludeIds = [...rail.map((c) => c.id), ...(billing ? [billing.id] : [])];
+
     return (
         <Box component="main" id="main-content" sx={{ backgroundColor: 'var(--cc-bg)', minHeight: '100vh' }}>
             <Box sx={{ backgroundImage: 'var(--cc-field)' }}>
                 <Box sx={{ maxWidth: 1080, mx: 'auto', px: { xs: 2.5, md: 6 }, pt: 3, pb: 5 }}>
                     <TopLine />
                     <Masthead />
-                    <FrontHero message={heroMessage} />
+                    <FrontHero message={heroMessage} imageUrl={heroImage} />
                     <FrontMajors conventions={conventions} />
 
                     {loadFailed ? (
@@ -257,9 +265,9 @@ export default function FrontPage({
                         </Box>
                     ) : (
                         <>
-                            <FrontBilling conventions={conventions} />
+                            <FrontBilling billing={billing} rail={rail} />
                             <PitchBand />
-                            <Front100Days conventions={conventions} />
+                            <Front100Days conventions={conventions} excludeIds={excludeIds} />
                         </>
                     )}
 
