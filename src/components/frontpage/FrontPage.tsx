@@ -7,6 +7,7 @@ import { HomeConvention } from '../home/home-types';
 import FrontMajors from './FrontMajors';
 import FrontBilling from './FrontBilling';
 import Front100Days from './Front100Days';
+import PaletteTester from './PaletteTester';
 
 // The Electric Night front page ("the Anchor layout"): masthead with the claim,
 // majors strip, Top Billing + up-next rail, first-timer pitch band, and the
@@ -262,6 +263,8 @@ export default function FrontPage({
                     <FrontFooter />
                 </Box>
             </Box>
+            {/* Temporary palette exploration; renders only on the dev server. */}
+            {process.env.NODE_ENV === 'development' && <PaletteTester />}
         </Box>
     );
 }

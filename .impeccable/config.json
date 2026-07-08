@@ -1,7 +1,9 @@
 {
   "detector": {
     "ignoreRules": [],
-    "ignoreFiles": [],
+    "ignoreFiles": [
+      "src/components/frontpage/PaletteTester.tsx"
+    ],
     "ignoreValues": [
       {
         "rule": "overused-font",
@@ -44,6 +46,36 @@
         "value": "rgba(122, 44, 240, 0.12)",
         "reason": "Electric Night tonal ramp tint (user-approved 2026-07-07 front page)",
         "createdAt": "2026-07-07T18:43:44.629Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(198, 151, 73, 0.14)",
+        "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
+        "createdAt": "2026-07-08T20:08:00.619Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(115, 95, 50, 0.55)",
+        "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
+        "createdAt": "2026-07-08T20:08:00.699Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(198, 151, 73, 0.12)",
+        "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
+        "createdAt": "2026-07-08T20:08:00.777Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(71, 139, 141, 0.09)",
+        "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
+        "createdAt": "2026-07-08T20:08:00.850Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(71, 139, 141, 0.14)",
+        "reason": "Chosen theme tonal ramp (Midnight Gold dark / Abyss light, user-approved 2026-07-07)",
+        "createdAt": "2026-07-08T20:08:00.930Z"
       }
     ]
   }

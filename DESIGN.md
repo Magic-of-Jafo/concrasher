@@ -17,22 +17,23 @@ colors:
   major-cobalt: "#1D4ED8"
   major-violet: "#6D28D9"
   major-emerald: "#047857"
-  night-bg: "#14032b"
-  night-ink: "#f3ecff"
-  night-muted: "#c9b6ea"
-  night-soft: "#8f7bb1"
-  neon-magenta: "#ff2e88"
-  neon-cyan: "#29e6ff"
-  marquee-gold: "#ffd76a"
-  marquee-gold-ink: "#2b1150"
-  night-live: "#6dffb0"
-  day-bg: "#f7f4fc"
-  day-ink: "#1d1035"
-  day-muted: "#4b3a6e"
-  day-soft: "#6b5c8f"
-  day-magenta: "#c40e63"
-  day-violet: "#6d28d9"
-  day-gold: "#f2c04b"
+  night-bg: "#000000"
+  night-ink: "#e3e3e3"
+  night-muted: "#b4b8bf"
+  night-soft: "#82868f"
+  night-gold: "#c69749"
+  night-gold-ink: "#191307"
+  night-slate: "#a9b4d6"
+  night-panel-base: "#282a3a"
+  night-bronze: "#735f32"
+  night-live: "#7fe0a0"
+  day-bg: "#f1f6f5"
+  day-ink: "#101443"
+  day-muted: "#3a4663"
+  day-soft: "#67748f"
+  day-teal: "#2e6b6e"
+  day-navy: "#294669"
+  day-teal-border: "#478b8d"
   day-live: "#0a7a43"
   surface-gray: "#f5f5f5"
   border-gray: "#e0e0e0"
@@ -143,8 +144,11 @@ A dark theatrical wash with a single precious accent: deep stage-light blue, hit
 - **Surface Gray** (#f5f5f5) / **Border Gray** (#e0e0e0): quiet fills and hairlines in organizer tooling.
 - **Legacy MUI Blue** (#1976d2): the untouched Material-UI default `primary.main`, still inherited by chips, links, and buttons. **Placeholder. Prohibited in new work**; it is the single biggest reason the site currently reads two-brained. The redesign retires it in favor of Blue Wash roles.
 
-### Electric Night (the 2026-07 front-page system — normative for the new homepage)
-The redesigned front page ("the Anchor layout") runs on its own two-theme palette, defined as CSS variables (`--cc-*`) in globals.css and toggled by the **House Lights** switch (`data-theme` on `<html>`; dark is default). Dark: Night BG #14032b drench, Night Ink #f3ecff, Neon Magenta #ff2e88 (kickers/countdowns) + Neon Cyan #29e6ff (links/section heads) with glow text-shadows, Marquee Gold #ffd76a rectangles for CTAs (ink #2b1150), Night Live #6dffb0. Light ("house lights up"): Day BG #f7f4fc, Day Ink #1d1035, glows retired, accents deepened for AA (Day Magenta #c40e63, Day Violet #6d28d9 takes the cyan role, Day Gold #f2c04b, Day Live #0a7a43). Low-alpha tints of these hues (panels, hairlines, gradient fields) are tonal ramps of this system. Headers Montserrat, body Open Sans (interim, user-chosen). **Buttons are rectangles (4-8px radius), never pills** (see Do's and Don'ts).
+### House Lights (the 2026-07 front-page system — normative for the new homepage)
+The redesigned front page ("the Anchor layout") runs on its own two-theme palette, defined as CSS variables (`--cc-*`) in globals.css and toggled by the **House Lights** switch (`data-theme` on `<html>`; dark is default). Chosen 2026-07-07 from a seven-palette bake-off:
+- **Dark ("house lights down") = Midnight Gold.** True black #000000, slate ink #e3e3e3 (deliberately cool, replacing the source palette's warm cream), gold #c69749 carrying kickers, countdowns, AND the CTA (ink #191307), slate-blue #a9b4d6 as the secondary accent (links/section heads), panels from #282a3a, bronze #735f32 in the field gradient, live green #7fe0a0. Gold glows on dark.
+- **Light ("house lights up") = Abyss daylight.** Pale teal-white #f1f6f5, deep indigo ink #101443, teal #2e6b6e (primary accent) + navy #294669 (secondary + CTA bg with #f1f6f5 ink), teal borders from #478b8d, live green #0a7a43. Glows retired.
+Low-alpha tints of these hues (panels, hairlines, gradient fields) are tonal ramps of this system. Headers Montserrat, body Open Sans (interim, user-chosen). **Buttons are rectangles (4-8px radius), never pills** (see Do's and Don'ts). The old Electric Night violet was the runner-up and lives only in the dev PaletteTester for reference.
 
 ### Named Rules
 **The Gold Spot Rule.** Gold is the spotlight: it hits one thing per screen, and that thing is the action we most want taken. Two gold elements on one screen means neither is the spotlight. Never use gold decoratively.
