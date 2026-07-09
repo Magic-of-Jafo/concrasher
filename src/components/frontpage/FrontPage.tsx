@@ -124,7 +124,7 @@ function Masthead() {
                 component="img"
                 src="https://convention-crasher.s3.us-east-1.amazonaws.com/images/defaults/convention-crasher-logo.png"
                 alt="Convention Crasher"
-                sx={{ width: 'min(270px, 55vw)', filter: 'var(--cc-glow-logo)' }}
+                sx={{ width: 'min(270px, 55vw)', filter: 'var(--cc-glow-logo)', display: 'block', mx: 'auto' }}
             />
             <Typography
                 component="p"
