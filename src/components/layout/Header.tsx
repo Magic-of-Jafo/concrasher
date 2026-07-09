@@ -108,9 +108,9 @@ export default function Header() {
       }}
     >
       <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 4 } }}>
-        <Box component={Toolbar} disableGutters sx={{ position: 'relative' }}>
-          {/* Quick fix: logo truly centered in the bar (proper header layout later). */}
-          <Box sx={{ py: '10px', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <Box component={Toolbar} disableGutters>
+          {/* Logo far left; right-side controls pushed by the spacer. */}
+          <Box sx={{ py: '10px' }}>
             <Link href="/">
               <img
                 src={getS3ImageUrl('/images/defaults/convention-crasher-logo.png')}
