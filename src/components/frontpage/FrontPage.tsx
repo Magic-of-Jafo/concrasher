@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { HomeConvention } from '../home/home-types';
 import type { HeroMessage } from '../home/headlines';
 import FrontHero from './FrontHero';
-import FrontMajors from './FrontMajors';
+import FrontMajors, { MajorData } from './FrontMajors';
 import FrontBilling, { pickFeatured } from './FrontBilling';
 import Front100Days from './Front100Days';
 import PaletteTester from './PaletteTester';
@@ -231,11 +231,13 @@ export default function FrontPage({
     loadFailed,
     heroMessage,
     heroImage,
+    majors,
 }: {
     conventions: HomeConvention[];
     loadFailed: boolean;
     heroMessage: HeroMessage;
     heroImage: string | null;
+    majors: MajorData[];
 }) {
     // The rail trio and the featured pick appear only in their own sections;
     // the 100-days list skips them (no duplicate listings on the page).
@@ -287,7 +289,7 @@ export default function FrontPage({
                     <TopLine />
                     <Masthead />
                     <FrontHero message={heroMessage} imageUrl={heroImage} />
-                    <FrontMajors conventions={conventions} />
+                    <FrontMajors majors={majors} />
 
                     {loadFailed ? (
                         <Box sx={{ py: 6, textAlign: 'center' }}>

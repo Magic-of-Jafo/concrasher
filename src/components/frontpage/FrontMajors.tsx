@@ -8,63 +8,30 @@ import { HomeConvention, formatLocation, getCountdown } from '../home/home-types
 import { DISPLAY, BODY } from './FrontPage';
 import { FlagCorner } from './FrontThumb';
 
-// The majors strip: the four conventions everyone in the community talks
-// about, deliberately unlabeled (the audience knows). Each tile binds to its
-// next listed edition; when none is upcoming it degrades to a static
-// descriptor and links to browse.
+// The majors strip: four series-anchored cards, deliberately unlabeled (the
+// audience knows). The server resolves each slot to its series' most recent
+// edition (see getMajors in page.tsx); this component just presents:
+//   upcoming edition  -> countdown kicker
+//   dateless TBD next -> "TBD"
+//   edition passed    -> the cadence line ("Every summer"), artwork retained
+//   nothing known     -> descriptor + monogram tile
 
-interface Major {
+export interface MajorData {
     key: string;
     short: string;
     descriptor: string;
     cadence: string;
-    match: (name: string) => boolean;
+    status: 'upcoming' | 'tbd' | 'past' | 'none';
+    convention: HomeConvention | null;
 }
 
-const MAJORS: Major[] = [
-    {
-        key: 'sam',
-        short: 'S.A.M.',
-        descriptor: 'Society of American Magicians',
-        cadence: 'Every summer',
-        // Dots or ALL-CAPS only, so "Sam" in an unrelated name can't match.
-        match: (n) => /society of american/i.test(n) || /(^|[^A-Za-z])S\.?A\.?M\.(?![A-Za-z])/.test(n) || /\bSAM\b/.test(n),
-    },
-    {
-        key: 'ibm',
-        short: 'I.B.M.',
-        descriptor: 'International Brotherhood of Magicians',
-        cadence: 'Every summer',
-        match: (n) => !/british ring/i.test(n) && (/international brotherhood/i.test(n) || /\bI\.?B\.?M\.?\b/.test(n)),
-    },
-    {
-        key: 'magiclive',
-        short: 'MAGIC Live',
-        descriptor: 'Las Vegas, NV',
-        cadence: 'Every August',
-        match: (n) => /magic\s*live/i.test(n),
-    },
-    {
-        key: 'blackpool',
-        short: 'Blackpool',
-        descriptor: "The world's biggest magic convention",
-        cadence: 'Every February',
-        match: (n) => /blackpool/i.test(n),
-    },
-];
-
-/** The next listed edition of each major (list arrives sorted by start date). */
-export function findMajor(conventions: HomeConvention[], key: string): HomeConvention | null {
-    const major = MAJORS.find((m) => m.key === key);
-    if (!major) return null;
-    return conventions.find((c) => major.match(c.name)) ?? null;
+function kickerFor(m: MajorData): string {
+    if (m.status === 'upcoming' && m.convention) return getCountdown(m.convention.startDate, m.convention.endDate).text;
+    if (m.status === 'tbd') return 'TBD';
+    return m.cadence;
 }
 
-export function isMajorName(name: string): boolean {
-    return MAJORS.some((m) => m.match(name));
-}
-
-export default function FrontMajors({ conventions }: { conventions: HomeConvention[] }) {
+export default function FrontMajors({ majors }: { majors: MajorData[] }) {
     return (
         <Box
             component="nav"
@@ -76,14 +43,13 @@ export default function FrontMajors({ conventions }: { conventions: HomeConventi
                 mb: 4,
             }}
         >
-            {MAJORS.map((major) => {
-                const convention = conventions.find((c) => major.match(c.name)) ?? null;
-                const countdown = convention ? getCountdown(convention.startDate, convention.endDate) : null;
+            {majors.map((major) => {
+                const c = major.convention;
                 return (
                     <Box
                         key={major.key}
                         component={Link}
-                        href={convention ? `/conventions/${convention.slug || convention.id}` : '/conventions'}
+                        href={c ? `/conventions/${c.slug || c.id}` : '/conventions'}
                         sx={{
                             position: 'relative',
                             display: 'flex',
@@ -107,10 +73,10 @@ export default function FrontMajors({ conventions }: { conventions: HomeConventi
                     >
                         {/* The artwork leads; the eye lands here first, then spills
                             onto the text below. */}
-                        {convention?.imageUrl ? (
+                        {c?.imageUrl ? (
                             <Box
                                 component="img"
-                                src={getS3ImageUrl(convention.imageUrl)}
+                                src={getS3ImageUrl(c.imageUrl)}
                                 alt=""
                                 loading="lazy"
                                 sx={{
@@ -141,15 +107,15 @@ export default function FrontMajors({ conventions }: { conventions: HomeConventi
                                 color: 'var(--cc-cyan)', textShadow: 'var(--cc-glow-cyan)', mb: 0.25,
                             }}
                         >
-                            {countdown ? countdown.text : major.cadence}
+                            {kickerFor(major)}
                         </Typography>
                         <Typography sx={{ fontFamily: DISPLAY, fontSize: '1.05rem', fontWeight: 800, color: 'var(--cc-ink)' }}>
                             {major.short}
                         </Typography>
                         <Typography sx={{ fontFamily: BODY, fontSize: '0.72rem', color: 'var(--cc-muted)' }}>
-                            {convention ? formatLocation(convention) : major.descriptor}
+                            {c ? formatLocation(c) : major.descriptor}
                         </Typography>
-                        <FlagCorner country={convention?.country ?? null} />
+                        <FlagCorner country={c?.country ?? null} />
                     </Box>
                 );
             })}

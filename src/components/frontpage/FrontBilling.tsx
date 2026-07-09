@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { HomeConvention, formatDateRange, formatLocation, getCountdown } from '../home/home-types';
 import { DISPLAY, BODY, GoldButton } from './FrontPage';
-import { isMajorName } from './FrontMajors';
+import { isMajorName } from './majors-config';
 import FrontThumb, { FlagCorner } from './FrontThumb';
 
 // Featured (the anchor story) + the Happening/Up Next rail. The rail owns the
