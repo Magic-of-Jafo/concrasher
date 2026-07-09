@@ -135,7 +135,8 @@ a {
      Dark: gold-warmed on the black stage. */
   --cc-pattern-overlay: linear-gradient(rgba(198, 151, 73, 1), rgba(198, 151, 73, 1));
   --cc-pattern-blend: overlay;
-  --cc-pattern-opacity: 0.05;
+  --cc-pattern-opacity: 0.14;
+  --cc-pattern-size: 560px;
 }
 
 /* Light ("house lights up"): Abyss daylight — pale teal-white, deep indigo
@@ -182,7 +183,8 @@ a {
   /* Light wallpaper: the same damask, navy-cooled on the pale teal ground. */
   --cc-pattern-overlay: linear-gradient(rgba(41, 70, 105, 1), rgba(41, 70, 105, 1));
   --cc-pattern-blend: color;
-  --cc-pattern-opacity: 0.08;
+  --cc-pattern-opacity: 0.14;
+  --cc-pattern-size: 560px;
 }
 
 /* Homepage hero load choreography ("House Lights Down"): content rises as the

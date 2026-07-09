@@ -10,6 +10,7 @@ import FrontMajors from './FrontMajors';
 import FrontBilling, { pickFeatured } from './FrontBilling';
 import Front100Days from './Front100Days';
 import PaletteTester from './PaletteTester';
+import PatternTuner from './PatternTuner';
 
 // The Electric Night front page ("the Anchor layout"): masthead with the claim,
 // majors strip, Top Billing + up-next rail, first-timer pitch band, and the
@@ -261,7 +262,7 @@ export default function FrontPage({
                     zIndex: 0,
                     pointerEvents: 'none',
                     backgroundImage: 'var(--cc-pattern-overlay), url(/BG/bg_pattern.png)',
-                    backgroundSize: 'auto, 560px 560px',
+                    backgroundSize: 'auto, var(--cc-pattern-size) var(--cc-pattern-size)',
                     backgroundBlendMode: 'var(--cc-pattern-blend)',
                     opacity: 'var(--cc-pattern-opacity)',
                 },
@@ -299,8 +300,9 @@ export default function FrontPage({
                     <FrontFooter />
                 </Box>
             </Box>
-            {/* Temporary palette exploration; renders only on the dev server. */}
+            {/* Temporary palette + wallpaper tools; render only on the dev server. */}
             {process.env.NODE_ENV === 'development' && <PaletteTester />}
+            {process.env.NODE_ENV === 'development' && <PatternTuner />}
         </Box>
     );
 }
