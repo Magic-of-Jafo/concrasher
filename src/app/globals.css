@@ -130,6 +130,12 @@ a {
   --cc-hero-bokeh-size: auto, auto, auto, auto, 90px 70px, 110px 90px, auto;
   --cc-hero-ink: #f2ede3;
   --cc-hero-sub: rgba(242, 237, 227, 0.82);
+  /* Victorian damask wallpaper (public/BG/bg_pattern.png, gray two-tone):
+     tinted per theme via blend, rendered at whisper opacity UNDER everything.
+     Dark: gold-warmed on the black stage. */
+  --cc-pattern-overlay: linear-gradient(rgba(198, 151, 73, 1), rgba(198, 151, 73, 1));
+  --cc-pattern-blend: overlay;
+  --cc-pattern-opacity: 0.05;
 }
 
 /* Light ("house lights up"): Abyss daylight — pale teal-white, deep indigo
@@ -173,6 +179,10 @@ a {
   --cc-hero-bokeh-size: auto, auto, auto, auto, 90px 70px, 110px 90px, auto;
   --cc-hero-ink: #f1f6f5;
   --cc-hero-sub: rgba(241, 246, 245, 0.85);
+  /* Light wallpaper: the same damask, navy-cooled on the pale teal ground. */
+  --cc-pattern-overlay: linear-gradient(rgba(41, 70, 105, 1), rgba(41, 70, 105, 1));
+  --cc-pattern-blend: color;
+  --cc-pattern-opacity: 0.08;
 }
 
 /* Homepage hero load choreography ("House Lights Down"): content rises as the

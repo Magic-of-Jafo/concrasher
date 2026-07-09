@@ -243,8 +243,31 @@ export default function FrontPage({
     const excludeIds = [...rail.map((c) => c.id), ...(billing ? [billing.id] : [])];
 
     return (
-        <Box component="main" id="main-content" sx={{ backgroundColor: 'var(--cc-bg)', minHeight: '100vh' }}>
-            <Box sx={{ backgroundImage: 'var(--cc-field)' }}>
+        <Box
+            component="main"
+            id="main-content"
+            sx={{
+                backgroundColor: 'var(--cc-bg)',
+                minHeight: '100vh',
+                position: 'relative',
+                isolation: 'isolate',
+                // The wallpaper: Victorian damask tinted through the theme's
+                // blend tokens, fixed so content scrolls over it. Decorative
+                // only; sits under every other layer.
+                '&::before': {
+                    content: '""',
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                    backgroundImage: 'var(--cc-pattern-overlay), url(/BG/bg_pattern.png)',
+                    backgroundSize: 'auto, 560px 560px',
+                    backgroundBlendMode: 'var(--cc-pattern-blend)',
+                    opacity: 'var(--cc-pattern-opacity)',
+                },
+            }}
+        >
+            <Box sx={{ backgroundImage: 'var(--cc-field)', position: 'relative', zIndex: 1 }}>
                 <Box sx={{ maxWidth: 1080, mx: 'auto', px: { xs: 2.5, md: 6 }, pt: 3, pb: 5 }}>
                     <TopLine />
                     <Masthead />
