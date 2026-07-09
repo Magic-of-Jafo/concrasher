@@ -268,8 +268,22 @@ export default function FrontPage({
                 },
             }}
         >
-            <Box sx={{ backgroundImage: 'var(--cc-field)', position: 'relative', zIndex: 1 }}>
-                <Box sx={{ maxWidth: 1080, mx: 'auto', px: { xs: 2.5, md: 6 }, pt: 3, pb: 5 }}>
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+                {/* The sheet: a solid panel behind the content column, so the
+                    wallpaper reads in the gutters only, never under the text. */}
+                <Box
+                    sx={{
+                        maxWidth: 1080,
+                        mx: 'auto',
+                        px: { xs: 2.5, md: 6 },
+                        pt: 3,
+                        pb: 5,
+                        minHeight: '100vh',
+                        backgroundColor: 'var(--cc-bg)',
+                        backgroundImage: 'var(--cc-field)',
+                        boxShadow: '0 0 44px rgba(0, 0, 0, 0.3)',
+                    }}
+                >
                     <TopLine />
                     <Masthead />
                     <FrontHero message={heroMessage} imageUrl={heroImage} />
