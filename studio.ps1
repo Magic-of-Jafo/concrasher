@@ -1,3 +1,10 @@
-#$env:DATABASE_URL = "postgresql://postgres:Alameda45212!@localhost:5432/conventioncrasher_dev"
-$env:DATABASE_URL = "postgresql://jafo38583:unhmbdpWfdFx5F5CbV3cZkNDqqUQlk1i@dpg-d1on2cje5dus73edi6s0-a.ohio-postgres.render.com/convention_crasher_db"
+# Prisma Studio launcher.
+# DATABASE_URL comes from .env.local — never hardcode credentials here;
+# this file is tracked in a PUBLIC repo. To point Studio at another
+# database, set $env:DATABASE_URL yourself before running this script.
+if (-not $env:DATABASE_URL) {
+    $line = Select-String -Path .env.local -Pattern '^DATABASE_URL=' | Select-Object -First 1
+    if (-not $line) { Write-Error 'DATABASE_URL not set and not found in .env.local'; exit 1 }
+    $env:DATABASE_URL = $line.Line -replace '^DATABASE_URL="?(.*?)"?$', '$1'
+}
 npx prisma studio
