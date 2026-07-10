@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
     Box,
     Typography,
-    Paper,
     Table,
     TableBody,
     TableCell,
@@ -12,7 +11,6 @@ import {
     TableHead,
     TableRow,
     Stack,
-    Chip,
     Button,
     Link as MuiLink,
     Tab,
@@ -20,6 +18,8 @@ import {
 } from '@mui/material';
 import { format } from 'date-fns';
 import { ConventionStatus } from '@prisma/client';
+import { DISPLAY, BODY } from '@/lib/fonts';
+import { SectionKicker } from './VenueSection';
 
 interface PricingSectionProps {
     convention: any;
@@ -75,11 +75,16 @@ function formatSave(amount: number, currencySymbol: string, _currencyCode: strin
 function SaveBadge({ amount, currencySymbol, currencyCode }: { amount: number; currencySymbol: string; currencyCode: string }) {
     if (!(amount > 0)) return null;
     return (
-        <Chip
-            size="small"
-            label={`Save ${formatSave(amount, currencySymbol, currencyCode)}`}
-            sx={{ bgcolor: '#E1F5EE', color: '#0F6E56', fontWeight: 600, height: 22, '& .MuiChip-label': { px: 1 } }}
-        />
+        <Box
+            component="span"
+            sx={{
+                fontFamily: BODY, fontSize: '0.72rem', fontWeight: 700,
+                color: 'var(--cc-live)', border: '1px solid var(--cc-live)',
+                borderRadius: '8px', px: 0.75, py: 0.25, whiteSpace: 'nowrap',
+            }}
+        >
+            {`Save ${formatSave(amount, currencySymbol, currencyCode)}`}
+        </Box>
     );
 }
 
@@ -105,18 +110,18 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
 
     if (isTwoChannel) {
         return (
-            <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+            <TableContainer sx={{ mt: 2, borderRadius: '12px', overflow: 'auto', border: '1px solid var(--cc-panel-border)' }}>
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 3 }}>
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>Attendee Category</Typography>
+                            <TableCell sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 3 }}>
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-ink)' }}>Attendee Category</Typography>
                             </TableCell>
-                            <TableCell align="center" sx={{ backgroundColor: 'grey.300', color: 'text.primary', py: 2.5, px: 2, minWidth: 120 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>{primaryLabel}</Typography>
+                            <TableCell align="center" sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-muted)' }}>{primaryLabel}</Typography>
                             </TableCell>
-                            <TableCell align="center" sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2, minWidth: 120 }}>
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>{secondaryLabel}</Typography>
+                            <TableCell align="center" sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-ink)' }}>{secondaryLabel}</Typography>
                             </TableCell>
                         </TableRow>
                     </TableHead>
@@ -131,7 +136,7 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                 const isDeal = other !== null && val < other;
                                 return (
                                     <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ flexWrap: 'wrap' }}>
-                                        <Typography sx={{ fontWeight: isDeal ? 'bold' : 500, fontSize: isDeal ? '1.25rem' : '1.1rem' }}>
+                                        <Typography sx={{ fontFamily: DISPLAY, fontWeight: isDeal ? 800 : 600, fontSize: isDeal ? '1.25rem' : '1.1rem', color: 'var(--cc-ink)' }}>
                                             {formatPrice(val, currencySymbol, currencyCode)}
                                         </Typography>
                                         {isDeal && other !== null && <SaveBadge amount={other - val} currencySymbol={currencySymbol} currencyCode={currencyCode} />}
@@ -139,16 +144,16 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                 );
                             };
                             return (
-                                <TableRow key={tier.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }, '&:hover': { backgroundColor: 'action.selected' } }}>
+                                <TableRow key={tier.id} sx={{ '& td': { borderBottom: '1px solid var(--cc-hairline)' }, '&:hover': { backgroundColor: 'var(--cc-panel)' } }}>
                                     <TableCell sx={{ py: 2.5, px: 3 }}>
-                                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>{tier.label}</Typography>
+                                        <Typography sx={{ fontFamily: BODY, fontWeight: 600, fontSize: '1rem', color: 'var(--cc-ink)' }}>{tier.label}</Typography>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
                                         {renderChannelCell(primary, secondary)}
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
                                         {secondary === null ? (
-                                            <Typography variant="body1" sx={{ color: 'text.disabled' }}>–</Typography>
+                                            <Typography sx={{ color: 'var(--cc-soft)' }}>–</Typography>
                                         ) : (
                                             renderChannelCell(secondary, primary)
                                         )}
@@ -179,29 +184,29 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
     const uniqueCutoffDates = allCutoffs.filter((d, i) => i === 0 || d.getTime() !== allCutoffs[i - 1].getTime());
 
     return (
-        <TableContainer sx={{ mt: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+        <TableContainer sx={{ mt: 2, borderRadius: '12px', overflow: 'auto', border: '1px solid var(--cc-panel-border)' }}>
             <Table>
                 <TableHead>
                     {uniqueCutoffDates.length > 0 && (
                         <TableRow>
                             <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
-                            <TableCell align="center" colSpan={uniqueCutoffDates.length} sx={{ borderBottom: 'none', backgroundColor: '#f5f5f5', color: 'text.primary', py: 2 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>Price good through</Typography>
+                            <TableCell align="center" colSpan={uniqueCutoffDates.length} sx={{ borderBottom: 'none', backgroundColor: 'var(--cc-panel)', py: 2 }}>
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-muted)' }}>Price good through</Typography>
                             </TableCell>
                             <TableCell sx={{ border: 'none', py: 2 }}></TableCell>
                         </TableRow>
                     )}
                     <TableRow>
-                        <TableCell sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 3 }}>
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>Attendee Category</Typography>
+                        <TableCell sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 3 }}>
+                            <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-ink)' }}>Attendee Category</Typography>
                         </TableCell>
                         {uniqueCutoffDates.map((date, index) => (
-                            <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.300', color: 'text.primary', py: 2.5, px: 2, minWidth: 120 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 600 }}>{formatDiscountDate(date, timezone)}</Typography>
+                            <TableCell key={index} align="center" sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 2, minWidth: 120 }}>
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-muted)' }}>{formatDiscountDate(date, timezone)}</Typography>
                             </TableCell>
                         ))}
-                        <TableCell align="center" sx={{ backgroundColor: 'grey.800', color: 'white', py: 2.5, px: 2, minWidth: 120 }}>
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>{uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}</Typography>
+                        <TableCell align="center" sx={{ backgroundColor: 'var(--cc-panel)', borderBottom: '1px solid var(--cc-panel-border)', py: 2.5, px: 2, minWidth: 120 }}>
+                            <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--cc-ink)' }}>{uniqueCutoffDates.length > 0 ? 'Current Price' : 'Price'}</Typography>
                         </TableCell>
                     </TableRow>
                 </TableHead>
@@ -213,9 +218,9 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                         const fullPrice = info.regular;
                         const hasDiscount = current < fullPrice;
                         return (
-                            <TableRow key={tier.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' }, '&:hover': { backgroundColor: 'action.selected' } }}>
+                            <TableRow key={tier.id} sx={{ '& td': { borderBottom: '1px solid var(--cc-hairline)' }, '&:hover': { backgroundColor: 'var(--cc-panel)' } }}>
                                 <TableCell sx={{ py: 2.5, px: 3 }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1rem' }}>{tier.label}</Typography>
+                                    <Typography sx={{ fontFamily: BODY, fontWeight: 600, fontSize: '1rem', color: 'var(--cc-ink)' }}>{tier.label}</Typography>
                                 </TableCell>
                                 {uniqueCutoffDates.map((cutoffDate, index) => {
                                     let cellPrice: number | null = null;
@@ -226,8 +231,8 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                         cellPrice = applicable ? applicable.amount : info.regular;
                                     }
                                     return (
-                                        <TableCell key={index} align="center" sx={{ backgroundColor: 'grey.50', py: 2.5, px: 2 }}>
-                                            <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'text.disabled' : 'inherit' }}>
+                                        <TableCell key={index} align="center" sx={{ py: 2.5, px: 2 }}>
+                                            <Typography sx={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: '1.1rem', color: cellPrice === null ? 'var(--cc-soft)' : 'var(--cc-muted)' }}>
                                                 {cellPrice === null ? '–' : formatPrice(cellPrice, currencySymbol, currencyCode)}
                                             </Typography>
                                         </TableCell>
@@ -235,7 +240,7 @@ function TabPricingTable({ tiers, discounts, currencySymbol, currencyCode, timez
                                 })}
                                 <TableCell align="center" sx={{ py: 2.5, px: 2 }}>
                                     <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ flexWrap: 'wrap' }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
+                                        <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '1.25rem', color: 'var(--cc-ink)' }}>
                                             {formatPrice(current, currencySymbol, currencyCode)}
                                         </Typography>
                                         {hasDiscount && <SaveBadge amount={fullPrice - current} currencySymbol={currencySymbol} currencyCode={currencyCode} />}
@@ -272,8 +277,6 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const secondaryChannelLabel =
         convention.settings?.find((s: any) => s.key === 'secondaryChannelLabel')?.value || 'Online';
 
-    const h1Styles = { fontSize: { xs: '2rem', md: '3rem' }, lineHeight: { xs: 1.2, md: 1.167 } };
-
     // Group tiers into tabs (independent tables). Empty tab = the single/base table.
     const tabValues: string[] = [];
     for (const tier of priceTiers) {
@@ -306,19 +309,23 @@ export default function PricingSection({ convention }: PricingSectionProps) {
             <Box sx={{ minWidth: { xs: 'auto', md: 120 }, display: 'flex', justifyContent: 'center' }}>
                 {hasRegistrationUrl ? (
                     <Button
-                        variant="contained"
-                        color="primary"
-                        size="large"
                         component="a"
                         href={convention.registrationUrl!}
                         target="_blank"
                         rel="noopener noreferrer"
-                        sx={{ fontWeight: 600, px: 3, py: 1.5, fontSize: '1rem', whiteSpace: 'nowrap' }}
+                        sx={{
+                            fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', textTransform: 'none',
+                            backgroundColor: 'var(--cc-gold)', color: 'var(--cc-gold-ink)',
+                            px: 3.25, py: 1.5, minHeight: 48, borderRadius: '8px', whiteSpace: 'nowrap',
+                            boxShadow: 'var(--cc-glow-gold)',
+                            '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                            '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
+                        }}
                     >
-                        Register Here
+                        Register Here ↗
                     </Button>
                 ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ fontStyle: 'italic', textAlign: 'center', fontFamily: BODY, color: 'var(--cc-soft)' }}>
                         Check back later for registration link
                     </Typography>
                 )}
@@ -331,36 +338,38 @@ export default function PricingSection({ convention }: PricingSectionProps) {
         // point ticket-buyers to the festival's own site instead.
         if (convention.type === 'FESTIVAL') {
             return (
-                <Paper sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>Tickets &amp; Pricing</Typography>
-                    <Typography variant="body1" color="text.secondary" sx={{ mb: officialPricingUrl ? 2.5 : 0 }}>
+                <Box sx={{ py: 1 }}>
+                    <SectionKicker>Tickets &amp; Pricing</SectionKicker>
+                    <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)', mb: officialPricingUrl ? 2.5 : 0 }}>
                         Each show at this festival is ticketed individually, with its own price.
                         For tickets and full pricing, visit the festival&apos;s official site.
                     </Typography>
                     {officialPricingUrl && (
                         <Button
-                            variant="contained"
-                            color="primary"
-                            size="large"
                             component="a"
                             href={officialPricingUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            sx={{ fontWeight: 600, px: 3, py: 1.5 }}
+                            sx={{
+                                fontFamily: DISPLAY, fontWeight: 700, textTransform: 'none',
+                                color: 'var(--cc-ink)', border: '1px solid var(--cc-panel-border)',
+                                borderRadius: '8px', px: 2, minHeight: 44,
+                                '&:hover': { borderColor: 'var(--cc-cyan)', backgroundColor: 'var(--cc-panel)' },
+                            }}
                         >
-                            Tickets &amp; pricing on the festival site
+                            Tickets &amp; pricing on the festival site ↗
                         </Button>
                     )}
-                </Paper>
+                </Box>
             );
         }
         return (
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>Pricing</Typography>
-                <Typography variant="body1" color="text.secondary">
+            <Box sx={{ py: 1 }}>
+                <SectionKicker>Pricing</SectionKicker>
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
                     Pricing information is not yet available for this convention.
                 </Typography>
-            </Paper>
+            </Box>
         );
     }
 
@@ -368,10 +377,8 @@ export default function PricingSection({ convention }: PricingSectionProps) {
     const activeTabTiers = priceTiers.filter((t: any) => (t.tab || '') === activeTab);
 
     return (
-        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
-            <Typography variant="h1" component="h1" gutterBottom color="text.primary" sx={h1Styles}>
-                {convention.name} Pricing
-            </Typography>
+        <Box sx={{ py: 1 }}>
+            <SectionKicker>Pricing</SectionKicker>
 
             {tabValues.length > 1 && (
                 <Tabs
@@ -379,7 +386,12 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                     onChange={(_, val) => setSelectedTab(val)}
                     variant="scrollable"
                     scrollButtons="auto"
-                    sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { fontWeight: 600, fontSize: '1rem', textTransform: 'none' } }}
+                    sx={{
+                        mb: 2, borderBottom: '1px solid var(--cc-hairline)',
+                        '& .MuiTabs-indicator': { backgroundColor: 'var(--cc-gold)' },
+                        '& .MuiTab-root': { fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.95rem', textTransform: 'none', color: 'var(--cc-muted)' },
+                        '& .MuiTab-root.Mui-selected': { color: 'var(--cc-ink)' },
+                    }}
                     aria-label="Pricing tabs"
                 >
                     {tabValues.map((t) => (
@@ -403,15 +415,14 @@ export default function PricingSection({ convention }: PricingSectionProps) {
 
             <Typography
                 variant="caption"
-                color="text.secondary"
-                sx={{ display: 'block', mt: 1.5, mx: 'auto', maxWidth: 520, textAlign: 'center', fontStyle: 'italic' }}
+                sx={{ display: 'block', mt: 1.5, mx: 'auto', maxWidth: 520, textAlign: 'center', fontStyle: 'italic', fontFamily: BODY, color: 'var(--cc-soft)' }}
             >
                 {hasRegistrationUrl ? (
                     'Click above to register or to see the most current event pricing. Prices here are a guide and may change; the official event page is always the final word.'
                 ) : officialPricingUrl ? (
                     <>
                         Prices here are a guide and may change. If anything differs from the{' '}
-                        <MuiLink href={officialPricingUrl} target="_blank" rel="noopener noreferrer">official event page</MuiLink>,
+                        <MuiLink href={officialPricingUrl} target="_blank" rel="noopener noreferrer" sx={{ color: 'var(--cc-cyan)' }}>official event page</MuiLink>,
                         the official page is correct.
                     </>
                 ) : (

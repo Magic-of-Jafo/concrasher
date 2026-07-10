@@ -217,39 +217,22 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     }, [convention.priceTiers]);
     const registerLabel = minPrice ? `Register — from $${minPrice}` : 'Register';
 
-    // The legacy section components were designed on a white page; until each
-    // gets its reskin pass they render on a light island so nothing goes
-    // dark-on-dark under the House Lights themes.
-    const legacySheet = (children: React.ReactNode) => (
-        <Box
-            sx={{
-                backgroundColor: '#ffffff',
-                borderRadius: '12px',
-                border: '1px solid var(--cc-panel-border)',
-                overflow: 'hidden',
-                py: 1,
-            }}
-        >
-            {children}
-        </Box>
-    );
-
     const pane = () => {
         switch (tab) {
             case 'schedule':
-                return legacySheet(convention.type === 'FESTIVAL'
+                return convention.type === 'FESTIVAL'
                     ? <FestivalSchedule convention={convention} />
-                    : <ScheduleSection convention={convention} />);
+                    : <ScheduleSection convention={convention} />;
             case 'pricing':
-                return legacySheet(<PricingSection convention={convention} />);
+                return <PricingSection convention={convention} />;
             case 'venue':
-                return legacySheet(<VenueSection convention={convention} />);
+                return <VenueSection convention={convention} />;
             case 'hotels':
-                return legacySheet(<HotelSection convention={convention} />);
+                return <HotelSection convention={convention} />;
             case 'dealers':
-                return legacySheet(<DealersSection convention={convention} />);
+                return <DealersSection convention={convention} />;
             case 'media':
-                return legacySheet(<MediaGallerySection convention={convention} />);
+                return <MediaGallerySection convention={convention} />;
             default:
                 return <AboutPane convention={convention} />;
         }

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Box, Typography, Tabs, Tab, Chip, useTheme } from '@mui/material';
+import { Box, Typography, Tabs, Tab } from '@mui/material';
+import { DISPLAY, BODY } from '@/lib/fonts';
 import { alpha, darken } from '@mui/material/styles';
 import { keyframes } from '@mui/system';
 import Link from '@mui/material/Link';
@@ -50,7 +51,7 @@ function ProfileLink({ id, children }: { id: string; children: React.ReactNode }
             href={`/t/${id}`}
             target="_blank"
             rel="noopener noreferrer"
-            sx={{ color: 'primary.main', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+            sx={{ color: 'var(--cc-cyan)', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
         >
             {children}
         </Link>
@@ -106,7 +107,6 @@ const fadeInUp = keyframes`
 `;
 
 export default function ScheduleSection({ convention }: ScheduleSectionProps) {
-    const theme = useTheme();
 
     const sortedDays = useMemo(
         () => [...(convention.scheduleDays || [])].sort((a, b) => a.dayOffset - b.dayOffset),
@@ -133,10 +133,10 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     if (sortedDays.length === 0) {
         return (
             <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
-                <Typography variant="h1" component="h1" gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '3rem' } }}>
+                <Typography component="h2" gutterBottom sx={{ fontFamily: DISPLAY, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-magenta)', textShadow: 'var(--cc-glow-magenta)' }}>
                     Schedule
                 </Typography>
-                <Typography variant="body1" color="text.secondary">
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
                     The schedule for this convention has not been released yet.
                 </Typography>
             </Box>
@@ -152,7 +152,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
     return (
         <Box sx={{ width: '100%', pb: 4 }}>
             <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 }, pb: 1.5 }}>
-                <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.75rem' }, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                <Typography component="h2" sx={{ fontFamily: DISPLAY, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-magenta)', textShadow: 'var(--cc-glow-magenta)' }}>
                     Schedule
                 </Typography>
             </Box>
@@ -163,9 +163,11 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                     position: 'sticky',
                     top: 0,
                     zIndex: 3,
-                    bgcolor: alpha(theme.palette.background.paper, 0.85),
+                    backgroundColor: 'var(--cc-bg)',
+                    backgroundImage: 'linear-gradient(var(--cc-panel), var(--cc-panel))',
                     backdropFilter: 'blur(8px)',
-                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    borderBottom: '1px solid var(--cc-hairline)',
+                    borderRadius: '8px',
                     px: { xs: 1, sm: 2, md: 3 },
                 }}
             >
@@ -177,7 +179,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                     allowScrollButtonsMobile
                     sx={{
                         minHeight: 0,
-                        '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+                        '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0', backgroundColor: 'var(--cc-gold)' },
                         '& .MuiTab-root': { minHeight: 0, py: 1, px: { xs: 1.75, sm: 2.5 }, textTransform: 'none' },
                     }}
                 >
@@ -187,10 +189,10 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                             disableRipple
                             label={
                                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>
-                                    <Typography component="span" sx={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', color: activeIndex === i ? 'primary.main' : 'text.secondary' }}>
+                                    <Typography component="span" sx={{ fontFamily: DISPLAY, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', color: activeIndex === i ? 'var(--cc-gold)' : 'var(--cc-soft)' }}>
                                         {formatConventionDay(convention.startDate, d.dayOffset, 'EEE').toUpperCase()}
                                     </Typography>
-                                    <Typography component="span" sx={{ fontSize: '0.95rem', fontWeight: activeIndex === i ? 800 : 600, color: activeIndex === i ? 'text.primary' : 'text.secondary' }}>
+                                    <Typography component="span" sx={{ fontFamily: DISPLAY, fontSize: '0.95rem', fontWeight: activeIndex === i ? 800 : 600, color: activeIndex === i ? 'var(--cc-ink)' : 'var(--cc-muted)' }}>
                                         {formatConventionDay(convention.startDate, d.dayOffset, 'MMM d')}
                                     </Typography>
                                 </Box>
@@ -203,16 +205,16 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
             {/* Selected day */}
             <Box sx={{ px: { xs: 1.5, sm: 3, md: 4 }, pt: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2, px: { xs: 0.5, sm: 0 } }}>
-                    <Typography variant="h6" component="h2" sx={{ fontWeight: 700 }}>
+                    <Typography variant="h6" component="h3" sx={{ fontFamily: DISPLAY, fontWeight: 800, color: 'var(--cc-ink)' }}>
                         {formatConventionDay(convention.startDate, day.dayOffset, 'EEEE, MMMM d')}
                     </Typography>
                     {phase && (
-                        <Chip label={phase} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600 }} />
+                        <Box component="span" sx={{ fontFamily: DISPLAY, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--cc-soft)', border: '1px solid var(--cc-panel-border)', borderRadius: '8px', px: 1, py: 0.25 }}>{phase}</Box>
                     )}
                 </Box>
 
                 {events.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 2 }}>
+                    <Typography variant="body2" sx={{ px: 0.5, py: 2, fontFamily: BODY, color: 'var(--cc-muted)' }}>
                         No events scheduled for this day yet.
                     </Typography>
                 ) : (
@@ -242,9 +244,9 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                         pr: { xs: 1.25, sm: 2 },
                                         py: 1.4,
                                         mb: 1,
-                                        borderRadius: 2,
-                                        bgcolor: alpha(color, 0.05),
-                                        border: `1px solid ${alpha(color, 0.18)}`,
+                                        borderRadius: '8px',
+                                        bgcolor: alpha(color, 0.07),
+                                        border: `1px solid ${alpha(color, 0.22)}`,
                                         overflow: 'hidden',
                                         transition: 'background-color .18s ease, transform .18s ease, box-shadow .18s ease',
                                         animation: `${fadeInUp} .35s ease both`,
@@ -265,11 +267,11 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                 >
                                     {/* Time rail */}
                                     <Box sx={{ flexShrink: 0, minWidth: { xs: 64, sm: 74 }, pt: 0.1 }}>
-                                        <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.82rem', sm: '0.9rem' }, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
+                                        <Typography sx={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: { xs: '0.82rem', sm: '0.9rem' }, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', color: 'var(--cc-ink)' }}>
                                             {fmtMins(start)}
                                         </Typography>
                                         {!isMilestone && (
-                                            <Typography sx={{ color: 'text.secondary', fontSize: '0.72rem', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
+                                            <Typography sx={{ color: 'var(--cc-soft)', fontSize: '0.72rem', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }}>
                                                 {fmtMins(start + (event.durationMinutes as number))}
                                             </Typography>
                                         )}
@@ -277,7 +279,7 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
 
                                     {/* Content */}
                                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                                        <Typography component="div" sx={{ fontWeight: 600, fontSize: { xs: '0.92rem', sm: '1rem' }, lineHeight: 1.3 }}>
+                                        <Typography component="div" sx={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: { xs: '0.92rem', sm: '1rem' }, lineHeight: 1.3, color: 'var(--cc-ink)' }}>
                                             {linkifyNames(event.title, event.talentLinks)}
                                         </Typography>
                                         {event.eventType && (
@@ -290,8 +292,9 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                                     fontWeight: 700,
                                                     letterSpacing: '0.04em',
                                                     textTransform: 'uppercase',
-                                                    color: darken(color, 0.45),
+                                                    color,
                                                     bgcolor: alpha(color, 0.16),
+                                                    '[data-theme="light"] &': { color: darken(color, 0.45) },
                                                     px: 0.75, py: '2px',
                                                     borderRadius: 1,
                                                 }}
@@ -301,20 +304,20 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                                         )}
 
                                         {featuring.length > 0 && (
-                                            <Typography variant="body2" sx={{ mt: 0.4, fontSize: '0.82rem', color: 'text.secondary' }}>
+                                            <Typography variant="body2" sx={{ mt: 0.4, fontSize: '0.82rem', fontFamily: BODY, color: 'var(--cc-muted)' }}>
                                                 <Box component="span" sx={{ fontWeight: 600 }}>Featuring: </Box>
                                                 {renderTalentList(featuring)}
                                             </Typography>
                                         )}
 
                                         {event.description && (
-                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.82rem', color: 'text.secondary', whiteSpace: 'pre-wrap' }}>
+                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.82rem', fontFamily: BODY, color: 'var(--cc-muted)', whiteSpace: 'pre-wrap' }}>
                                                 {linkifyNames(event.description, event.talentLinks)}
                                             </Typography>
                                         )}
 
                                         {event.locationName && (
-                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.78rem', color: 'text.secondary' }}>
+                                            <Typography variant="body2" sx={{ mt: 0.5, fontSize: '0.78rem', fontFamily: BODY, color: 'var(--cc-soft)' }}>
                                                 📍 {event.locationName}
                                             </Typography>
                                         )}

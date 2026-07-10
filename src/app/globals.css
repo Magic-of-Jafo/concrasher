@@ -84,56 +84,56 @@ a {
    accents deepened for AA contrast on the lavender-white ground. The toggle
    lives in the page topline; the no-flash script in layout.tsx applies the
    saved choice before first paint. */
-/* Dark ("house lights down"): Midnight Gold — true black, slate ink, gold
-   accents. Chosen 2026-07-07 (with slate #e3e3e3 replacing the palette's warm
-   cream text, per the user). */
+/* Dark ("house lights down"): Slate & Taupe — deep slate stage, warm taupe
+   cream ink and CTAs (colorhunt 222831/393e46/948979/dfd0b8). Chosen
+   2026-07-10, replacing Midnight Gold after the palette-tester bake-off. */
 :root {
-  --cc-bg: #000000;
-  --cc-panel: rgba(40, 42, 58, 0.45);
-  --cc-panel-border: rgba(198, 151, 73, 0.45);
-  --cc-hairline: rgba(40, 42, 58, 0.95);
-  --cc-ink: #e3e3e3;
-  --cc-muted: #b4b8bf;
-  --cc-soft: #82868f;
-  --cc-magenta: #c69749;
-  --cc-cyan: #a9b4d6;
-  --cc-gold: #c69749;
-  --cc-gold-ink: #191307;
+  --cc-bg: #222831;
+  --cc-panel: rgba(57, 62, 70, 0.55);
+  --cc-panel-border: rgba(148, 137, 121, 0.5);
+  --cc-hairline: rgba(57, 62, 70, 0.95);
+  --cc-ink: #dfd0b8;
+  --cc-muted: #b9ad99;
+  --cc-soft: #8a8d94;
+  --cc-magenta: #dfd0b8;
+  --cc-cyan: #a8b3c4;
+  --cc-gold: #dfd0b8;
+  --cc-gold-ink: #222831;
   --cc-live: #7fe0a0;
-  --cc-majors-bg: linear-gradient(160deg, rgba(198, 151, 73, 0.14), rgba(40, 42, 58, 0.5));
-  --cc-majors-border: rgba(198, 151, 73, 0.4);
-  --cc-glow-magenta: 0 0 8px rgba(198, 151, 73, 0.8), 0 0 26px rgba(198, 151, 73, 0.45);
-  --cc-glow-cyan: 0 0 12px rgba(169, 180, 214, 0.5);
-  --cc-glow-live: 0 0 10px rgba(127, 224, 160, 0.7);
-  --cc-glow-gold: 0 0 20px rgba(198, 151, 73, 0.4);
-  --cc-glow-art: 0 0 22px rgba(227, 227, 227, 0.4);
-  --cc-glow-logo: drop-shadow(0 0 16px rgba(198, 151, 73, 0.45));
+  --cc-majors-bg: linear-gradient(160deg, rgba(148, 137, 121, 0.18), rgba(57, 62, 70, 0.5));
+  --cc-majors-border: rgba(148, 137, 121, 0.45);
+  --cc-glow-magenta: 0 0 8px rgba(223, 208, 184, 0.5), 0 0 26px rgba(223, 208, 184, 0.25);
+  --cc-glow-cyan: 0 0 12px rgba(168, 179, 196, 0.45);
+  --cc-glow-live: 0 0 10px rgba(127, 224, 160, 0.6);
+  --cc-glow-gold: 0 0 20px rgba(223, 208, 184, 0.25);
+  --cc-glow-art: 0 0 22px rgba(223, 208, 184, 0.4);
+  --cc-glow-logo: drop-shadow(0 0 16px rgba(148, 137, 121, 0.4));
   --cc-field:
-    radial-gradient(ellipse 75% 34% at 50% -4%, rgba(115, 95, 50, 0.55), transparent 65%),
-    radial-gradient(ellipse 40% 22% at 88% 20%, rgba(198, 151, 73, 0.12), transparent 70%);
+    radial-gradient(ellipse 75% 34% at 50% -4%, rgba(57, 62, 70, 0.8), transparent 65%),
+    radial-gradient(ellipse 40% 22% at 88% 20%, rgba(148, 137, 121, 0.18), transparent 70%);
   /* The site header: deliberately its own surface, distinct from the page.
-     Dark = lifted slate panel over the black stage, gold hairline underneath. */
-  --cc-header-bg: #14161d;
-  --cc-header-ink: #e3e3e3;
-  --cc-header-border: rgba(198, 151, 73, 0.35);
+     Dark = deeper slate panel over the stage, taupe hairline underneath. */
+  --cc-header-bg: #1a1f26;
+  --cc-header-ink: #dfd0b8;
+  --cc-header-border: rgba(148, 137, 121, 0.35);
   /* Hero band placeholder scene (until admin-uploaded rotating images exist):
-     gold spotlight pools + faint bokeh over a lifted black stage, plus a scrim
+     taupe spotlight pools + faint bokeh over a deep slate stage, plus a scrim
      so the rotating headline always reads. */
   --cc-hero-scene:
     linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 100%),
-    radial-gradient(ellipse 45% 90% at 12% -10%, rgba(198, 151, 73, 0.4), transparent 70%),
-    radial-gradient(ellipse 40% 80% at 88% -10%, rgba(198, 151, 73, 0.28), transparent 70%),
-    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(115, 95, 50, 0.35), transparent 65%),
-    radial-gradient(circle at 22% 38%, rgba(198, 151, 73, 0.2) 0 2px, transparent 3px),
-    radial-gradient(circle at 71% 62%, rgba(198, 151, 73, 0.16) 0 2px, transparent 3px),
-    linear-gradient(180deg, #0b0c11, #06060a);
+    radial-gradient(ellipse 45% 90% at 12% -10%, rgba(148, 137, 121, 0.45), transparent 70%),
+    radial-gradient(ellipse 40% 80% at 88% -10%, rgba(148, 137, 121, 0.3), transparent 70%),
+    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(148, 137, 121, 0.28), transparent 65%),
+    radial-gradient(circle at 22% 38%, rgba(223, 208, 184, 0.2) 0 2px, transparent 3px),
+    radial-gradient(circle at 71% 62%, rgba(223, 208, 184, 0.16) 0 2px, transparent 3px),
+    linear-gradient(180deg, #1c2129, #14181e);
   --cc-hero-bokeh-size: auto, auto, auto, auto, 90px 70px, 110px 90px, auto;
-  --cc-hero-ink: #f2ede3;
-  --cc-hero-sub: rgba(242, 237, 227, 0.82);
+  --cc-hero-ink: #f2ead8;
+  --cc-hero-sub: rgba(242, 234, 216, 0.82);
   /* Victorian damask wallpaper (public/BG/bg_pattern.png, gray two-tone):
      tinted per theme via blend, rendered at whisper opacity UNDER everything.
-     Dark: gold-warmed on the black stage. */
-  --cc-pattern-overlay: linear-gradient(rgba(198, 151, 73, 1), rgba(198, 151, 73, 1));
+     Dark: taupe-warmed on the slate stage. */
+  --cc-pattern-overlay: linear-gradient(rgba(148, 137, 121, 1), rgba(148, 137, 121, 1));
   --cc-pattern-blend: overlay;
   --cc-pattern-opacity: 0.14;
   --cc-pattern-size: 560px;

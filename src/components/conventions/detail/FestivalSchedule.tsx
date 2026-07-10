@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Box, Typography, ToggleButtonGroup, ToggleButton, MenuItem, Select, FormControl, InputLabel, Collapse, Chip, Button, Link } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { Box, Typography, ToggleButtonGroup, ToggleButton, MenuItem, Select, FormControl, InputLabel, Collapse, Button, Link } from '@mui/material';
+import { DISPLAY, BODY } from '@/lib/fonts';
+import { SectionKicker } from './VenueSection';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewTimelineIcon from '@mui/icons-material/ViewTimeline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -67,7 +68,6 @@ function runSummary(start: string, perfs: Performance[]): string {
 }
 
 function ProductionCard({ production, start, venueFilter }: { production: Production; start: string; venueFilter: string }) {
-    const theme = useTheme();
     const [open, setOpen] = useState(false);
 
     const perfs = (production.performances || [])
@@ -78,38 +78,34 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
     return (
         <Box
             sx={{
-                borderRadius: 3, overflow: 'hidden',
-                border: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)', transition: 'box-shadow .2s, transform .2s',
-                '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.14)' },
+                borderRadius: '12px', overflow: 'hidden',
+                border: '1px solid var(--cc-panel-border)', backgroundColor: 'var(--cc-panel)',
+                transition: 'border-color .2s, transform .2s',
+                '&:hover': { borderColor: 'var(--cc-cyan)', transform: 'translateY(-2px)' },
+                '@media (prefers-reduced-motion: reduce)': { '&:hover': { transform: 'none' } },
             }}
         >
             {production.coverImageUrl ? (
                 <Box component="img" src={production.coverImageUrl} alt={production.title}
                     sx={{ width: '100%', display: 'block', aspectRatio: '3 / 2', objectFit: 'cover' }} />
             ) : (
-                (() => {
-                    const hue = production.title.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-                    return (
-                        <Box sx={{
-                            width: '100%', aspectRatio: '3 / 2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: `linear-gradient(135deg, hsl(${hue},62%,52%), hsl(${(hue + 45) % 360},68%,42%))`,
-                            color: 'rgba(255,255,255,0.92)',
-                        }}>
-                            <AutoAwesomeIcon sx={{ fontSize: 44 }} />
-                        </Box>
-                    );
-                })()
+                <Box sx={{
+                    width: '100%', aspectRatio: '3 / 2', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--cc-hero-scene)', backgroundSize: 'var(--cc-hero-bokeh-size)',
+                    color: 'var(--cc-hero-sub)',
+                }}>
+                    <AutoAwesomeIcon sx={{ fontSize: 44 }} />
+                </Box>
             )}
             <Box sx={{ p: 2 }}>
-                <Typography variant="h6" component="h3" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                <Typography variant="h6" component="h3" sx={{ fontFamily: DISPLAY, fontWeight: 800, lineHeight: 1.2, color: 'var(--cc-ink)' }}>
                     {production.title}
                 </Typography>
                 {production.tagline && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>{production.tagline}</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.25, fontFamily: BODY, color: 'var(--cc-muted)' }}>{production.tagline}</Typography>
                 )}
 
-                <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: 'primary.main' }}>
+                <Typography variant="body2" sx={{ mt: 1, fontFamily: DISPLAY, fontWeight: 700, color: 'var(--cc-cyan)', textShadow: 'var(--cc-glow-cyan)' }}>
                     {runSummary(start, perfs)}
                 </Typography>
 
@@ -117,7 +113,7 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
                     onClick={() => setOpen(o => !o)}
                     size="small"
                     endIcon={<ExpandMoreIcon sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />}
-                    sx={{ mt: 0.5, ml: -1 }}
+                    sx={{ mt: 0.5, ml: -1, fontFamily: DISPLAY, fontWeight: 700, textTransform: 'none', color: 'var(--cc-ink)', borderRadius: '8px', '&:hover': { backgroundColor: 'var(--cc-panel)' } }}
                 >
                     {open ? 'Less' : 'Show times & details'}
                 </Button>
@@ -125,20 +121,20 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
                 <Collapse in={open} unmountOnExit>
                     <Box sx={{ pt: 1 }}>
                         {production.description && (
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, whiteSpace: 'pre-wrap' }}>
+                            <Typography variant="body2" sx={{ mb: 1.5, whiteSpace: 'pre-wrap', fontFamily: BODY, color: 'var(--cc-muted)' }}>
                                 {production.description}
                             </Typography>
                         )}
 
-                        <Typography variant="overline" color="text.secondary">Performances</Typography>
+                        <Typography variant="overline" sx={{ fontFamily: DISPLAY, color: 'var(--cc-soft)' }}>Performances</Typography>
                         <Box sx={{ mb: 1.5 }}>
                             {perfs.map(p => (
                                 <Box key={p.id} sx={{ display: 'flex', gap: 1, alignItems: 'baseline', py: 0.3, flexWrap: 'wrap' }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 132 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: DISPLAY, fontWeight: 700, minWidth: 132, color: 'var(--cc-ink)' }}>
                                         {formatConventionDay(start, p.dayOffset ?? 0, 'EEE, MMM d')}
                                         {typeof p.startTimeMinutes === 'number' ? ` · ${fmtMins(p.startTimeMinutes)}` : ''}
                                     </Typography>
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" sx={{ fontFamily: BODY, color: 'var(--cc-muted)' }}>
                                         {[p.venue?.venueName, p.locationName].filter(Boolean).join(' · ')}
                                     </Typography>
                                 </Box>
@@ -147,22 +143,23 @@ function ProductionCard({ production, start, venueFilter }: { production: Produc
 
                         {Array.isArray(production.priceTiers) && production.priceTiers.length > 0 && (
                             <>
-                                <Typography variant="overline" color="text.secondary">Tickets</Typography>
+                                <Typography variant="overline" sx={{ fontFamily: DISPLAY, color: 'var(--cc-soft)' }}>Tickets</Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: production.priceNote ? 0.5 : 1 }}>
                                     {production.priceTiers.map((t, i) => (
-                                        <Chip key={i} size="small" variant="outlined"
-                                            label={`${t.label}: $${typeof t.amount === 'number' ? t.amount : t.amount}`} />
+                                        <Box key={i} component="span" sx={{ fontFamily: BODY, fontSize: '0.75rem', fontWeight: 600, color: 'var(--cc-muted)', border: '1px solid var(--cc-panel-border)', borderRadius: '8px', px: 1, py: 0.4 }}>
+                                            {`${t.label}: $${t.amount}`}
+                                        </Box>
                                     ))}
                                 </Box>
                                 {production.priceNote && (
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{production.priceNote}</Typography>
+                                    <Typography variant="caption" sx={{ display: 'block', mb: 1, fontFamily: BODY, color: 'var(--cc-soft)' }}>{production.priceNote}</Typography>
                                 )}
                             </>
                         )}
 
                         {production.detailsUrl && (
                             <Link component={NextLink} href={production.detailsUrl} target="_blank" rel="noopener noreferrer"
-                                sx={{ fontWeight: 600 }}>
+                                sx={{ fontWeight: 700, fontFamily: DISPLAY, color: 'var(--cc-cyan)' }}>
                                 Full details →
                             </Link>
                         )}
@@ -200,9 +197,7 @@ export default function FestivalSchedule({ convention }: { convention: FestivalC
     return (
         <Box sx={{ width: '100%', pb: 4 }}>
             <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 }, pb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, justifyContent: 'space-between' }}>
-                <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.75rem' }, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                    Shows
-                </Typography>
+                <SectionKicker>Shows</SectionKicker>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
                     {view === 'cards' && venues.length > 1 && (
                         <FormControl size="small" sx={{ minWidth: 170 }}>
@@ -213,7 +208,22 @@ export default function FestivalSchedule({ convention }: { convention: FestivalC
                             </Select>
                         </FormControl>
                     )}
-                    <ToggleButtonGroup exclusive size="small" value={view} onChange={(_, v) => v && setView(v)}>
+                    <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={view}
+                        onChange={(_, v) => v && setView(v)}
+                        sx={{
+                            '& .MuiToggleButton-root': {
+                                fontFamily: DISPLAY, fontWeight: 700, textTransform: 'none',
+                                color: 'var(--cc-muted)', borderColor: 'var(--cc-panel-border)',
+                            },
+                            '& .MuiToggleButton-root.Mui-selected': {
+                                color: 'var(--cc-gold-ink)', backgroundColor: 'var(--cc-gold)',
+                                '&:hover': { backgroundColor: 'var(--cc-gold)' },
+                            },
+                        }}
+                    >
                         <ToggleButton value="cards"><ViewModuleIcon fontSize="small" sx={{ mr: 0.5 }} /> Shows</ToggleButton>
                         <ToggleButton value="timeline"><ViewTimelineIcon fontSize="small" sx={{ mr: 0.5 }} /> By day</ToggleButton>
                     </ToggleButtonGroup>
@@ -223,7 +233,7 @@ export default function FestivalSchedule({ convention }: { convention: FestivalC
             {view === 'timeline' ? (
                 <ScheduleSection convention={convention as any} />
             ) : visibleProductions.length === 0 ? (
-                <Typography variant="body1" color="text.secondary" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+                <Typography sx={{ px: { xs: 2, sm: 3, md: 4 }, fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
                     No shows have been announced yet.
                 </Typography>
             ) : (

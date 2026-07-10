@@ -3,21 +3,17 @@
 import React, { useState } from 'react';
 import {
     Typography,
-    Paper,
     ImageList,
     ImageListItem,
     ImageListItemBar,
-    Card,
-    CardMedia,
-    CardContent,
     Box,
     Tabs,
     Tab,
-    useTheme,
-    useMediaQuery,
     Skeleton,
 } from '@mui/material';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { BODY } from '@/lib/fonts';
+import { SectionKicker } from './VenueSection';
 
 interface ConventionMedia {
     id: string;
@@ -44,8 +40,8 @@ function VideoPlayer({ url, caption }: { url: string; caption?: string | null })
                 position: 'relative',
                 width: '100%',
                 paddingTop: '56.25%', // 16:9 aspect ratio
-                backgroundColor: '#f5f5f5',
-                borderRadius: 1,
+                backgroundColor: 'var(--cc-panel)',
+                borderRadius: '8px',
                 overflow: 'hidden'
             }}>
                 {isLoading && (
@@ -83,24 +79,16 @@ function VideoPlayer({ url, caption }: { url: string; caption?: string | null })
 }
 
 export default function MediaGallerySection({ convention }: MediaGallerySectionProps) {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
-    // Responsive h1 Typography styles
-    const h1Styles = {
-        fontSize: { xs: '2rem', md: '3rem' },
-        lineHeight: { xs: 1.2, md: 1.167 },
-    };
+    // Hook stays above the empty-state return (rules of hooks).
+    const [tab, setTab] = useState<'photos' | 'videos'>('photos');
 
     const media = convention.media || [];
 
     if (media.length === 0) {
         return (
-            <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
-                <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
-                    Media Gallery
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
+            <Box sx={{ py: 1 }}>
+                <SectionKicker>Media</SectionKicker>
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
                     No media has been added for this convention yet.
                 </Typography>
             </Box>
@@ -110,17 +98,23 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
     const images = media.filter((m) => m.type === 'IMAGE');
     const videos = media.filter((m) => m.type === 'VIDEO_LINK');
 
-    const [tab, setTab] = useState<'photos' | 'videos'>('photos');
-
     const handleTabChange = (_e: React.SyntheticEvent, val: 'photos' | 'videos') => setTab(val);
 
     return (
-        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, md: 4 } }}>
-            <Typography variant="h1" component="h1" gutterBottom sx={h1Styles}>
-                Media Gallery
-            </Typography>
+        <Box sx={{ py: 1 }}>
+            <SectionKicker>Media</SectionKicker>
 
-            <Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2 }} aria-label="media tabs">
+            <Tabs
+                value={tab}
+                onChange={handleTabChange}
+                aria-label="media tabs"
+                sx={{
+                    mb: 2,
+                    '& .MuiTabs-indicator': { backgroundColor: 'var(--cc-gold)' },
+                    '& .MuiTab-root': { fontFamily: BODY, textTransform: 'none', color: 'var(--cc-muted)' },
+                    '& .MuiTab-root.Mui-selected': { color: 'var(--cc-ink)' },
+                }}
+            >
                 <Tab label={`Photos (${images.length})`} value="photos" />
                 <Tab label={`Videos (${videos.length})`} value="videos" />
             </Tabs>
@@ -135,7 +129,7 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
                                     src={getS3ImageUrl(img.url)}
                                     alt={img.caption || 'Convention image'}
                                     loading="lazy"
-                                    style={{ width: '100%', height: 'auto' }}
+                                    style={{ width: '100%', height: 'auto', borderRadius: 8 }}
                                 />
                                 {img.caption && <ImageListItemBar title={img.caption} />}
                             </ImageListItem>
@@ -147,14 +141,14 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
             {tab === 'videos' && videos.length > 0 && (
                 <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
                     {videos.map((vid) => (
-                        <Card key={vid.id}>
+                        <Box key={vid.id} sx={{ borderRadius: '12px', border: '1px solid var(--cc-panel-border)', backgroundColor: 'var(--cc-panel)', overflow: 'hidden' }}>
                             <VideoPlayer url={vid.url} caption={vid.caption} />
                             {vid.caption && (
-                                <CardContent>
-                                    <Typography variant="body2">{vid.caption}</Typography>
-                                </CardContent>
+                                <Typography sx={{ fontFamily: BODY, fontSize: '0.85rem', color: 'var(--cc-muted)', p: 1.5 }}>
+                                    {vid.caption}
+                                </Typography>
                             )}
-                        </Card>
+                        </Box>
                     ))}
                 </Box>
             )}

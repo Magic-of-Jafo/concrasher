@@ -17,15 +17,16 @@ colors:
   major-cobalt: "#1D4ED8"
   major-violet: "#6D28D9"
   major-emerald: "#047857"
-  night-bg: "#000000"
-  night-ink: "#e3e3e3"
-  night-muted: "#b4b8bf"
-  night-soft: "#82868f"
-  night-gold: "#c69749"
-  night-gold-ink: "#191307"
-  night-slate: "#a9b4d6"
-  night-panel-base: "#282a3a"
-  night-bronze: "#735f32"
+  night-bg: "#222831"
+  night-ink: "#dfd0b8"
+  night-muted: "#b9ad99"
+  night-soft: "#8a8d94"
+  night-gold: "#dfd0b8"
+  night-gold-ink: "#222831"
+  night-slate: "#a8b3c4"
+  night-panel-base: "#393e46"
+  night-taupe: "#948979"
+  night-header: "#1a1f26"
   night-live: "#7fe0a0"
   day-bg: "#f1f6f5"
   day-ink: "#101443"
@@ -146,8 +147,8 @@ A dark theatrical wash with a single precious accent: deep stage-light blue, hit
 - **Legacy MUI Blue** (#1976d2): the untouched Material-UI default `primary.main`, still inherited by chips, links, and buttons. **Placeholder. Prohibited in new work**; it is the single biggest reason the site currently reads two-brained. The redesign retires it in favor of Blue Wash roles.
 
 ### House Lights (the 2026-07 front-page system — normative for the new homepage)
-The redesigned front page ("the Anchor layout") runs on its own two-theme palette, defined as CSS variables (`--cc-*`) in globals.css and toggled by the **House Lights** switch (`data-theme` on `<html>`; dark is default). Chosen 2026-07-07 from a seven-palette bake-off:
-- **Dark ("house lights down") = Midnight Gold.** True black #000000, slate ink #e3e3e3 (deliberately cool, replacing the source palette's warm cream), gold #c69749 carrying kickers, countdowns, AND the CTA (ink #191307), slate-blue #a9b4d6 as the secondary accent (links/section heads), panels from #282a3a, bronze #735f32 in the field gradient, live green #7fe0a0. Gold glows on dark.
+The redesigned front page ("the Anchor layout") runs on its own two-theme palette, defined as CSS variables (`--cc-*`) in globals.css and toggled by the **House Lights** switch (`data-theme` on `<html>`; dark is default). Light chosen 2026-07-07; dark re-chosen 2026-07-10 from the live palette tester:
+- **Dark ("house lights down") = Slate & Taupe.** Deep slate #222831 stage, warm taupe cream #dfd0b8 as ink AND the gold-role accent (kickers, countdowns, CTA — CTA ink #222831), muted taupe #b9ad99 for body copy, slate-blue #a8b3c4 as the secondary accent (links/section heads), panels from #393e46, taupe #948979 in borders/field gradient, header surface #1a1f26, live green #7fe0a0. Cream glows on dark. (Replaced Midnight Gold: true black / #c69749 gold.)
 - **Light ("house lights up") = Abyss daylight.** Pale teal-white #f1f6f5, deep indigo ink #101443, teal #2e6b6e (primary accent) + navy #294669 (secondary + CTA bg with #f1f6f5 ink), teal borders from #478b8d, live green #0a7a43. Glows retired.
 Low-alpha tints of these hues (panels, hairlines, gradient fields) are tonal ramps of this system. Headers Montserrat, body Open Sans (interim, user-chosen). **Buttons are rectangles (4-8px radius), never pills** (see Do's and Don'ts). The old Electric Night violet was the runner-up and lives only in the dev PaletteTester for reference.
 
