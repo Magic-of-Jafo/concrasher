@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Box, Alert } from '@mui/material';
 import { AutofillTextField } from '../ui/AutofillTextField';
+import { DISPLAY } from '@/lib/fonts';
 import { signIn } from 'next-auth/react';
 import { generateEventId, trackPixelEvent } from '@/lib/tracking-utils';
 
@@ -167,9 +168,17 @@ export default function RegisterForm() {
             <Button
                 type="submit"
                 fullWidth
-                variant="contained"
-                sx={{ mt: 3, mb: 2 }}
                 disabled={isSubmitting}
+                sx={{
+                    mt: 3, mb: 2,
+                    fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', textTransform: 'none',
+                    backgroundColor: 'var(--cc-gold)', color: 'var(--cc-gold-ink)',
+                    py: 1.5, minHeight: 48, borderRadius: '8px',
+                    boxShadow: 'var(--cc-glow-gold)',
+                    '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                    '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
+                    '&.Mui-disabled': { backgroundColor: 'var(--cc-panel)', color: 'var(--cc-soft)' },
+                }}
             >
                 {isSubmitting ? 'Signing Up...' : 'Sign Up'}
             </Button>

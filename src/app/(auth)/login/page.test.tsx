@@ -15,6 +15,7 @@ jest.mock('next-auth/react', () => ({
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
+  usePathname: jest.fn().mockReturnValue('/login'),
 }));
 
 describe('LoginPage Component', () => {
@@ -37,7 +38,7 @@ describe('LoginPage Component', () => {
 
   it('should render the login form elements correctly', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();

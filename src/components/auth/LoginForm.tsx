@@ -7,8 +7,9 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LoginSchema } from '@/lib/validators';
 import { z } from 'zod';
-import { TextField, Button, Box, Typography, Alert, Link } from '@mui/material';
+import { Button, Box, Alert, Link } from '@mui/material';
 import { AutofillTextField } from '@/components/ui/AutofillTextField';
+import { DISPLAY, BODY } from '@/lib/fonts';
 
 type LoginFormInputs = z.infer<typeof LoginSchema>;
 
@@ -107,14 +108,31 @@ export default function LoginForm() {
             <Button
                 type="submit"
                 fullWidth
-                variant="contained"
-                sx={{ mt: 3, mb: 2 }}
                 disabled={isSubmitting}
+                sx={{
+                    mt: 3, mb: 2,
+                    fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', textTransform: 'none',
+                    backgroundColor: 'var(--cc-gold)', color: 'var(--cc-gold-ink)',
+                    py: 1.5, minHeight: 48, borderRadius: '8px',
+                    boxShadow: 'var(--cc-glow-gold)',
+                    '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                    '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
+                    '&.Mui-disabled': { backgroundColor: 'var(--cc-panel)', color: 'var(--cc-soft)' },
+                }}
             >
                 {isSubmitting ? 'Logging In...' : 'Login'}
             </Button>
             <Box sx={{ textAlign: 'right' }}>
-                <Link component="button" type="button" onClick={handleForgotPassword} variant="body2">
+                <Link
+                    component="button"
+                    type="button"
+                    onClick={handleForgotPassword}
+                    sx={{
+                        fontFamily: BODY, fontSize: '0.82rem',
+                        color: 'var(--cc-cyan)', textDecorationColor: 'var(--cc-cyan)',
+                        '&:hover': { color: 'var(--cc-ink)' },
+                    }}
+                >
                     Forgot password?
                 </Link>
             </Box>
