@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import Link from 'next/link';
 import { HomeConvention } from '../home/home-types';
 import type { HeroMessage } from '../home/headlines';
@@ -63,33 +65,59 @@ function HouseLightsToggle() {
         document.documentElement.dataset.theme = next ? 'light' : '';
         try { localStorage.setItem('cc-house-lights', next ? 'light' : 'dark'); } catch { /* private mode */ }
     }, [light]);
+    // A wordless slide toggle showing the CURRENT state: the thumb sits on
+    // the sun in light mode and on the moon in dark mode. (The old labeled
+    // button described the action instead, which read backwards.)
     return (
         <Box
             component="button"
             type="button"
+            role="switch"
             onClick={toggle}
-            aria-pressed={light}
+            aria-checked={light}
+            aria-label="Light or dark theme"
             suppressHydrationWarning
             sx={{
-                fontFamily: DISPLAY,
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
+                position: 'relative',
+                width: 64,
+                height: 32,
+                p: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 backgroundColor: 'var(--cc-panel)',
-                color: 'var(--cc-ink)',
                 border: '1px solid var(--cc-panel-border)',
                 borderRadius: '8px',
-                px: 1.5,
-                py: 1,
-                minHeight: 34,
                 cursor: 'pointer',
                 transition: 'border-color 0.15s ease-out',
-                '&:hover': { borderColor: 'var(--cc-magenta)' },
+                '&:hover': { borderColor: 'var(--cc-cyan)' },
                 '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '2px' },
             }}
         >
-            {light ? '☾ House lights down' : '☀ House lights up'}
+            {/* The thumb glides to the active side. */}
+            <Box
+                aria-hidden
+                suppressHydrationWarning
+                sx={{
+                    position: 'absolute',
+                    top: 3,
+                    left: light ? 3 : 33,
+                    width: 26,
+                    height: 24,
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--cc-gold)',
+                    transition: 'left 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                }}
+            />
+            <LightModeIcon
+                suppressHydrationWarning
+                sx={{ fontSize: 15, ml: '8.5px', zIndex: 1, color: light ? 'var(--cc-gold-ink)' : 'var(--cc-soft)', transition: 'color 0.2s' }}
+            />
+            <DarkModeIcon
+                suppressHydrationWarning
+                sx={{ fontSize: 14, mr: '9px', zIndex: 1, color: light ? 'var(--cc-soft)' : 'var(--cc-gold-ink)', transition: 'color 0.2s' }}
+            />
         </Box>
     );
 }
