@@ -1,14 +1,18 @@
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import ConventionDetailClient from './ConventionDetailClient';
+import ConventionListingShell from '@/components/conventions/listing/ConventionListingShell';
+import { tabKeyForPath } from '@/components/conventions/listing/listing-tabs';
 import { getConventionDetailsByIdWithRelations, db } from '@/lib/db';
 import { authOptions } from '@/lib/auth';
 import { Metadata } from 'next';
 import { ConventionStatus } from '@prisma/client';
 
+// Optional catch-all: /conventions/<slug> is the About view, and each other
+// tab is deep-linkable at /conventions/<slug>/<tab> (schedule, pricing, ...).
 interface ConventionDetailPageProps {
   params: {
     id: string;
+    tab?: string[];
   };
 }
 
@@ -110,6 +114,16 @@ async function populateDealerLinks(convention: any) {
 }
 
 export default async function ConventionDetailPage({ params }: ConventionDetailPageProps) {
+  // Resolve the tab segment before any data work; unknown paths 404.
+  const tabSegments = params.tab ?? [];
+  if (tabSegments.length > 1) {
+    notFound();
+  }
+  const initialTab = tabSegments.length ? tabKeyForPath(tabSegments[0]) : 'about';
+  if (!initialTab) {
+    notFound();
+  }
+
   try {
     // Try to find convention by ID first, then by slug if not found
     let convention = await getConventionDetailsByIdWithRelations(params.id);
@@ -237,7 +251,7 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd, null, 2) }}
         />
-        <ConventionDetailClient convention={serializedConvention} canEdit={canEdit} />
+        <ConventionListingShell convention={serializedConvention} canEdit={canEdit} initialTab={initialTab} />
       </>
     );
   } catch (error) {
