@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Container, Typography } from '@mui/material';
 import Link from 'next/link';
 import EditIcon from '@mui/icons-material/Edit';
@@ -194,11 +194,50 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     useEffect(() => {
         const onPop = () => {
             const last = window.location.pathname.split('/').filter(Boolean).pop() ?? '';
+            setSlideDir(0);
             setTab(tabKeyForPath(last) ?? 'about');
         };
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
     }, []);
+
+    // Swipe between tabs on mobile: a horizontal flick in the pane area moves
+    // to the neighboring tab. Vertical scrolling always wins; touches that
+    // start inside horizontally scrollable content (pricing tables) or within
+    // the screen-edge zone (OS back/forward gestures) are left alone.
+    const [slideDir, setSlideDir] = useState(0);
+    const touchRef = useRef<{ x: number; y: number } | null>(null);
+
+    const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+        touchRef.current = null;
+        const t = e.touches[0];
+        if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;
+        let el = e.target as HTMLElement | null;
+        while (el && el !== e.currentTarget) {
+            if (el.scrollWidth > el.clientWidth + 8) {
+                const { overflowX } = window.getComputedStyle(el);
+                if (overflowX === 'auto' || overflowX === 'scroll') return;
+            }
+            el = el.parentElement;
+        }
+        touchRef.current = { x: t.clientX, y: t.clientY };
+    }, []);
+
+    const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+        const startPt = touchRef.current;
+        touchRef.current = null;
+        if (!startPt) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startPt.x;
+        const dy = t.clientY - startPt.y;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        const at = tabs.findIndex((x) => x.key === tab);
+        const next = tabs[at + (dx < 0 ? 1 : -1)];
+        if (next) {
+            setSlideDir(dx < 0 ? 1 : -1);
+            switchTab(next);
+        }
+    }, [tabs, tab, switchTab]);
 
     const kicker = kickerFor(convention);
     const dates = convention.isTBD || !convention.startDate
@@ -406,6 +445,7 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                             aria-current={tab === t.key ? 'page' : undefined}
                             onClick={(e: React.MouseEvent) => {
                                 e.preventDefault();
+                                setSlideDir(0);
                                 switchTab(t);
                             }}
                             sx={{
@@ -428,7 +468,26 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                     ))}
                 </Box>
 
-                <Box sx={{ pt: 3 }}>{pane()}</Box>
+                <Box
+                    key={tab}
+                    onTouchStart={onTouchStart}
+                    onTouchEnd={onTouchEnd}
+                    sx={{
+                        pt: 3,
+                        // Swiped-in panes glide from the direction of travel;
+                        // tapped tabs switch instantly (slideDir 0).
+                        ...(slideDir !== 0 && {
+                            '@keyframes cc-pane-in': {
+                                from: { opacity: 0.3, transform: `translateX(${slideDir * 28}px)` },
+                                to: { opacity: 1, transform: 'translateX(0)' },
+                            },
+                            animation: 'cc-pane-in 0.22s ease-out',
+                            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+                        }),
+                    }}
+                >
+                    {pane()}
+                </Box>
             </Container>
 
             {/* Mobile: the registration CTA never leaves the screen. */}

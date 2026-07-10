@@ -119,10 +119,14 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
         return Math.round(ms / 86_400_000);
     }, [convention.startDate, convention.endDate]);
 
-    // Auto-select today's day if the convention is currently running.
+    // Auto-select today's day if the convention is currently running, so an
+    // attendee opening the schedule lands on the right day with zero taps.
+    // "Today" is the viewer's LOCAL calendar date (an attendee is in the
+    // venue's timezone): UTC components would flip a US viewer to tomorrow
+    // during the evening shows.
     const initialIndex = useMemo(() => {
         const now = new Date();
-        const todayKey = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        const todayKey = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
         const idx = sortedDays.findIndex(d => conventionDayDate(convention.startDate, d.dayOffset).getTime() === todayKey);
         return idx >= 0 ? idx : 0;
     }, [sortedDays, convention.startDate]);
