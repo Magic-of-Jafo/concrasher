@@ -41,6 +41,13 @@ export const MediaTab: React.FC<MediaTabProps> = ({
     onSave,
 }) => {
     const [media, setMedia] = useState<ConventionMediaData[]>(initialMedia);
+    // Mirror of `media` that updates synchronously, so parallel upload
+    // callbacks (multi-file drop) each build on the latest list instead of a
+    // stale closure. React state updaters run at render time, NOT during the
+    // setMedia call — reading the "updated" list right after setMedia was the
+    // bug that saved an empty media list to the database.
+    const mediaRef = React.useRef(media);
+    useEffect(() => { mediaRef.current = media; }, [media]);
     const [coverImageUrl, setCoverImageUrl] = useState<string | null>(initialCoverImageUrl || null);
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(initialProfileImageUrl || null);
     const [isSaving, setIsSaving] = useState(false);
@@ -89,30 +96,25 @@ export const MediaTab: React.FC<MediaTabProps> = ({
         setGalleryTab(newValue);
     }, []);
 
-    // Handle promotional image upload with auto-save
+    // Handle promotional image upload with auto-save. Builds the new list from
+    // mediaRef (updated synchronously below) so a multi-file drop appends each
+    // image to the latest list and each save writes the COMPLETE list.
     const handlePromotionalImageUpload = useCallback(async (imageUrl: string) => {
-        let updatedMediaForDatabase: ConventionMediaData[] = [];
-
-        // Use functional update to avoid race conditions with multiple uploads
-        setMedia(prev => {
-            const newImage: ConventionMediaData = {
-                conventionId,
-                type: 'IMAGE',
-                url: imageUrl,
-                caption: '',
-                order: prev.filter(m => m.type === 'IMAGE').length, // Count existing images
-            };
-
-            const newMedia = [...prev, newImage];
-            updatedMediaForDatabase = newMedia; // Store for database save
-            console.log('[MediaTab] Updated media state:', newMedia);
-            console.log('[MediaTab] New image object:', newImage);
-            return newMedia;
-        });
+        const current = mediaRef.current;
+        const newImage: ConventionMediaData = {
+            conventionId,
+            type: 'IMAGE',
+            url: imageUrl,
+            caption: '',
+            order: current.filter(m => m.type === 'IMAGE').length, // Count existing images
+        };
+        const newMedia = [...current, newImage];
+        mediaRef.current = newMedia;
+        setMedia(newMedia);
 
         // Auto-save to database
         try {
-            const result = await updateConventionMedia(conventionId, updatedMediaForDatabase);
+            const result = await updateConventionMedia(conventionId, newMedia);
             console.log('[MediaTab] Save result:', result);
             if (result.success) {
                 const successMsg = 'Image added and saved successfully!';
@@ -124,12 +126,14 @@ export const MediaTab: React.FC<MediaTabProps> = ({
                 console.error('[MediaTab] Field errors:', result.fieldErrors);
                 setError(result.error || 'Failed to save image to database');
                 // Remove from local state if database save failed
+                mediaRef.current = mediaRef.current.filter(m => m.url !== imageUrl);
                 setMedia(prev => prev.filter(m => m.url !== imageUrl));
             }
         } catch (error) {
             console.error('[MediaTab] Save exception:', error);
             setError('Failed to save image to database');
             // Remove from local state if database save failed
+            mediaRef.current = mediaRef.current.filter(m => m.url !== imageUrl);
             setMedia(prev => prev.filter(m => m.url !== imageUrl));
         }
     }, [conventionId, onSave]);
