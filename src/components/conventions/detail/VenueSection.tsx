@@ -74,6 +74,9 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any; isCompact?: boole
                     backgroundSize: 'var(--cc-hero-bokeh-size)',
                     borderBottom: '1px solid var(--cc-hairline)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden',
+                    // Subtle zoom on hover (pointer devices only).
+                    '@media (hover: hover)': { '&:hover img': { transform: 'scale(1.05)' } },
                 }}
             >
                 {photo ? (
@@ -81,7 +84,11 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any; isCompact?: boole
                         component="img"
                         src={getS3ImageUrl(photo.url)}
                         alt={photo.caption || venue.venueName || ''}
-                        sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        sx={{
+                            width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                            transition: 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+                            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                        }}
                     />
                 ) : (
                     <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-hero-sub)' }}>

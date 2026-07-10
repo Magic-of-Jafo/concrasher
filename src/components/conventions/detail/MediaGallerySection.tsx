@@ -121,7 +121,18 @@ export default function MediaGallerySection({ convention }: MediaGallerySectionP
 
             {tab === 'photos' && images.length > 0 && (
                 <Box sx={{ width: '100%', mb: 4 }}>
-                    <ImageList variant="masonry" cols={3} gap={8}>
+                    <ImageList
+                        variant="masonry"
+                        cols={3}
+                        gap={8}
+                        sx={{
+                            '& .MuiImageListItem-root': { overflow: 'hidden', borderRadius: '8px' },
+                            '& img': { transition: 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)' },
+                            // Subtle zoom on hover (pointer devices only).
+                            '@media (hover: hover)': { '& .MuiImageListItem-root:hover img': { transform: 'scale(1.04)' } },
+                            '@media (prefers-reduced-motion: reduce)': { '& img': { transition: 'none' } },
+                        }}
+                    >
                         {images.map((img) => (
                             <ImageListItem key={img.id}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
