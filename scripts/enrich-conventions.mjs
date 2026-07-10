@@ -11,8 +11,14 @@
  *   node scripts/enrich-conventions.mjs --limit 5                   # first 5 imported
  *   node scripts/enrich-conventions.mjs --all                       # everything imported
  *   ... --tier3                                                     # venue/hotel pass instead of tier 1+2
+ *   ... --tier4                                                     # schedule pass (server-side Schedule Helper)
  *   ... [--model gpt-5.5] [--dry-run]                               # dry-run: extract but don't PATCH
  *   API_BASE=https://conventioncrasher.com node scripts/...         # target production
+ *
+ * Tier 4 drives POST /api/conventions/:id/scrape-schedule with the agent key;
+ * extraction runs SERVER-side (admin AI settings key), so no local OpenAI key
+ * is needed. The route skips any convention that already has schedule content
+ * (fill, don't clobber) and needs a start date to anchor day offsets.
  *
  * Key/model resolution: --model flag → admin AI Settings (DB) → default.
  * OPENAI_API_KEY: env → .env.local → admin AI Settings (DB).
@@ -55,7 +61,7 @@ const model = args.model ?? dbSettings.openai_model ?? 'gpt-5';
 const openaiKey = process.env.OPENAI_API_KEY ?? readEnvLocal('OPENAI_API_KEY') ?? dbSettings.openai_api_key;
 const agentKey = process.env.AGENT_API_KEY ?? readEnvLocal('AGENT_API_KEY');
 
-if (!openaiKey) { console.error('No OpenAI API key (env, .env.local, or Admin → AI Settings)'); process.exit(1); }
+if (!openaiKey && !args.tier4) { console.error('No OpenAI API key (env, .env.local, or Admin → AI Settings)'); process.exit(1); }
 if (!agentKey) { console.error('No AGENT_API_KEY (env or .env.local)'); process.exit(1); }
 
 // ── extraction schema (matches PATCH /api/v1/conventions/:id) ─────────────
@@ -248,7 +254,7 @@ const TIER3_SCHEMA = {
 function parseArgs(argv) {
     const out = { _: [] };
     for (let i = 0; i < argv.length; i++) {
-        if (argv[i] === '--dry-run' || argv[i] === '--all' || argv[i] === '--tier3') out[argv[i].slice(2).replace('-', '')] = true;
+        if (argv[i] === '--dry-run' || argv[i] === '--all' || argv[i] === '--tier3' || argv[i] === '--tier4') out[argv[i].slice(2).replace('-', '')] = true;
         else if (argv[i].startsWith('--')) out[argv[i].slice(2)] = argv[i + 1], i++;
         else out._.push(argv[i]);
     }
@@ -457,6 +463,24 @@ async function extractTier3(convention) {
     return { data, usage };
 }
 
+// ── tier 4: schedule pass (extraction runs server-side) ───────────────────
+
+async function runTier4(convention) {
+    const res = await fetch(`${API_BASE}/api/conventions/${convention.id}/scrape-schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': agentKey },
+        body: JSON.stringify({
+            mode: args.dryrun ? 'preview' : 'apply',
+            replace: false,
+            source: { type: 'website' },
+        }),
+        signal: AbortSignal.timeout(600000), // site crawl + extraction can take minutes
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`${res.status}: ${json.error || 'scrape-schedule failed'}`);
+    return json;
+}
+
 // ── main ──────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -474,13 +498,37 @@ async function main() {
         process.exit(1);
     }
 
-    console.log(`Enriching ${items.length} convention(s) with ${model}${args.tier3 ? ' [tier 3: venue/hotel]' : ' [tier 1+2]'}${args.dryrun ? ' (dry run)' : ''}\n`);
+    const tierLabel = args.tier4 ? ' [tier 4: schedule]' : args.tier3 ? ' [tier 3: venue/hotel]' : ' [tier 1+2]';
+    console.log(`Enriching ${items.length} convention(s) with ${args.tier4 ? 'the server-side Schedule Helper' : model}${tierLabel}${args.dryrun ? ' (dry run)' : ''}\n`);
     const results = [];
     let totalTokens = 0;
     const extractFn = args.tier3 ? extractTier3 : extract;
 
     for (const convention of items) {
         process.stdout.write(`• ${convention.name} … `);
+
+        if (args.tier4) {
+            try {
+                const json = await runTier4(convention);
+                if (json.skipped) {
+                    console.log(`— skipped (${json.reason})`);
+                    results.push({ convention: convention.slug, skipped: json.reason });
+                } else if (json.applied) {
+                    const s = json.summary ?? {};
+                    console.log(`✓ ${s.days ?? '?'} day(s), ${s.events ?? s.performances ?? '?'} event(s)${s.talent ? `, ${s.talent} talent` : ''} — ${json.source}`);
+                    results.push({ convention: convention.slug, applied: json.summary, source: json.source });
+                } else {
+                    const count = json.events?.length ?? json.shows?.length ?? 0;
+                    console.log(`extracted ${count} item(s) (dry run, not saved) — ${json.source}`);
+                    results.push({ convention: convention.slug, dryRun: true, preview: json });
+                }
+            } catch (err) {
+                console.log(`✗ ${err.message}`);
+                results.push({ convention: convention.slug, error: err.message });
+            }
+            continue;
+        }
+
         try {
             const { data, usage } = await extractFn(convention);
             totalTokens += usage.reduce((s, u) => s + (u?.total_tokens ?? 0), 0);
@@ -519,7 +567,7 @@ async function main() {
     const outName = `enrich-${stamp}-${model.replace(/[^\w.-]/g, '_')}.json`;
     writeFileSync(new URL(`./enrichment-results/${outName}`, import.meta.url), JSON.stringify(results, null, 2));
 
-    const ok = results.filter(r => r.patch || r.dryRun).length;
+    const ok = results.filter(r => r.patch || r.dryRun || r.applied || r.skipped).length;
     console.log(`\nDone. ${ok}/${results.length} succeeded. Tokens: ${totalTokens}. Full report: scripts/enrichment-results/${outName}`);
 }
 

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getOpenAIConfig } from '@/lib/ai-settings';
+import { checkAgentApiKey } from '@/lib/agent-auth';
 import {
     extractScheduleFromText,
     extractScheduleFromImages,
@@ -26,25 +27,50 @@ import {
 // JSON body:      { mode: 'preview'|'apply', replace?: boolean, source: { type:'url'|'website'|'pdf', url?: string } }
 // multipart form: pdf=<file>, mode, replace, sourceType=pdf   (for PDF uploads)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Two callers: a signed-in organizer/admin (session), or the enrichment
+    // runner presenting the agent API key (x-api-key header).
+    let isAgent = false;
+    if (req.headers.get('x-api-key') !== null) {
+        const denied = checkAgentApiKey(req);
+        if (denied) return denied;
+        isAgent = true;
+    } else {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const isAdmin = (session.user as any).roles?.includes('ADMIN');
+        if (!isAdmin) {
+            const owned = await prisma.convention.findFirst({
+                where: { id: params.id, series: { organizerUserId: session.user.id } },
+                select: { id: true },
+            });
+            if (!owned) {
+                return NextResponse.json({ error: 'You must be the organizer or an admin for this convention.' }, { status: 403 });
+            }
+        }
     }
 
     const conventionId = params.id;
     const conv = await prisma.convention.findUnique({
         where: { id: conventionId },
-        select: { id: true, name: true, type: true, startDate: true, websiteUrl: true, series: { select: { organizerUserId: true } } },
+        select: { id: true, name: true, type: true, startDate: true, websiteUrl: true },
     });
     if (!conv) return NextResponse.json({ error: 'Convention not found' }, { status: 404 });
 
-    const isAdmin = (session.user as any).roles?.includes('ADMIN');
-    const isOwner = conv.series?.organizerUserId === session.user.id;
-    if (!isAdmin && !isOwner) {
-        return NextResponse.json({ error: 'You must be the organizer or an admin for this convention.' }, { status: 403 });
-    }
-
     const festival = conv.type === 'FESTIVAL';
+
+    // Agent provenance rule (same spirit as the PATCH endpoint): fill, don't
+    // clobber. The runner only ever writes into an empty schedule; anything an
+    // organizer (or an earlier pass) created is left alone.
+    if (isAgent) {
+        const existing = festival
+            ? await prisma.production.count({ where: { conventionId } })
+            : await prisma.conventionScheduleItem.count({ where: { conventionId } });
+        if (existing > 0) {
+            return NextResponse.json({ success: true, skipped: true, reason: `existing schedule content (${existing} record(s))` });
+        }
+    }
     // Festivals carry their own dates in the programme and the helper sets them
     // on apply; regular schedules are anchored to a pre-set start date.
     if (!festival && !conv.startDate) {
