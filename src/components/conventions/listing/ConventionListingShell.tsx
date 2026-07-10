@@ -128,7 +128,16 @@ function AboutPane({ convention }: { convention: any }) {
     } as const;
 
     return (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.7fr 1fr' }, gap: 3, alignItems: 'start' }}>
+        <Box
+            sx={{
+                display: 'grid',
+                // No uploaded photos: the description takes the full width and
+                // the photo rail simply doesn't exist (no empty placeholders).
+                gridTemplateColumns: { xs: '1fr', md: featured.length > 0 ? '1.7fr 1fr' : '1fr' },
+                gap: 3,
+                alignItems: 'start',
+            }}
+        >
             <Box
                 sx={{
                     borderRadius: '12px',
@@ -169,57 +178,37 @@ function AboutPane({ convention }: { convention: any }) {
                 )}
             </Box>
 
-            {/* Featured photos rail: the organizer's two showcase shots (from the
-                media gallery). Placeholder slots until photos are uploaded. */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Typography
-                    component="h3"
-                    sx={{
-                        fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
-                        letterSpacing: '0.18em', textTransform: 'uppercase',
-                        color: 'var(--cc-soft)', m: 0,
-                    }}
-                >
-                    From past events
-                </Typography>
-                {[0, 1].map((i) => {
-                    const photo = featured[i];
-                    return (
+            {/* Featured photos rail: the organizer's showcase shots (first two
+                gallery images). Renders only when photos exist. */}
+            {featured.length > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {featured.map((photo: any, i: number) => (
                         <Box
-                            key={i}
+                            key={photo.id ?? i}
                             sx={{
                                 aspectRatio: '3 / 2',
                                 borderRadius: '12px',
                                 border: '1px solid var(--cc-panel-border)',
                                 overflow: 'hidden',
-                                background: 'var(--cc-hero-scene)',
-                                backgroundSize: 'var(--cc-hero-bokeh-size)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 // Subtle zoom on hover (pointer devices only).
                                 '@media (hover: hover)': { '&:hover img': { transform: 'scale(1.05)' } },
                             }}
                         >
-                            {photo ? (
-                                <Box
-                                    component="img"
-                                    src={getS3ImageUrl(photo.url)}
-                                    alt={photo.caption || ''}
-                                    loading="lazy"
-                                    sx={{
-                                        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-                                        transition: 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
-                                        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-                                    }}
-                                />
-                            ) : (
-                                <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-hero-sub)' }}>
-                                    Featured photo
-                                </Typography>
-                            )}
+                            <Box
+                                component="img"
+                                src={getS3ImageUrl(photo.url)}
+                                alt={photo.caption || ''}
+                                loading="lazy"
+                                sx={{
+                                    width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                                    transition: 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+                                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                                }}
+                            />
                         </Box>
-                    );
-                })}
-            </Box>
+                    ))}
+                </Box>
+            )}
         </Box>
     );
 }
