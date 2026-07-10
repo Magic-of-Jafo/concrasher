@@ -100,6 +100,8 @@ export default function Front100Days({
                                     key={c.id}
                                     component={Link}
                                     href={`/conventions/${c.slug || c.id}`}
+                                    target='_blank'
+                                    rel='noopener noreferrer'
                                     sx={{
                                         position: 'relative',
                                         display: 'flex', alignItems: 'center', gap: 1.25,

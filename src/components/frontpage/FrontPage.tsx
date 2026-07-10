@@ -22,11 +22,13 @@ export const DISPLAY = 'var(--font-montserrat), system-ui, arial, sans-serif';
 export const BODY = 'var(--font-open-sans), system-ui, arial, sans-serif';
 
 /** The one CTA shape: a rectangle, never a pill (see DESIGN.md / papyrus rule). */
-export function GoldButton({ href, children }: { href: string; children: React.ReactNode }) {
+export function GoldButton({ href, children, newTab = false }: { href: string; children: React.ReactNode; newTab?: boolean }) {
     return (
         <Button
             component={Link}
             href={href}
+            target={newTab ? '_blank' : undefined}
+            rel={newTab ? 'noopener noreferrer' : undefined}
             sx={{
                 backgroundColor: 'var(--cc-gold)',
                 color: 'var(--cc-gold-ink)',

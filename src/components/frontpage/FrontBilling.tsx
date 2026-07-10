@@ -134,7 +134,7 @@ export default function FrontBilling({
                             </>
                         )}
                     </Typography>
-                    <GoldButton href={`/conventions/${billing.slug || billing.id}`}>See the listing</GoldButton>
+                    <GoldButton href={`/conventions/${billing.slug || billing.id}`} newTab>See the listing</GoldButton>
                 </Box>
             )}
 
@@ -160,6 +160,8 @@ export default function FrontBilling({
                                 key={c.id}
                                 component={Link}
                                 href={`/conventions/${c.slug || c.id}`}
+                                target='_blank'
+                                rel='noopener noreferrer'
                                 sx={{
                                     position: 'relative',
                                     display: 'flex', alignItems: 'center', gap: 1.5,

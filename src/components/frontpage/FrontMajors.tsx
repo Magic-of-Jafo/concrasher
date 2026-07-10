@@ -50,6 +50,8 @@ export default function FrontMajors({ majors }: { majors: MajorData[] }) {
                         key={major.key}
                         component={Link}
                         href={c ? `/conventions/${c.slug || c.id}` : '/conventions'}
+                        target={c ? '_blank' : undefined}
+                        rel={c ? 'noopener noreferrer' : undefined}
                         sx={{
                             position: 'relative',
                             display: 'flex',
