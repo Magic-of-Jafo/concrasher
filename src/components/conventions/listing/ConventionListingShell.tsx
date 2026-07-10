@@ -109,43 +109,111 @@ function RegisterButton({ href, label, compact = false }: { href: string; label:
 
 function AboutPane({ convention }: { convention: any }) {
     const html = convention.descriptionMain || convention.descriptionShort;
+    // The helpers write plain text with blank-line paragraph breaks; the rich
+    // editor writes HTML. Render whichever this listing carries.
+    const isHtml = !!html && /<[a-z][^>]*>/i.test(String(html));
+    const paragraphs = !isHtml && html
+        ? String(html).split(/\r?\n\s*\r?\n/).map((s: string) => s.trim()).filter(Boolean)
+        : [];
+    const featured = (convention.media ?? [])
+        .filter((m: any) => m.type === 'IMAGE')
+        .slice(0, 2);
+
+    const bodySx = {
+        fontFamily: BODY,
+        fontSize: '0.95rem',
+        lineHeight: 1.7,
+        color: 'var(--cc-muted)',
+        maxWidth: '62ch',
+    } as const;
+
     return (
-        <Box
-            sx={{
-                borderRadius: '12px',
-                backgroundColor: 'var(--cc-panel)',
-                border: '1px solid var(--cc-panel-border)',
-                px: { xs: 2.5, md: 4 },
-                py: { xs: 2.5, md: 3.5 },
-            }}
-        >
-            {html ? (
-                <Box
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.7fr 1fr' }, gap: 3, alignItems: 'start' }}>
+            <Box
+                sx={{
+                    borderRadius: '12px',
+                    backgroundColor: 'var(--cc-panel)',
+                    border: '1px solid var(--cc-panel-border)',
+                    px: { xs: 2.5, md: 4 },
+                    py: { xs: 2.5, md: 3.5 },
+                }}
+            >
+                {isHtml ? (
+                    <Box
+                        sx={{
+                            ...bodySx,
+                            '& p': { mb: 2 },
+                            '& ul, & ol': { mb: 2, pl: 3 },
+                            '& li': { mb: 1 },
+                            '& h1, & h2, & h3, & h4, & h5, & h6': { mb: 2, mt: 3, color: 'var(--cc-ink)', fontFamily: DISPLAY },
+                            '& a': { color: 'var(--cc-cyan)', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
+                            '& img': { maxWidth: '100%', height: 'auto', borderRadius: '8px' },
+                            '& blockquote': {
+                                borderLeft: '4px solid var(--cc-panel-border)',
+                                pl: 2, py: 1, my: 2, fontStyle: 'italic',
+                            },
+                        }}
+                        dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                ) : paragraphs.length > 0 ? (
+                    paragraphs.map((para: string, i: number) => (
+                        <Typography key={i} sx={{ ...bodySx, mb: i < paragraphs.length - 1 ? 2 : 0 }}>
+                            {para}
+                        </Typography>
+                    ))
+                ) : (
+                    <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
+                        The organizer hasn&apos;t added a description yet. Check the schedule and
+                        pricing tabs, or visit the official site for more.
+                    </Typography>
+                )}
+            </Box>
+
+            {/* Featured photos rail: the organizer's two showcase shots (from the
+                media gallery). Placeholder slots until photos are uploaded. */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Typography
+                    component="h3"
                     sx={{
-                        fontFamily: BODY,
-                        fontSize: '0.95rem',
-                        lineHeight: 1.7,
-                        color: 'var(--cc-muted)',
-                        maxWidth: '72ch',
-                        '& p': { mb: 2 },
-                        '& ul, & ol': { mb: 2, pl: 3 },
-                        '& li': { mb: 1 },
-                        '& h1, & h2, & h3, & h4, & h5, & h6': { mb: 2, mt: 3, color: 'var(--cc-ink)', fontFamily: DISPLAY },
-                        '& a': { color: 'var(--cc-cyan)', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
-                        '& img': { maxWidth: '100%', height: 'auto', borderRadius: '8px' },
-                        '& blockquote': {
-                            borderLeft: '4px solid var(--cc-panel-border)',
-                            pl: 2, py: 1, my: 2, fontStyle: 'italic',
-                        },
+                        fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
+                        letterSpacing: '0.18em', textTransform: 'uppercase',
+                        color: 'var(--cc-soft)', m: 0,
                     }}
-                    dangerouslySetInnerHTML={{ __html: html }}
-                />
-            ) : (
-                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
-                    The organizer hasn&apos;t added a description yet. Check the schedule and
-                    pricing tabs, or visit the official site for more.
+                >
+                    From past events
                 </Typography>
-            )}
+                {[0, 1].map((i) => {
+                    const photo = featured[i];
+                    return (
+                        <Box
+                            key={i}
+                            sx={{
+                                aspectRatio: '3 / 2',
+                                borderRadius: '12px',
+                                border: '1px solid var(--cc-panel-border)',
+                                overflow: 'hidden',
+                                background: 'var(--cc-hero-scene)',
+                                backgroundSize: 'var(--cc-hero-bokeh-size)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                        >
+                            {photo ? (
+                                <Box
+                                    component="img"
+                                    src={getS3ImageUrl(photo.url)}
+                                    alt={photo.caption || ''}
+                                    loading="lazy"
+                                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                            ) : (
+                                <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-hero-sub)' }}>
+                                    Featured photo
+                                </Typography>
+                            )}
+                        </Box>
+                    );
+                })}
+            </Box>
         </Box>
     );
 }

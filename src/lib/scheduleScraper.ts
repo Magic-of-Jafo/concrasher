@@ -701,8 +701,17 @@ Rules:
   applicable (e.g. a US state), otherwise "". "country" is the full country name.
 - "websiteUrl": the event's official website. "registrationUrl": where to register or buy tickets,
   only if it's a different link; otherwise "".
-- "descriptionShort": a one or two sentence summary.
-- "descriptionMain": a fuller description — one to three short paragraphs of plain text.
+- "descriptionShort": one or two tight sentences that make a visitor want to read on. Concrete, not hypey.
+- "descriptionMain": two or three SHORT paragraphs of original marketing copy for the event's public
+  listing page, separated by blank lines (\\n\\n). Write it fresh in your own words; never copy sentences
+  from the source, and never write ABOUT the source ("is described as", "the website says"). Lead with
+  what attendees actually get: who they'll see, what they'll do, what makes this event different. Weave
+  the facts (dates, venue, headliners, traditions, who it's for) into that story. Voice: a knowledgeable
+  human editor who likes this event; warm, direct, specific.
+- Copy style rules (strict): no em dashes anywhere. No "isn't just X, it's Y" or "more than just" framing.
+  Don't open with "Whether you're...". Avoid stock hype words (unforgettable, immersive, elevate, unleash,
+  vibrant, magical journey). Vary sentence length; not every sentence gets a three-item list. No
+  exclamation marks. No invented facts, performers, prices, or numbers: only what the source states.
 - If the source is in another language, translate the name and descriptions into natural English;
   keep proper names. Use null or "" for anything not present. Do not invent details.`;
 }
