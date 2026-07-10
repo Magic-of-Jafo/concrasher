@@ -88,9 +88,13 @@ const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
       onRemoveImage(); // This will update the parent form state (e.g., set photos: [])
     }
 
-    // If the image URL was one from the server (not a temporary local object URL)
-    // and it seems like a relative path we manage, then try to delete it from the server.
-    if (imageUrlToDelete && imageUrlToDelete.startsWith('/uploads/images/')) {
+    // If the image URL is one we manage (an S3 upload, or a legacy relative
+    // path from the old local-disk uploader), delete it from the server too.
+    const isManagedUrl = imageUrlToDelete && (
+        imageUrlToDelete.startsWith('/uploads/images/') ||
+        (imageUrlToDelete.startsWith('https://') && imageUrlToDelete.includes('/uploads/images/'))
+    );
+    if (isManagedUrl) {
       try {
         setUploading(true); // Indicate activity
         const response = await fetch('/api/upload-image', {
