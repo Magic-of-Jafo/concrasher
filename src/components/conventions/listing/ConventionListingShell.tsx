@@ -209,13 +209,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     const registerUrl: string | null = kicker.past
         ? null
         : convention.registrationUrl || convention.websiteUrl || null;
-    const minPrice = useMemo(() => {
-        const amounts = (convention.priceTiers ?? [])
-            .map((t: any) => Number(t.amount))
-            .filter((n: number) => Number.isFinite(n) && n > 0);
-        return amounts.length ? Math.min(...amounts) : null;
-    }, [convention.priceTiers]);
-    const registerLabel = minPrice ? `Register — from $${minPrice}` : 'Register';
+    // No price on the button: the cheapest tier is usually an add-on (spouse,
+    // youth, workshop), so "from $X" undersells full registration.
+    const registerLabel = 'Register';
 
     const pane = () => {
         switch (tab) {
@@ -248,7 +244,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 {/* ---- banner: clean cover, avatar over its bottom edge ---- */}
                 <Box
                     sx={{
-                        height: { xs: 150, md: 220 },
+                        // Canonical Facebook cover aspect (851×315) — same spec the
+                        // uploader crops to, so the art shows uncropped.
+                        aspectRatio: '851 / 315',
                         borderRadius: '12px',
                         border: '1px solid var(--cc-panel-border)',
                         overflow: 'hidden',
