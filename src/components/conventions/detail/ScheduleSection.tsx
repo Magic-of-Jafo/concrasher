@@ -140,8 +140,9 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                 <Typography component="h2" gutterBottom sx={{ fontFamily: DISPLAY, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-magenta)', textShadow: 'var(--cc-glow-magenta)' }}>
                     Schedule
                 </Typography>
-                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
-                    The schedule for this convention has not been released yet.
+                <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)', maxWidth: '52ch' }}>
+                    The schedule hasn&apos;t been posted yet. Organizers usually publish it
+                    closer to the convention, so check back.
                 </Typography>
             </Box>
         );

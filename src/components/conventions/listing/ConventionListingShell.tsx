@@ -302,11 +302,30 @@ export default function ConventionListingShell({ convention, canEdit = false, in
         tabs.some((t) => t.key === initialTab) ? initialTab : 'about',
     );
 
+    // Anchor just above the (sticky) tab bar. On every tab switch we snap the
+    // viewport back to it when scrolled past, so a short tab never leaves the
+    // reader clamped at the bottom of a collapsed page — the bar stays put
+    // visually and the new pane presents from its top.
+    const navAnchorRef = useRef<HTMLDivElement | null>(null);
+    const snapToTabs = useCallback(() => {
+        const doSnap = () => {
+            const el = navAnchorRef.current;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top + window.scrollY;
+            if (window.scrollY > top) window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
+        };
+        doSnap();
+        // Once more after the new pane has laid out: the browser's own scroll
+        // anchoring and the height change both nudge the position post-render.
+        requestAnimationFrame(() => requestAnimationFrame(doSnap));
+    }, []);
+
     // Tab switches are client-side; pushState keeps the deep-linkable URL in
     // sync without a server round trip, and popstate honors back/forward.
     const switchTab = useCallback(
         (next: ListingTab) => {
             setTab(next.key);
+            snapToTabs();
             window.history.pushState(null, '', next.path ? `${base}/${next.path}` : base);
             try {
                 window.fbq?.('track', 'ViewContent', {
@@ -557,6 +576,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 )}
 
                 {/* ---- sticky tab bar; every tab is a real URL ---- */}
+                {/* Zero-height anchor: the snap target for tab switches (the
+                    nav itself reads as top:0 while stuck, so it can't be). */}
+                <Box ref={navAnchorRef} aria-hidden />
                 <Box
                     component="nav"
                     aria-label="Listing sections"
