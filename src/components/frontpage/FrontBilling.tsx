@@ -14,19 +14,16 @@ import FrontThumb, { FlagCorner } from './FrontThumb';
 // appear ONLY here (excluded from the 100-days list; redundancy is the enemy).
 // Featured picks past the trio so the two never overlap.
 
-// Interim editorial control until the admin FeaturedBilling queue exists:
-// name-matched overrides, first match wins. Currently Abbott's (historical
-// significance; MAGIC Live is sold out, so featuring it sells nothing).
-const EDITORIAL_PICKS: RegExp[] = [/abbott/i];
-
-/** The featured convention: editorial override first, then auto-pick from
- *  everything after the rail trio (majors first, then artwork, then nearest). */
-export function pickFeatured(conventions: HomeConvention[]): HomeConvention | null {
-    const pool = conventions.slice(3);
-    for (const re of EDITORIAL_PICKS) {
-        const hit = pool.find((c) => re.test(c.name)) ?? conventions.find((c) => re.test(c.name));
-        if (hit) return hit;
+/** The featured convention: the admin's pick (set in /admin/conventions)
+ *  when it's live on the page, otherwise auto-pick from everything after
+ *  the rail trio (majors first, then artwork, then nearest). */
+export function pickFeatured(conventions: HomeConvention[], featuredId?: string | null): HomeConvention | null {
+    if (featuredId) {
+        const chosen = conventions.find((c) => c.id === featuredId);
+        if (chosen) return chosen;
+        // Chosen convention expired or unpublished since: fall through to auto.
     }
+    const pool = conventions.slice(3);
     if (pool.length === 0) return conventions[0] ?? null;
     return pool.find((c) => isMajorName(c.name)) ?? pool.find((c) => c.imageUrl) ?? pool[0];
 }

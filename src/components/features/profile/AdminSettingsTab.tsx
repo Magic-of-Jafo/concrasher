@@ -78,7 +78,7 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
                         <Button
                             variant="contained"
                             component={Link}
-                            href="/profile?tab=organizer"
+                            href="/admin/conventions"
                         >
                             Manage All Conventions
                         </Button>

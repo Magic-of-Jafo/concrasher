@@ -246,6 +246,17 @@ async function pickHeroImage(): Promise<string | null> {
   }
 }
 
+// The admin's Featured pick (set in /admin/conventions); '' or missing means
+// automatic selection.
+async function getFeaturedConventionId(): Promise<string | null> {
+  try {
+    const row = await db.siteSetting.findUnique({ where: { key: 'featured_convention_id' } });
+    return row?.value || null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Home() {
   const { conventions, loadFailed } = await getUpcomingConventions();
   // Server-side picks: each request (the page is force-dynamic) gets one of
@@ -253,6 +264,7 @@ export default async function Home() {
   const heroMessage = pickHeroMessage();
   const heroImage = await pickHeroImage();
   const majors = await getMajors();
+  const featuredId = await getFeaturedConventionId();
   return (
     <FrontPage
       conventions={conventions}
@@ -260,6 +272,7 @@ export default async function Home() {
       heroMessage={heroMessage}
       heroImage={heroImage}
       majors={majors}
+      featuredId={featuredId}
     />
   );
 }

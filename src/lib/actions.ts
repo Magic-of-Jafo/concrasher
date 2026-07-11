@@ -2599,3 +2599,46 @@ export async function deletePerformance(itemId: string) {
     return { success: false, error: 'An unexpected error occurred.' };
   }
 }
+// ── featured convention (front page) ─────────────────────────────────────────
+
+/**
+ * Admin-only: pick THE featured convention for the front page (or null to
+ * return to automatic selection). Stored as a SiteSetting so exactly one
+ * value exists — radio semantics for free.
+ */
+export async function setFeaturedConvention(conventionId: string | null): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { roles: true } });
+  if (!user?.roles.includes(Role.ADMIN)) {
+    return { success: false, error: "Admins only." };
+  }
+
+  try {
+    if (conventionId) {
+      const conv = await db.convention.findFirst({
+        where: { id: conventionId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!conv) return { success: false, error: "Convention not found." };
+    }
+    await db.siteSetting.upsert({
+      where: { key: 'featured_convention_id' },
+      update: { value: conventionId ?? '' },
+      create: { key: 'featured_convention_id', value: conventionId ?? '' },
+    });
+    revalidatePath('/');
+    revalidatePath('/admin/conventions');
+    return { success: true };
+  } catch (error) {
+    console.error('Error setting featured convention:', error);
+    return { success: false, error: 'A database error occurred.' };
+  }
+}

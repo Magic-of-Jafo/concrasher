@@ -262,17 +262,20 @@ export default function FrontPage({
     heroMessage,
     heroImage,
     majors,
+    featuredId = null,
 }: {
     conventions: HomeConvention[];
     loadFailed: boolean;
     heroMessage: HeroMessage;
     heroImage: string | null;
     majors: MajorData[];
+    /** Admin's Featured pick (from /admin/conventions); null = automatic. */
+    featuredId?: string | null;
 }) {
     // The rail trio and the featured pick appear only in their own sections;
     // the 100-days list skips them (no duplicate listings on the page).
     const rail = conventions.slice(0, 3);
-    const billing = pickFeatured(conventions);
+    const billing = pickFeatured(conventions, featuredId);
     const excludeIds = [...rail.map((c) => c.id), ...(billing ? [billing.id] : [])];
 
     return (
