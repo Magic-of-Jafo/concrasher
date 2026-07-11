@@ -307,18 +307,22 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // reader clamped at the bottom of a collapsed page — the bar stays put
     // visually and the new pane presents from its top.
     const navAnchorRef = useRef<HTMLDivElement | null>(null);
-    const snapToTabs = useCallback(() => {
+    const snapToTabs = useCallback((fixedTop?: number) => {
         const anchorTop = () => {
             const el = navAnchorRef.current;
             return el ? el.getBoundingClientRect().top + window.scrollY : null;
         };
-        const top = anchorTop();
-        if (top === null || window.scrollY <= top) return; // already above the bar: leave the reader be
+        const top = fixedTop ?? anchorTop();
+        if (top === null) return;
+        // Clicked tabs keep the existing behavior: readers above the bar stay
+        // where they are. Swipes pass a fixed touch-start position so small
+        // vertical thumb drift cannot move the destination pane up or down.
+        if (fixedTop === undefined && window.scrollY <= top) return;
         window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
         // Re-pin after the new pane lays out: the height change and the
         // browser's scroll anchoring both nudge the position post-render.
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            const t = anchorTop();
+            const t = fixedTop ?? anchorTop();
             if (t !== null) window.scrollTo({ top: t, behavior: 'instant' as ScrollBehavior });
         }));
     }, []);
@@ -326,9 +330,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // Tab switches are client-side; pushState keeps the deep-linkable URL in
     // sync without a server round trip, and popstate honors back/forward.
     const switchTab = useCallback(
-        (next: ListingTab) => {
+        (next: ListingTab, fixedTop?: number) => {
             setTab(next.key);
-            snapToTabs();
+            snapToTabs(fixedTop);
             window.history.pushState(null, '', next.path ? `${base}/${next.path}` : base);
             try {
                 window.fbq?.('track', 'ViewContent', {
@@ -361,7 +365,7 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // start inside horizontally scrollable content (pricing tables) or within
     // the screen-edge zone (OS back/forward gestures) are left alone.
     const [slideDir, setSlideDir] = useState(0);
-    const touchRef = useRef<{ x: number; y: number } | null>(null);
+    const touchRef = useRef<{ x: number; y: number; scrollTarget: number } | null>(null);
 
     const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
         touchRef.current = null;
@@ -375,7 +379,16 @@ export default function ConventionListingShell({ convention, canEdit = false, in
             }
             el = el.parentElement;
         }
-        touchRef.current = { x: t.clientX, y: t.clientY };
+        const anchor = navAnchorRef.current;
+        const anchorTop = anchor
+            ? anchor.getBoundingClientRect().top + window.scrollY
+            : null;
+        // If the tab bar is already sticky, preserve its anchored position;
+        // otherwise preserve the exact viewport position where the touch began.
+        const scrollTarget = anchorTop !== null && window.scrollY > anchorTop
+            ? anchorTop
+            : window.scrollY;
+        touchRef.current = { x: t.clientX, y: t.clientY, scrollTarget };
     }, []);
 
     const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -390,7 +403,7 @@ export default function ConventionListingShell({ convention, canEdit = false, in
         const next = tabs[at + (dx < 0 ? 1 : -1)];
         if (next) {
             setSlideDir(dx < 0 ? 1 : -1);
-            switchTab(next);
+            switchTab(next, startPt.scrollTarget);
         }
     }, [tabs, tab, switchTab]);
 
