@@ -3,7 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Container, Typography } from '@mui/material';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import EditIcon from '@mui/icons-material/Edit';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { formatDateRange } from '@/components/home/home-types';
 import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
@@ -107,6 +111,71 @@ function RegisterButton({ href, label, compact = false }: { href: string; label:
     );
 }
 
+// The engagement box: star / favorite / alerts, previewed here as grayed-out
+// actions (the features land in an upcoming pass — schema and endpoints don't
+// exist yet). For visitors it doubles as an account pitch; the actions will
+// unlock for signed-in users when they're wired up.
+function EngagementPanel() {
+    const { status } = useSession();
+    const loggedIn = status === 'authenticated';
+    const rows = [
+        { Icon: StarBorderIcon, label: 'Give it a star' },
+        { Icon: FavoriteBorderIcon, label: 'Add to favorites' },
+        { Icon: NotificationsNoneIcon, label: 'Get alerts' },
+    ];
+    return (
+        <Box
+            sx={{
+                borderRadius: '12px',
+                backgroundColor: 'var(--cc-panel)',
+                border: '1px solid var(--cc-panel-border)',
+                p: 2.5,
+            }}
+        >
+            <Typography component="h3" sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '1rem', color: 'var(--cc-ink)', m: 0 }}>
+                Keep tabs on this one
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1.75 }}>
+                {rows.map(({ Icon, label }) => (
+                    <Box
+                        key={label}
+                        aria-disabled
+                        sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.25,
+                            fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.85rem',
+                            color: 'var(--cc-soft)',
+                            border: '1px solid var(--cc-hairline)',
+                            borderRadius: '8px',
+                            px: 1.75, py: 1.25, minHeight: 44,
+                            opacity: 0.75,
+                            cursor: 'default',
+                        }}
+                    >
+                        <Icon sx={{ fontSize: 18 }} />
+                        {label}
+                    </Box>
+                ))}
+            </Box>
+            <Typography sx={{ fontFamily: BODY, fontSize: '0.78rem', color: 'var(--cc-muted)', mt: 1.5 }}>
+                {loggedIn ? (
+                    <>Almost ready. These unlock in an upcoming update.</>
+                ) : (
+                    <>
+                        <Box
+                            component={Link}
+                            href="/login"
+                            sx={{ color: 'var(--cc-cyan)', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                            Log in or sign up
+                        </Box>
+                        {' '}to star, favorite, and get alerts.
+                    </>
+                )}
+            </Typography>
+        </Box>
+    );
+}
+
 function AboutPane({ convention }: { convention: any }) {
     const html = convention.descriptionMain || convention.descriptionShort;
     // The helpers write plain text with blank-line paragraph breaks; the rich
@@ -131,9 +200,10 @@ function AboutPane({ convention }: { convention: any }) {
         <Box
             sx={{
                 display: 'grid',
-                // No uploaded photos: the description takes the full width and
-                // the photo rail simply doesn't exist (no empty placeholders).
-                gridTemplateColumns: { xs: '1fr', md: featured.length > 0 ? '1.7fr 1fr' : '1fr' },
+                // The rail is permanent (photos when they exist, the engagement
+                // box always), so the description column reads the same width
+                // on every listing.
+                gridTemplateColumns: { xs: '1fr', md: '1.7fr 1fr' },
                 gap: 3,
                 alignItems: 'start',
             }}
@@ -178,11 +248,11 @@ function AboutPane({ convention }: { convention: any }) {
                 )}
             </Box>
 
-            {/* Featured photos rail: the organizer's showcase shots (first two
-                gallery images). Renders only when photos exist. */}
-            {featured.length > 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {featured.map((photo: any, i: number) => (
+            {/* The rail: the organizer's showcase shots (first two gallery
+                images) when they exist, with the engagement box anchoring it.
+                On mobile this stacks below the description. */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {featured.map((photo: any, i: number) => (
                         <Box
                             key={photo.id ?? i}
                             sx={{
@@ -207,8 +277,8 @@ function AboutPane({ convention }: { convention: any }) {
                             />
                         </Box>
                     ))}
-                </Box>
-            )}
+                <EngagementPanel />
+            </Box>
         </Box>
     );
 }
