@@ -102,6 +102,11 @@ a {
   --cc-cyan: #a8b3c4;
   --cc-gold: #dfd0b8;
   --cc-gold-ink: #222831;
+  /* The conversion color: Crash Red, reserved for THE action (Register).
+     Nothing else on the page may wear it — that exclusivity is the point. */
+  --cc-cta: #c9303e;
+  --cc-cta-ink: #ffffff;
+  --cc-glow-cta: 0 0 20px rgba(201, 48, 62, 0.35);
   --cc-live: #7fe0a0;
   --cc-majors-bg: linear-gradient(160deg, rgba(148, 137, 121, 0.18), rgba(57, 62, 70, 0.5));
   --cc-majors-border: rgba(148, 137, 121, 0.45);
@@ -156,6 +161,10 @@ a {
   --cc-cyan: #294669;
   --cc-gold: #294669;
   --cc-gold-ink: #f1f6f5;
+  /* Crash Red CTA in daylight: the brand crimson straight off the logo. */
+  --cc-cta: #b3122e;
+  --cc-cta-ink: #ffffff;
+  --cc-glow-cta: 0 2px 0 rgba(16, 20, 67, 0.3);
   --cc-live: #0a7a43;
   --cc-majors-bg: linear-gradient(160deg, rgba(71, 139, 141, 0.09), rgba(41, 70, 105, 0.07));
   --cc-majors-border: rgba(71, 139, 141, 0.45);

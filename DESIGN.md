@@ -28,6 +28,8 @@ colors:
   night-taupe: "#948979"
   night-header: "#1a1f26"
   night-live: "#7fe0a0"
+  night-cta: "#c9303e"
+  day-cta: "#b3122e"
   day-bg: "#f1f6f5"
   day-ink: "#101443"
   day-muted: "#3a4663"
@@ -154,6 +156,8 @@ Low-alpha tints of these hues (panels, hairlines, gradient fields) are tonal ram
 
 ### Named Rules
 **The Gold Spot Rule.** Gold is the spotlight: it hits one thing per screen, and that thing is the action we most want taken. Two gold elements on one screen means neither is the spotlight. Never use gold decoratively.
+
+**The Crash Red Rule (2026-07-11).** On listing pages, THE conversion action (Register) wears Crash Red — the brand crimson (`--cc-cta`: night #c9303e, day #b3122e, white ink) — and nothing else may. It exists because Slate & Taupe's gold role doubles as the ink color, so a gold CTA no longer stands out; red restores the single unmistakable spotlight and ties it to the logo. Exclusivity is the entire value: a second red element on the screen breaks the rule.
 
 **The Two Rooms Rule.** Public, attendee-facing surfaces live in the auditorium: Blue Wash atmosphere, theatrical contrast, persuasive energy. Organizer, admin, and editor surfaces live in the production office: Paper backgrounds, Ink text, calm density. Never theatrical chrome on a form; never gray-SaaS minimalism on a listing.
 

@@ -315,10 +315,10 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                         rel="noopener noreferrer"
                         sx={{
                             fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', textTransform: 'none',
-                            backgroundColor: 'var(--cc-gold)', color: 'var(--cc-gold-ink)',
+                            backgroundColor: 'var(--cc-cta)', color: 'var(--cc-cta-ink)',
                             px: 3.25, py: 1.5, minHeight: 48, borderRadius: '8px', whiteSpace: 'nowrap',
-                            boxShadow: 'var(--cc-glow-gold)',
-                            '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                            boxShadow: 'var(--cc-glow-cta)',
+                            '&:hover': { backgroundColor: 'var(--cc-cta)', filter: 'brightness(1.08)' },
                             '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
                         }}
                     >

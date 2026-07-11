@@ -79,7 +79,7 @@ function locationLine(convention: any): string {
     return parts.filter(Boolean).join(', ') || 'Location TBD';
 }
 
-/** The one CTA shape: a gold rectangle, never a pill (papyrus rule). */
+/** THE action: Crash Red, reserved for Register alone (rectangle, never a pill). */
 function RegisterButton({ href, label, compact = false }: { href: string; label: string; compact?: boolean }) {
     return (
         <Button
@@ -89,8 +89,8 @@ function RegisterButton({ href, label, compact = false }: { href: string; label:
             rel="noopener noreferrer"
             fullWidth={!compact}
             sx={{
-                backgroundColor: 'var(--cc-gold)',
-                color: 'var(--cc-gold-ink)',
+                backgroundColor: 'var(--cc-cta)',
+                color: 'var(--cc-cta-ink)',
                 fontFamily: DISPLAY,
                 fontWeight: 800,
                 fontSize: compact ? '0.85rem' : '0.95rem',
@@ -99,10 +99,10 @@ function RegisterButton({ href, label, compact = false }: { href: string; label:
                 py: compact ? 1.25 : 1.5,
                 minHeight: compact ? 44 : 48,
                 borderRadius: '8px',
-                boxShadow: 'var(--cc-glow-gold)',
+                boxShadow: 'var(--cc-glow-cta)',
                 whiteSpace: 'nowrap',
                 transition: 'filter 0.2s ease-out',
-                '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                '&:hover': { backgroundColor: 'var(--cc-cta)', filter: 'brightness(1.08)' },
                 '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
             }}
         >
@@ -699,17 +699,22 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 </Box>
             </Container>
 
-            {/* Mobile: the registration CTA never leaves the screen. */}
+            {/* Mobile: the registration CTA never leaves the screen — a
+                floating button, not a full-width bar (which read as a footer).
+                The wrapper ignores taps so the page stays usable around it. */}
             {registerUrl && (
                 <Box
                     sx={{
-                        display: { xs: 'block', md: 'none' },
-                        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
-                        px: 2, pt: 1.25, pb: 2,
-                        background: 'linear-gradient(transparent, var(--cc-bg) 45%)',
+                        display: { xs: 'flex', md: 'none' },
+                        justifyContent: 'center',
+                        position: 'fixed', bottom: 16, left: 0, right: 0, zIndex: 40,
+                        pointerEvents: 'none',
+                        px: 2,
                     }}
                 >
-                    <RegisterButton href={registerUrl} label={registerLabel} />
+                    <Box sx={{ pointerEvents: 'auto', filter: 'drop-shadow(0 6px 16px rgba(0, 0, 0, 0.35))' }}>
+                        <RegisterButton href={registerUrl} label={registerLabel} compact />
+                    </Box>
                 </Box>
             )}
         </Box>
