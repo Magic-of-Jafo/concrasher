@@ -307,22 +307,18 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // reader clamped at the bottom of a collapsed page — the bar stays put
     // visually and the new pane presents from its top.
     const navAnchorRef = useRef<HTMLDivElement | null>(null);
-    const snapToTabs = useCallback((fixedTop?: number) => {
+    const snapToTabs = useCallback(() => {
         const anchorTop = () => {
             const el = navAnchorRef.current;
             return el ? el.getBoundingClientRect().top + window.scrollY : null;
         };
-        const top = fixedTop ?? anchorTop();
-        if (top === null) return;
-        // Clicked tabs keep the existing behavior: readers above the bar stay
-        // where they are. Swipes pass a fixed touch-start position so small
-        // vertical thumb drift cannot move the destination pane up or down.
-        if (fixedTop === undefined && window.scrollY <= top) return;
+        const top = anchorTop();
+        if (top === null || window.scrollY <= top) return; // already above the bar: leave the reader be
         window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
         // Re-pin after the new pane lays out: the height change and the
         // browser's scroll anchoring both nudge the position post-render.
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            const t = fixedTop ?? anchorTop();
+            const t = anchorTop();
             if (t !== null) window.scrollTo({ top: t, behavior: 'instant' as ScrollBehavior });
         }));
     }, []);
@@ -330,9 +326,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // Tab switches are client-side; pushState keeps the deep-linkable URL in
     // sync without a server round trip, and popstate honors back/forward.
     const switchTab = useCallback(
-        (next: ListingTab, fixedTop?: number) => {
+        (next: ListingTab) => {
             setTab(next.key);
-            snapToTabs(fixedTop);
+            snapToTabs();
             window.history.pushState(null, '', next.path ? `${base}/${next.path}` : base);
             try {
                 window.fbq?.('track', 'ViewContent', {
@@ -360,52 +356,86 @@ export default function ConventionListingShell({ convention, canEdit = false, in
         return () => window.removeEventListener('popstate', onPop);
     }, []);
 
-    // Swipe between tabs on mobile: a horizontal flick in the pane area moves
-    // to the neighboring tab. Vertical scrolling always wins; touches that
-    // start inside horizontally scrollable content (pricing tables) or within
-    // the screen-edge zone (OS back/forward gestures) are left alone.
+    // Swipe between tabs on mobile. The first ~10px of movement decides the
+    // gesture's axis; once it's horizontal, every further touchmove is
+    // preventDefault'ed so the page cannot scroll (or build fling momentum)
+    // under the thumb's vertical drift — that native scrolling was what made
+    // transitions lurch up and down. Vertical gestures are left entirely to
+    // the browser. Native listeners because React's synthetic touch handlers
+    // are passive and cannot preventDefault.
     const [slideDir, setSlideDir] = useState(0);
-    const touchRef = useRef<{ x: number; y: number; scrollTarget: number } | null>(null);
+    const paneRef = useRef<HTMLDivElement | null>(null);
+    const tabRef = useRef(tab);
+    useEffect(() => { tabRef.current = tab; }, [tab]);
+    const tabsRef = useRef(tabs);
+    useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+    const switchTabRef = useRef(switchTab);
+    useEffect(() => { switchTabRef.current = switchTab; }, [switchTab]);
 
-    const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        touchRef.current = null;
-        const t = e.touches[0];
-        if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;
-        let el = e.target as HTMLElement | null;
-        while (el && el !== e.currentTarget) {
-            if (el.scrollWidth > el.clientWidth + 8) {
-                const { overflowX } = window.getComputedStyle(el);
-                if (overflowX === 'auto' || overflowX === 'scroll') return;
+    useEffect(() => {
+        const pane = paneRef.current;
+        if (!pane) return;
+        let gesture: { x: number; y: number; mode: 'undecided' | 'horizontal' | 'vertical' } | null = null;
+
+        const onStart = (e: TouchEvent) => {
+            gesture = null;
+            if (e.touches.length !== 1) return;
+            const t = e.touches[0];
+            // Leave the screen-edge zone to OS back/forward gestures.
+            if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;
+            // Leave horizontally scrollable content (pricing tables) alone.
+            let el = e.target as HTMLElement | null;
+            while (el && el !== pane) {
+                if (el.scrollWidth > el.clientWidth + 8) {
+                    const { overflowX } = window.getComputedStyle(el);
+                    if (overflowX === 'auto' || overflowX === 'scroll') return;
+                }
+                el = el.parentElement;
             }
-            el = el.parentElement;
-        }
-        const anchor = navAnchorRef.current;
-        const anchorTop = anchor
-            ? anchor.getBoundingClientRect().top + window.scrollY
-            : null;
-        // If the tab bar is already sticky, preserve its anchored position;
-        // otherwise preserve the exact viewport position where the touch began.
-        const scrollTarget = anchorTop !== null && window.scrollY > anchorTop
-            ? anchorTop
-            : window.scrollY;
-        touchRef.current = { x: t.clientX, y: t.clientY, scrollTarget };
-    }, []);
+            gesture = { x: t.clientX, y: t.clientY, mode: 'undecided' };
+        };
 
-    const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        const startPt = touchRef.current;
-        touchRef.current = null;
-        if (!startPt) return;
-        const t = e.changedTouches[0];
-        const dx = t.clientX - startPt.x;
-        const dy = t.clientY - startPt.y;
-        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-        const at = tabs.findIndex((x) => x.key === tab);
-        const next = tabs[at + (dx < 0 ? 1 : -1)];
-        if (next) {
-            setSlideDir(dx < 0 ? 1 : -1);
-            switchTab(next, startPt.scrollTarget);
-        }
-    }, [tabs, tab, switchTab]);
+        const onMove = (e: TouchEvent) => {
+            if (!gesture) return;
+            const t = e.touches[0];
+            const dx = t.clientX - gesture.x;
+            const dy = t.clientY - gesture.y;
+            if (gesture.mode === 'undecided') {
+                if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; // within slop, undecided
+                gesture.mode = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'horizontal' : 'vertical';
+            }
+            if (gesture.mode === 'horizontal') e.preventDefault();
+        };
+
+        const onEnd = (e: TouchEvent) => {
+            const g = gesture;
+            gesture = null;
+            if (!g || g.mode !== 'horizontal') return;
+            const dx = e.changedTouches[0].clientX - g.x;
+            if (Math.abs(dx) < 60) return;
+            const list = tabsRef.current;
+            const at = list.findIndex((x) => x.key === tabRef.current);
+            const next = list[at + (dx < 0 ? 1 : -1)];
+            if (next) {
+                setSlideDir(dx < 0 ? 1 : -1);
+                switchTabRef.current(next);
+            }
+        };
+
+        const onCancel = () => { gesture = null; };
+
+        pane.addEventListener('touchstart', onStart, { passive: true });
+        pane.addEventListener('touchmove', onMove, { passive: false });
+        pane.addEventListener('touchend', onEnd, { passive: true });
+        pane.addEventListener('touchcancel', onCancel, { passive: true });
+        return () => {
+            pane.removeEventListener('touchstart', onStart);
+            pane.removeEventListener('touchmove', onMove);
+            pane.removeEventListener('touchend', onEnd);
+            pane.removeEventListener('touchcancel', onCancel);
+        };
+        // The pane node remounts per tab (key={tab}), so re-attach each switch.
+    }, [tab]);
 
     const kicker = kickerFor(convention);
     const dates = convention.isTBD || !convention.startDate
@@ -641,8 +671,7 @@ export default function ConventionListingShell({ convention, canEdit = false, in
 
                 <Box
                     key={tab}
-                    onTouchStart={onTouchStart}
-                    onTouchEnd={onTouchEnd}
+                    ref={paneRef}
                     sx={{
                         pt: 3,
                         // At least a viewport tall, so the snap-to-bar on tab
