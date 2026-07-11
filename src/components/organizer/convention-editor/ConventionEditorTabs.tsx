@@ -151,7 +151,11 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   }, []); // Empty dependency array ensures this runs only once on mount
 
   const [basicInfoData, setBasicInfoData] = useState<BasicInfoFormData>(() => {
-    const { priceTiers, priceDiscounts, id, venueHotel, ...basicDataFromInitial } = initialConventionData || {};
+    // Exclude cover/profile URLs: the dedicated uploaders own them (each does
+    // its own image-only PUT). If they lived in basicInfoData, a later full
+    // Save Changes would spread this stale copy back over the DB and restore
+    // a removed/replaced image URL — the "disappearing cover" bug.
+    const { priceTiers, priceDiscounts, id, venueHotel, coverImageUrl, profileImageUrl, ...basicDataFromInitial } = initialConventionData || {};
     return {
       ...initialBasicFormData,
       ...basicDataFromInitial,
@@ -245,6 +249,8 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           media,
           settings,
           keywords,
+          coverImageUrl,
+          profileImageUrl,
           ...basicDataFromInitial
         } = initialConventionData || {};
 
