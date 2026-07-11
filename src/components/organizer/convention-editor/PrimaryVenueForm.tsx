@@ -3,6 +3,7 @@ import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Butt
 import { VenueData, VenuePhotoData } from '@/lib/validators';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ImageUploadInput from '@/components/shared/ImageUploadInput';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface PrimaryVenueFormProps {
   value: VenueData;
@@ -235,7 +236,7 @@ const PrimaryVenueForm: React.FC<PrimaryVenueFormProps> = ({ value, onChange, on
       <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Venue Photo</Typography>
       {value.photos && value.photos.length > 0 ? (
         <Box>
-          <img src={value.photos[0].url} alt="Venue" style={{ maxWidth: '100%', height: 'auto', maxHeight: '300px' }} />
+          <img src={getS3ImageUrl(value.photos[0].url)} alt="Venue" style={{ maxWidth: '100%', height: 'auto', maxHeight: '300px' }} />
           <TextField
             fullWidth
             label="Photo Caption"

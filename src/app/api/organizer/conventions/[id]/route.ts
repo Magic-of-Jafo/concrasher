@@ -108,8 +108,8 @@ export async function GET(
         priceDiscounts: true, // Include PriceDiscounts (though these are more complex to load directly)
         // Consider if PriceDiscounts should be a separate fetch or structured differently
         // For now, including them to see if it works for the page load.
-        venues: true, // Include venues
-        hotels: true, // Include hotels
+        venues: { include: { photos: true } }, // Include venues + their photos so the editor shows uploaded images
+        hotels: { include: { photos: true } }, // Include hotels + their photos
         media: true, // Include media
         tags: true, // Include tags
       }

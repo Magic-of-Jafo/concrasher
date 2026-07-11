@@ -6,6 +6,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { HotelData, HotelPhotoData } from '@/lib/validators';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ImageUploadInput from '@/components/shared/ImageUploadInput';
+import { getS3ImageUrl } from '@/lib/defaults';
 
 interface HotelFormProps {
   formData: HotelData;
@@ -377,7 +378,7 @@ const HotelForm: React.FC<HotelFormProps> = ({
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <ImageUploadInput
           label="Upload Hotel Photo"
-          currentImageUrl={localFormData.photos && localFormData.photos.length > 0 ? localFormData.photos[0].url : null}
+          currentImageUrl={localFormData.photos && localFormData.photos.length > 0 ? getS3ImageUrl(localFormData.photos[0].url) : null}
           onUploadComplete={handlePhotoUpload}
           onRemoveImage={handleRemovePhoto}
           disabled={disabled}
