@@ -132,7 +132,7 @@ export default function FrontBilling({
                             </>
                         )}
                     </Typography>
-                    <GoldButton href={`/conventions/${billing.slug || billing.id}`} newTab>See the listing</GoldButton>
+                    <GoldButton href={`/conventions/${billing.slug || billing.id}`} newTab>Learn More</GoldButton>
                 </Box>
             )}
 

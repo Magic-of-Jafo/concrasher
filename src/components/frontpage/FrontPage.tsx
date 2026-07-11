@@ -32,8 +32,8 @@ export function GoldButton({ href, children, newTab = false }: { href: string; c
             target={newTab ? '_blank' : undefined}
             rel={newTab ? 'noopener noreferrer' : undefined}
             sx={{
-                backgroundColor: 'var(--cc-gold)',
-                color: 'var(--cc-gold-ink)',
+                backgroundColor: '#F5A623',
+                color: '#1C1405',
                 fontFamily: DISPLAY,
                 fontWeight: 800,
                 fontSize: '0.9rem',
@@ -44,7 +44,7 @@ export function GoldButton({ href, children, newTab = false }: { href: string; c
                 borderRadius: '8px',
                 boxShadow: 'var(--cc-glow-gold)',
                 transition: 'filter 0.2s ease-out',
-                '&:hover': { backgroundColor: 'var(--cc-gold)', filter: 'brightness(1.06)' },
+                '&:hover': { backgroundColor: '#FFB43B', filter: 'brightness(1.03)' },
                 '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '3px' },
             }}
         >

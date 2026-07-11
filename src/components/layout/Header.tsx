@@ -148,7 +148,7 @@ export default function Header() {
             // Desktop Layout
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Button color="inherit" component={Link} href="/conventions" sx={{ mr: 1 }}>
-                Advanced Search
+                All Conventions
               </Button>
 
               {/* Auth Actions */}

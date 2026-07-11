@@ -77,7 +77,7 @@ export default function HeaderMobileDrawer({
         <List>
           <ListItem disablePadding>
             <ListItemButton component={Link} href="/conventions" onClick={onClose}>
-              <ListItemText primary="Advanced Search" />
+              <ListItemText primary="All Conventions" />
             </ListItemButton>
           </ListItem>
 
