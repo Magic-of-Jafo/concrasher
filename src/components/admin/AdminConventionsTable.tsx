@@ -94,7 +94,7 @@ export default function AdminConventionsTable({
     const [rows, setRows] = useState(initialRows);
     const [featuredId, setFeaturedId] = useState<string | null>(initialFeaturedId);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [statusFilter, setStatusFilter] = useState<string>('PUBLISHED');
     const [sortBy, setSortBy] = useState<SortBy>('date');
     const [sortAsc, setSortAsc] = useState(true);
     const [confirmDelete, setConfirmDelete] = useState<AdminConventionRow | null>(null);

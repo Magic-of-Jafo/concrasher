@@ -290,12 +290,18 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     const tabs = useMemo<ListingTab[]>(
         () =>
             LISTING_TABS.filter((t) => {
-                if (t.key === 'hotels') return (convention.hotels?.length ?? 0) > 0;
+                // When guests stay at the primary venue, its lodging details
+                // live in the Venue tab. Hide Hotels even if an older hotel
+                // record remains attached to the convention.
+                if (t.key === 'hotels') {
+                    return !convention.guestsStayAtPrimaryVenue
+                        && (convention.hotels?.length ?? 0) > 0;
+                }
                 if (t.key === 'dealers') return (convention.dealerLinks?.length ?? 0) > 0;
                 if (t.key === 'media') return (convention.media?.length ?? 0) > 0;
                 return true;
             }),
-        [convention.hotels, convention.dealerLinks, convention.media],
+        [convention.guestsStayAtPrimaryVenue, convention.hotels, convention.dealerLinks, convention.media],
     );
 
     const [tab, setTab] = useState<ListingTabKey>(

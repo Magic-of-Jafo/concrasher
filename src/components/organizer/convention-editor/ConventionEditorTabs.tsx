@@ -143,7 +143,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
     const storedTab = localStorage.getItem(localStorageKey);
     if (storedTab) {
       const tabIndex = parseInt(storedTab, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 6) {
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 7) {
         setActiveTab(tabIndex);
         // console.log(`[ConventionEditorTabs] Loaded active tab ${tabIndex} from localStorage.`);
       }
@@ -400,9 +400,10 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           <Tab label="Pricing" {...allyProps(1)} />
           <Tab label="Venue/Hotel" {...allyProps(2)} />
           <Tab label={conventionType === 'FESTIVAL' ? 'Shows' : 'Schedule'} {...allyProps(3)} />
-          <Tab label="Dealers" {...allyProps(4)} disabled={!isEditing} />
-          <Tab label="Media" {...allyProps(5)} disabled={!isEditing} />
-          <Tab label="Settings" {...allyProps(6)} disabled={!isEditing} />
+          <Tab label="Talent" {...allyProps(4)} disabled={!isEditing} />
+          <Tab label="Dealers" {...allyProps(5)} disabled={!isEditing} />
+          <Tab label="Media" {...allyProps(6)} disabled={!isEditing} />
+          <Tab label="Settings" {...allyProps(7)} disabled={!isEditing} />
         </Tabs>
       </Box>
 
@@ -492,6 +493,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       </TabPanel>
 
       <TabPanel value={activeTab} index={4}>
+        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Talent
+          </Typography>
+          <Typography color="text.secondary">
+            Talent selection will be available here in a future update.
+          </Typography>
+        </Paper>
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={5}>
         {conventionId ? (
           <DealersTab
             conventionId={conventionId}
@@ -505,7 +517,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         )}
       </TabPanel>
 
-      <TabPanel value={activeTab} index={5}>
+      <TabPanel value={activeTab} index={6}>
         <MediaTab
           conventionId={conventionId as string}
           initialMedia={mediaData}
@@ -515,7 +527,7 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
         />
       </TabPanel>
 
-      <TabPanel value={activeTab} index={6}>
+      <TabPanel value={activeTab} index={7}>
         <SettingsTab
           value={settingsData}
           onFormChange={handleSettingsChange}
@@ -561,4 +573,4 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
   );
 };
 
-export default ConventionEditorTabs; 
+export default ConventionEditorTabs;

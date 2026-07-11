@@ -320,10 +320,20 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                 disabled={disabled}
                 errors={structuredErrors.venues[index + 1]}
                 title={`Secondary Venue ${index + 1}`}
-                onRemove={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
                 isNew={!venue.id}
                 isPrimary={false}
               />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Button
+                  startIcon={<DeleteIcon />}
+                  onClick={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
+                  color="error"
+                  disabled={disabled}
+                  aria-label={`Delete Secondary Venue ${index + 1}`}
+                >
+                  Delete Secondary Venue
+                </Button>
+              </Box>
             </AccordionDetails>
           </Accordion>
         ))}

@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Typography, Button, Stack } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import { DISPLAY, BODY } from '@/lib/fonts';
+import { getS3ImageUrl } from '@/lib/defaults';
 import { SectionKicker } from './VenueSection';
 
 // House Lights reskin (2026-07-10): panel cards on the theme surface. All
@@ -24,6 +25,7 @@ const outlineButtonSx = {
 
 const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boolean }) => {
     if (!hotel) return null;
+    const photo = hotel.photos?.[0];
 
     return (
         <Box
@@ -31,11 +33,52 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
                 borderRadius: '12px',
                 backgroundColor: 'var(--cc-panel)',
                 border: '1px solid var(--cc-panel-border)',
-                p: isCompact ? 1.75 : 2.5,
                 mb: 2,
                 height: '100%',
+                overflow: 'hidden',
+                display: isCompact ? 'block' : { xs: 'block', lg: 'grid' },
+                gridTemplateColumns: isCompact ? undefined : { lg: 'minmax(320px, 42%) minmax(0, 1fr)' },
             }}
         >
+            {!isCompact && (
+                <Box
+                    sx={{
+                        height: { xs: 150, sm: 'auto', lg: '100%' },
+                        minHeight: { lg: 320 },
+                        aspectRatio: { xs: 'auto', sm: '16 / 9', lg: 'auto' },
+                        background: 'var(--cc-hero-scene)',
+                        backgroundSize: 'var(--cc-hero-bokeh-size)',
+                        borderBottom: { xs: '1px solid var(--cc-hairline)', lg: 'none' },
+                        borderRight: { xs: 'none', lg: '1px solid var(--cc-hairline)' },
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        '@media (hover: hover)': { '&:hover img': { transform: 'scale(1.05)' } },
+                    }}
+                >
+                    {photo ? (
+                        <Box
+                            component="img"
+                            src={getS3ImageUrl(photo.url)}
+                            alt={photo.caption || hotel.hotelName || ''}
+                            sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                                transition: 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+                                '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                            }}
+                        />
+                    ) : (
+                        <Typography sx={{ fontFamily: DISPLAY, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-hero-sub)' }}>
+                            {hotel.hotelName}
+                        </Typography>
+                    )}
+                </Box>
+            )}
+            <Box sx={{ p: isCompact ? 1.75 : { xs: 2.5, lg: 3 } }}>
             <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: isCompact ? '1rem' : '1.2rem', color: 'var(--cc-ink)' }}>
                 {hotel.hotelName}
             </Typography>
@@ -102,6 +145,7 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
                     </Button>
                 )}
             </Stack>
+            </Box>
         </Box>
     );
 };

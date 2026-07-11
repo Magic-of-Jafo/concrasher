@@ -177,6 +177,7 @@ function ConventionEditPage() { // Remove params from props
   const [isLoading, setIsLoading] = useState(isEditing); // Start true if editing, false if new
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
@@ -481,6 +482,7 @@ function ConventionEditPage() { // Remove params from props
   const handleSubmitConvention = async (dataFromTabs: Partial<PageConventionData>) => {
     setIsSaving(true);
     setError(null);
+    setSuccessMessage(null);
 
     // Merge the latest data from the active tab with the ref data from all other tabs
     const finalData = { ...conventionPageDataRef.current, ...dataFromTabs };
@@ -563,12 +565,7 @@ function ConventionEditPage() { // Remove params from props
         }
       }));
 
-      // Optionally, show a success message
-      // e.g., using a toast notification library
-      console.log('Convention saved successfully!');
-
-      // Everyone manages conventions from the profile hub now.
-      router.push('/profile?tab=organizer');
+      setSuccessMessage('Convention changes saved successfully.');
 
     } catch (err: any) {
       console.error('Save failed:', err);
@@ -627,6 +624,12 @@ function ConventionEditPage() { // Remove params from props
         </Alert>
       )}
 
+      {successMessage && (
+        <Alert severity="success" onClose={() => setSuccessMessage(null)} sx={{ mb: 2 }}>
+          {successMessage}
+        </Alert>
+      )}
+
       {currentStep === 'selectSeries' && !isEditing ? (
         <Paper elevation={3} sx={{ p: 4 }}>
           <ConventionSeriesSelector
@@ -649,4 +652,4 @@ function ConventionEditPage() { // Remove params from props
 
 export default function GuardedConventionEditPage() {
   return <ConventionEditPage />;
-} 
+}

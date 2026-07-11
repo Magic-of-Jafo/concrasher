@@ -64,15 +64,20 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any; isCompact?: boole
                 overflow: 'hidden',
                 mb: 2,
                 height: '100%',
+                display: isCompact ? 'block' : { xs: 'block', lg: 'grid' },
+                gridTemplateColumns: isCompact ? undefined : { lg: 'minmax(320px, 42%) minmax(0, 1fr)' },
             }}
         >
             {/* The photo band: every venue reserves this space. */}
             <Box
                 sx={{
-                    height: isCompact ? 110 : { xs: 150, md: 200 },
+                    height: isCompact ? 110 : { xs: 150, sm: 'auto', lg: '100%' },
+                    minHeight: isCompact ? undefined : { lg: 320 },
+                    aspectRatio: isCompact ? undefined : { xs: 'auto', sm: '16 / 9', lg: 'auto' },
                     background: 'var(--cc-hero-scene)',
                     backgroundSize: 'var(--cc-hero-bokeh-size)',
-                    borderBottom: '1px solid var(--cc-hairline)',
+                    borderBottom: isCompact ? '1px solid var(--cc-hairline)' : { xs: '1px solid var(--cc-hairline)', lg: 'none' },
+                    borderRight: isCompact ? 'none' : { xs: 'none', lg: '1px solid var(--cc-hairline)' },
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     overflow: 'hidden',
                     // Subtle zoom on hover (pointer devices only).
@@ -97,7 +102,7 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any; isCompact?: boole
                 )}
             </Box>
 
-            <Box sx={{ p: isCompact ? 1.75 : 2.5 }}>
+            <Box sx={{ p: isCompact ? 1.75 : { xs: 2.5, lg: 3 } }}>
                 <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: isCompact ? '1rem' : '1.2rem', color: 'var(--cc-ink)' }}>
                     {venue.venueName}
                 </Typography>
