@@ -261,8 +261,23 @@ function parseArgs(argv) {
     return out;
 }
 
-function htmlToText(html) {
+// Decode Cloudflare email obfuscation (data-cfemail hex) so scraped contact
+// emails are real addresses, not the "[email protected]" placeholder.
+function decodeCfEmail(hex) {
+    const key = parseInt(hex.slice(0, 2), 16);
+    let out = '';
+    for (let i = 2; i < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+    return out;
+}
+function deobfuscateCfEmails(html) {
     return html
+        .replace(/<a\b[^>]*\bdata-cfemail="([0-9a-fA-F]+)"[^>]*>[\s\S]*?<\/a>/gi, (_m, hex) => { try { return decodeCfEmail(hex); } catch { return ''; } })
+        .replace(/href="\/cdn-cgi\/l\/email-protection#([0-9a-fA-F]+)"/gi, (_m, hex) => { try { return `href="mailto:${decodeCfEmail(hex)}"`; } catch { return _m; } })
+        .replace(/\[email(?:&#160;|&nbsp;|\s)*protected\]/gi, '');
+}
+
+function htmlToText(html) {
+    return deobfuscateCfEmails(html)
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
         .replace(/<!--[\s\S]*?-->/g, ' ')

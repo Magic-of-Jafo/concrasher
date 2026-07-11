@@ -191,8 +191,37 @@ export async function extractScheduleFromImages(
 }
 
 // ── input adapters ────────────────────────────────────────────────────────────
+
+// Cloudflare's "Email Address Obfuscation" replaces real emails in the HTML
+// with the literal text "[email protected]" plus a data-cfemail hex attribute
+// that browser JS decodes. A text scraper would otherwise store the useless
+// placeholder (the "Invalid contact email" bug), so decode it back here.
+function decodeCfEmail(hex: string): string {
+    const key = parseInt(hex.slice(0, 2), 16);
+    let out = '';
+    for (let i = 2; i < hex.length; i += 2) {
+        out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+    }
+    return out;
+}
+
+function deobfuscateCfEmails(html: string): string {
+    let out = html.replace(
+        /<a\b[^>]*\bdata-cfemail="([0-9a-fA-F]+)"[^>]*>[\s\S]*?<\/a>/gi,
+        (_m, hex) => { try { return decodeCfEmail(hex); } catch { return ''; } },
+    );
+    out = out.replace(
+        /href="\/cdn-cgi\/l\/email-protection#([0-9a-fA-F]+)"/gi,
+        (_m, hex) => { try { return `href="mailto:${decodeCfEmail(hex)}"`; } catch { return _m; } },
+    );
+    // Any placeholder still left (e.g. no hex present) → remove it so the
+    // literal "[email protected]" can never reach the model or the database.
+    out = out.replace(/\[email(?:&#160;|&nbsp;|\s)*protected\]/gi, '');
+    return out;
+}
+
 function htmlToText(html: string): string {
-    return html
+    return deobfuscateCfEmails(html)
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
         .replace(/<!--[\s\S]*?-->/g, ' ')
@@ -916,6 +945,11 @@ Rules:
 function shapePlace(p: any): ScrapedPlace | null {
     if (!p || typeof p !== 'object') return null;
     const str = (v: any) => (v && String(v).trim() ? String(v).trim() : null);
+    // Only keep a real-looking address; drop leftover obfuscation placeholders.
+    const email = (v: any) => {
+        const s = str(v);
+        return s && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
+    };
     const date = (v: any) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim()) ? String(v).trim() : null);
     const amenities = (Array.isArray(p.amenities) ? p.amenities : [])
         .map((a: any) => String(a || '').trim()).filter(Boolean);
@@ -928,7 +962,7 @@ function shapePlace(p: any): ScrapedPlace | null {
         stateRegion: str(p.stateRegion),
         postalCode: str(p.postalCode),
         country: str(p.country),
-        contactEmail: str(p.contactEmail),
+        contactEmail: email(p.contactEmail),
         contactPhone: str(p.contactPhone),
         description: str(p.description),
         amenities,
