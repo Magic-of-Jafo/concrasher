@@ -6,6 +6,7 @@ import { unlink } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { assertSafeUploadBucket } from '@/lib/s3-config';
 
 // Generic image uploads (venue/hotel photos via ImageUploadInput).
 //
@@ -32,6 +33,8 @@ export async function POST(request: NextRequest) {
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const bucketError = assertSafeUploadBucket();
+        if (bucketError) return NextResponse.json({ error: bucketError }, { status: 500 });
 
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
@@ -102,6 +105,8 @@ export async function DELETE(request: NextRequest) {
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const bucketError = assertSafeUploadBucket();
+        if (bucketError) return NextResponse.json({ error: bucketError }, { status: 500 });
 
         const body = await request.json();
         const imageUrl: unknown = body.url;

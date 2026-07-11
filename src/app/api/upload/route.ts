@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { assertSafeUploadBucket } from '@/lib/s3-config';
 
 // Configure S3 Client
 const s3Client = new S3Client({
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const bucketError = assertSafeUploadBucket();
+    if (bucketError) return NextResponse.json({ error: bucketError }, { status: 500 });
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -192,6 +195,8 @@ export async function DELETE(request: Request) {
     if (!session) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+    const bucketError = assertSafeUploadBucket();
+    if (bucketError) return NextResponse.json({ message: bucketError }, { status: 500 });
 
     const { key } = await request.json();
 
