@@ -455,8 +455,11 @@ export const ConventionMediaSchema = z.object({
   conventionId: z.string().cuid().optional(),
   type: z.enum(['IMAGE', 'VIDEO_LINK']),
   url: z.string().min(1, 'URL is required').refine((val) => {
-    // Accept S3 URLs, relative upload paths, or supported video host URLs
-    if (val.startsWith('/uploads/') || val.startsWith('https://convention-crasher.s3.amazonaws.com')) {
+    // Accept our S3 bucket (with or without the region in the host — the
+    // uploader returns region-qualified URLs like s3.us-east-1.amazonaws.com;
+    // the old check only matched the region-less form, which rejected every
+    // real upload), relative upload paths, or supported video host URLs.
+    if (val.startsWith('/uploads/') || /^https:\/\/convention-crasher\.s3([.-][a-z0-9-]+)?\.amazonaws\.com\//i.test(val)) {
       return true;
     }
 
