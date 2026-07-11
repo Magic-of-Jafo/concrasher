@@ -308,16 +308,19 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     // visually and the new pane presents from its top.
     const navAnchorRef = useRef<HTMLDivElement | null>(null);
     const snapToTabs = useCallback(() => {
-        const doSnap = () => {
+        const anchorTop = () => {
             const el = navAnchorRef.current;
-            if (!el) return;
-            const top = el.getBoundingClientRect().top + window.scrollY;
-            if (window.scrollY > top) window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
+            return el ? el.getBoundingClientRect().top + window.scrollY : null;
         };
-        doSnap();
-        // Once more after the new pane has laid out: the browser's own scroll
-        // anchoring and the height change both nudge the position post-render.
-        requestAnimationFrame(() => requestAnimationFrame(doSnap));
+        const top = anchorTop();
+        if (top === null || window.scrollY <= top) return; // already above the bar: leave the reader be
+        window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
+        // Re-pin after the new pane lays out: the height change and the
+        // browser's scroll anchoring both nudge the position post-render.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const t = anchorTop();
+            if (t !== null) window.scrollTo({ top: t, behavior: 'instant' as ScrollBehavior });
+        }));
     }, []);
 
     // Tab switches are client-side; pushState keeps the deep-linkable URL in
@@ -629,6 +632,15 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                     onTouchEnd={onTouchEnd}
                     sx={{
                         pt: 3,
+                        // At least a viewport tall, so the snap-to-bar on tab
+                        // switches can always reach the top: on a shorter pane
+                        // the browser clamps the scroll partway and the bar
+                        // never makes it up. The slack is below the fold.
+                        minHeight: 'calc(100vh - 60px)',
+                        // Keep the browser's scroll anchoring out of tab
+                        // switches: it fights the snap-to-bar scroll while
+                        // the pane content swaps.
+                        overflowAnchor: 'none',
                         // Swiped-in panes glide from the direction of travel;
                         // tapped tabs switch instantly (slideDir 0).
                         ...(slideDir !== 0 && {
