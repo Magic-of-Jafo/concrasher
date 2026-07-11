@@ -40,6 +40,14 @@ async function getUpcomingConventions(): Promise<{
         coverImageUrl: true,
         profileImageUrl: true,
         descriptionShort: true,
+        // First gallery image: the Featured block leads with it (a real
+        // event photo beats a logo); profile art remains the fallback.
+        media: {
+          where: { type: 'IMAGE' as const },
+          orderBy: { order: 'asc' as const },
+          take: 1,
+          select: { url: true },
+        },
       },
     });
 
@@ -66,6 +74,7 @@ async function getUpcomingConventions(): Promise<{
         startDate: row.startDate ? row.startDate.toISOString() : null,
         endDate: row.endDate ? row.endDate.toISOString() : null,
         imageUrl: row.profileImageUrl || row.coverImageUrl || null,
+        featuredImageUrl: row.media[0]?.url ?? null,
         descriptionShort: row.descriptionShort,
         region: countryToRegion(row.country),
       }));

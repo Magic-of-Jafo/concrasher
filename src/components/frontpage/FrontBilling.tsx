@@ -72,6 +72,10 @@ export default function FrontBilling({
                     >
                         Featured
                     </Typography>
+                    {/* Featured art: first gallery photo when the organizer has
+                        one (a real event shot beats a logo), else profile art,
+                        else the hero scene. The headline rides ON the art over
+                        a bottom-weighted scrim, poster-style. */}
                     <Box
                         sx={{
                             position: 'relative',
@@ -80,44 +84,41 @@ export default function FrontBilling({
                             border: '1px solid var(--cc-panel-border)',
                             mb: 2,
                             overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
                             background: 'var(--cc-hero-scene)',
                             backgroundSize: 'var(--cc-hero-bokeh-size)',
                         }}
                     >
-                        {billing.imageUrl ? (
+                        {(billing.featuredImageUrl || billing.imageUrl) && (
                             <Box
                                 component="img"
-                                src={getS3ImageUrl(billing.imageUrl)}
+                                src={getS3ImageUrl(billing.featuredImageUrl || billing.imageUrl)}
                                 alt=""
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#ffffff' }}
+                                sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#ffffff' }}
                             />
-                        ) : (
-                            <Typography
-                                component="span"
-                                sx={{
-                                    fontFamily: DISPLAY, fontWeight: 800,
-                                    fontSize: 'clamp(1.75rem, 4vw, 2.9rem)', color: 'var(--cc-ink)',
-                                    textShadow: 'var(--cc-glow-art)', px: 2, textAlign: 'center',
-                                }}
-                            >
-                                {billing.name}
-                            </Typography>
                         )}
+                        <Box
+                            aria-hidden
+                            sx={{
+                                position: 'absolute', inset: 0,
+                                background: 'linear-gradient(180deg, rgba(10, 12, 16, 0) 32%, rgba(10, 12, 16, 0.52) 62%, rgba(10, 12, 16, 0.86) 100%)',
+                            }}
+                        />
+                        <Typography
+                            component="h2"
+                            sx={{
+                                position: 'absolute', left: 0, right: 0, bottom: 0,
+                                px: { xs: 2, md: 2.75 }, pb: { xs: 1.75, md: 2.25 }, pr: { xs: 6, md: 7 },
+                                fontFamily: DISPLAY, fontWeight: 800,
+                                fontSize: 'clamp(1.35rem, 3vw, 2.1rem)', lineHeight: 1.1,
+                                letterSpacing: '-0.015em', color: 'var(--cc-hero-ink)',
+                                textShadow: '0 2px 14px rgba(0, 0, 0, 0.6)',
+                                textWrap: 'balance', m: 0,
+                            }}
+                        >
+                            {billingHeadline(billing)}
+                        </Typography>
                         <FlagCorner country={billing.country} />
                     </Box>
-                    <Typography
-                        component="h2"
-                        sx={{
-                            fontFamily: DISPLAY, fontWeight: 800,
-                            fontSize: 'clamp(1.75rem, 3.6vw, 2.6rem)', lineHeight: 1.08,
-                            letterSpacing: '-0.015em', color: 'var(--cc-ink)', textWrap: 'balance', m: 0,
-                        }}
-                    >
-                        {billingHeadline(billing)}
-                    </Typography>
                     {billing.descriptionShort && (
                         <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', lineHeight: 1.7, color: 'var(--cc-muted)', mt: 1.5, maxWidth: '54ch' }}>
                             {billing.descriptionShort}

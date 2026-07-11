@@ -12,6 +12,9 @@ export interface HomeConvention {
   startDate: string | null; // ISO
   endDate: string | null; // ISO
   imageUrl: string | null;
+  /** First gallery image (a real event photo), when the organizer has one.
+   *  The Featured block prefers it over the profile/logo art. */
+  featuredImageUrl?: string | null;
   descriptionShort: string | null;
   region: Region;
 }
