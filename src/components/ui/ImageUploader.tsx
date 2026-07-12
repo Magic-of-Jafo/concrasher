@@ -3,6 +3,7 @@ import { Box, Button, Typography, CircularProgress, Paper, Alert, Tooltip, IconB
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useDropzone, FileWithPath } from 'react-dropzone';
 import { usePasteImage } from '@/hooks/usePasteImage';
+import { MAX_UPLOAD_MB } from '@/lib/upload-limits';
 import ReactCrop, {
   centerCrop,
   makeAspectCrop,
@@ -149,7 +150,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   minHeight,
   aspectRatio,
   aspectRatioTolerance = 0.05,
-  maxFileSizeMB = 5,
+  maxFileSizeMB = MAX_UPLOAD_MB,
   dropzoneHeight = 150,
   imagePreviewStyle,
   tooltipPlacement = 'top',

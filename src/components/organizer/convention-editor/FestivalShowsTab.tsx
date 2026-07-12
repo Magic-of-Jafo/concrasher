@@ -33,6 +33,7 @@ import {
     type ProductionInput,
 } from '@/lib/actions';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '@/lib/upload-limits';
 import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import PerformancesDialog from './PerformancesDialog';
 import FestivalHelperDialog from './FestivalHelperDialog';
@@ -134,7 +135,7 @@ const FestivalShowsTab: React.FC<FestivalShowsTabProps> = ({ conventionId, start
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 5 * 1024 * 1024) { setFormError('Image must be under 5MB.'); return; }
+        if (file.size > MAX_UPLOAD_BYTES) { setFormError(`Image must be under ${MAX_UPLOAD_MB}MB.`); return; }
         setUploading(true);
         setFormError(null);
         try {

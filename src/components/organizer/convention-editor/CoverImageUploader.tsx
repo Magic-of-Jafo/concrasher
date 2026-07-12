@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import ImageDropZone from '@/components/ui/ImageDropZone';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '@/lib/upload-limits';
 import {
     Box,
     Typography,
@@ -65,7 +66,7 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
     // Canonical Facebook cover spec (851×315, ~2.7:1).
     const TARGET_WIDTH = 851;
     const TARGET_HEIGHT = 315;
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_FILE_SIZE = MAX_UPLOAD_BYTES;
 
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -75,7 +76,7 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            setError('File size must be less than 5MB');
+            setError(`File size must be less than ${MAX_UPLOAD_MB}MB`);
             return;
         }
 
@@ -142,14 +143,19 @@ export const CoverImageUploader: React.FC<CoverImageUploaderProps> = ({
                 // source rect to the real image pixels and size the canvas to match, so
                 // the saved file is only real pixels — no transparent padding, no
                 // distortion. The display banner centers it; side bars come from there.
-                const scale = TARGET_WIDTH / cropArea.width; // aspect-locked: == TARGET_HEIGHT / cropArea.height
-
                 const sx = Math.max(0, cropArea.x);
                 const sy = Math.max(0, cropArea.y);
                 const sRight = Math.min(image.naturalWidth, cropArea.x + cropArea.width);
                 const sBottom = Math.min(image.naturalHeight, cropArea.y + cropArea.height);
                 const sw = Math.max(1, sRight - sx);
                 const sh = Math.max(1, sBottom - sy);
+
+                // Export at the cropped source's NATIVE resolution (never upscale),
+                // capped at 2553px wide (3× the 851 spec). The old code forced the
+                // output down to 851px wide, which looked blurry once the banner
+                // rendered larger; the server applies its own downscale cap.
+                const MAX_EXPORT_WIDTH = 2553;
+                const scale = Math.min(1, MAX_EXPORT_WIDTH / sw); // aspect preserved (crop box is 851:315)
 
                 canvas.width = Math.round(sw * scale);
                 canvas.height = Math.round(sh * scale);

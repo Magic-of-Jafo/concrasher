@@ -7,6 +7,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 import { assertSafeUploadBucket } from '@/lib/s3-config';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '@/lib/upload-limits';
 
 // Generic image uploads (venue/hotel photos via ImageUploadInput).
 //
@@ -45,9 +46,8 @@ export async function POST(request: NextRequest) {
         if (!file.type.startsWith('image/')) {
             return NextResponse.json({ error: 'Invalid file type. Only images are allowed.' }, { status: 400 });
         }
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        if (file.size > maxSize) {
-            return NextResponse.json({ error: `File size exceeds the limit of ${maxSize / (1024 * 1024)}MB.` }, { status: 400 });
+        if (file.size > MAX_UPLOAD_BYTES) {
+            return NextResponse.json({ error: `File size exceeds the limit of ${MAX_UPLOAD_MB}MB.` }, { status: 400 });
         }
 
         let buffer: Buffer = Buffer.from(await file.arrayBuffer());

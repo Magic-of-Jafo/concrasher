@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { usePasteImage, fileToInput } from '@/hooks/usePasteImage';
 import ImageDropZone from '@/components/ui/ImageDropZone';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '@/lib/upload-limits';
 import {
     Box,
     Typography,
@@ -46,7 +47,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 
     const TARGET_WIDTH = 400;
     const TARGET_HEIGHT = 400;
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_FILE_SIZE = MAX_UPLOAD_BYTES;
 
     // Fit the loaded image to the CROP BOX by its LONGER natural dimension: a
     // portrait image fits its height to the box (sides fall short), a landscape
@@ -75,7 +76,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 
         // Validate file size
         if (file.size > MAX_FILE_SIZE) {
-            setError('File size must be less than 5MB');
+            setError(`File size must be less than ${MAX_UPLOAD_MB}MB`);
             return;
         }
 

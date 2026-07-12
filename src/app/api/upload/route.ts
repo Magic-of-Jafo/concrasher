@@ -5,6 +5,7 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 import { assertSafeUploadBucket } from '@/lib/s3-config';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '@/lib/upload-limits';
 
 // Configure S3 Client
 const s3Client = new S3Client({
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
-    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+    const MAX_BYTES = MAX_UPLOAD_BYTES;
 
     const conventionId = formData.get('conventionId') as string;
     const userId = formData.get('userId') as string;
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     let sourceName: string;
     if (file && typeof file !== 'string') {
       if (file.size > MAX_BYTES) {
-        return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
+        return NextResponse.json({ error: `File size must be less than ${MAX_UPLOAD_MB}MB` }, { status: 400 });
       }
       if (!validTypes.includes(file.type)) {
         return NextResponse.json({ error: 'Invalid file type.' }, { status: 400 });
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
       }
       const ab = await imgRes.arrayBuffer();
       if (ab.byteLength > MAX_BYTES) {
-        return NextResponse.json({ error: 'Image must be less than 5MB' }, { status: 400 });
+        return NextResponse.json({ error: `Image must be less than ${MAX_UPLOAD_MB}MB` }, { status: 400 });
       }
       buffer = Buffer.from(ab);
       let nameFromUrl = 'image';
@@ -119,7 +120,9 @@ export async function POST(request: Request) {
     // Keep PNG (and its transparency) for images with an alpha channel; convert
     // opaque images to JPEG. Skip GIFs (may be animated) and fall back to the
     // original bytes if processing fails for any reason.
-    const MAX_DIM = 1600;
+    // 2560px keeps wide cover banners crisp on high-DPI screens (they render up
+    // to ~1080 CSS px, i.e. ~2160px at 2x); JPEG q82 keeps the file small.
+    const MAX_DIM = 2560;
     if (contentType !== 'image/gif') {
       try {
         // Pasted images often carry an alpha channel even when fully opaque, so test

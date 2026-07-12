@@ -24,6 +24,7 @@ import { PromotionalImageItem } from './PromotionalImageItem';
 import { VideoLinkItem } from './VideoLinkItem';
 import { updateConventionMedia } from '@/lib/actions';
 import { type ConventionMediaData } from '@/lib/validators';
+import { MAX_UPLOAD_MB } from '@/lib/upload-limits';
 
 interface MediaTabProps {
     conventionId: string;
@@ -522,7 +523,7 @@ export const MediaTab: React.FC<MediaTabProps> = ({
                                 label="Add Images"
                                 onUploadSuccess={handlePromotionalImageUpload}
                                 dropzoneHeight={40}
-                                maxFileSizeMB={5}
+                                maxFileSizeMB={MAX_UPLOAD_MB}
                                 conventionId={conventionId}
                                 mediaType="promotional"
                                 resetAfterUpload={true}
