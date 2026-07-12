@@ -123,19 +123,21 @@ export default function ProfileTabs({
             },
         ];
 
-        if (isOrganizer) {
-            defs.push({
-                key: 'organizer',
-                label: 'My Conventions',
-                render: () => <OrganizerConventionsTab />,
-            });
-        }
-
+        // Order: the base (user) profile first, the talent profile right below it,
+        // then everything else.
         if (showTalentTab) {
             defs.push({
                 key: 'talent',
                 label: 'Talent Profile',
                 render: () => <TalentProfileTab userId={user.id} user={user} />,
+            });
+        }
+
+        if (isOrganizer) {
+            defs.push({
+                key: 'organizer',
+                label: 'My Conventions',
+                render: () => <OrganizerConventionsTab />,
             });
         }
 

@@ -78,6 +78,7 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
 
             {/* Owner-only completion meter (motivation, not shown publicly). */}
             <ProfileStrengthMeter
+                dismissKey="member"
                 strength={memberStrength({
                     image: currentImageUrl,
                     firstName: user.firstName,

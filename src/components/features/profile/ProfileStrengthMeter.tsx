@@ -1,30 +1,64 @@
 'use client';
 
-import React from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Typography, IconButton } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import CloseIcon from '@mui/icons-material/Close';
 import type { ProfileStrength } from '@/lib/profile-strength';
 
 // Owner-only completion meter (never shown on the public page). Motivates
 // finishing the profile with a themed bar, tier label, and an actionable list
-// of what's left. See docs/profile-strength.md.
+// of what's left. Once complete (100%) the user can dismiss it; it stays hidden
+// until their score drops back below 100%, then returns. See
+// docs/profile-strength.md.
 
 const DISPLAY = 'var(--font-montserrat), system-ui, arial, sans-serif';
+const STORAGE_PREFIX = 'cc-strength-dismissed-';
+
+function readDismissed(key: string): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.localStorage.getItem(STORAGE_PREFIX + key) === '1';
+    } catch {
+        return false;
+    }
+}
 
 export default function ProfileStrengthMeter({
     strength,
+    dismissKey,
     title = 'Profile strength',
 }: {
     strength: ProfileStrength;
+    /** Namespaces the "dismissed at 100%" flag, e.g. "member" / "talent". */
+    dismissKey: string;
     title?: string;
 }) {
     const { score, tier, missing } = strength;
     const complete = missing.length === 0;
+    const [dismissed, setDismissed] = useState(() => readDismissed(dismissKey));
+
+    // A profile that dips back below 100% must show the reminder again — clear
+    // any prior dismissal so it reappears (and can be dismissed again next time).
+    useEffect(() => {
+        if (!complete) {
+            try { window.localStorage.removeItem(STORAGE_PREFIX + dismissKey); } catch { /* ignore */ }
+            if (dismissed) setDismissed(false);
+        }
+    }, [complete, dismissKey, dismissed]);
+
+    if (complete && dismissed) return null;
+
+    const handleDismiss = () => {
+        try { window.localStorage.setItem(STORAGE_PREFIX + dismissKey, '1'); } catch { /* ignore */ }
+        setDismissed(true);
+    };
 
     return (
         <Box
             sx={{
+                position: 'relative',
                 border: '1px solid var(--cc-panel-border)',
                 borderRadius: '12px',
                 backgroundColor: 'var(--cc-panel)',
@@ -32,7 +66,18 @@ export default function ProfileStrengthMeter({
                 mb: 3,
             }}
         >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+            {complete && (
+                <IconButton
+                    onClick={handleDismiss}
+                    size="small"
+                    aria-label="Dismiss profile strength"
+                    sx={{ position: 'absolute', top: 6, right: 6, color: 'var(--cc-soft)', '&:hover': { color: 'var(--cc-ink)' } }}
+                >
+                    <CloseIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+            )}
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, pr: complete ? 3 : 0 }}>
                 <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', color: 'var(--cc-ink)' }}>
                     {title}
                 </Typography>

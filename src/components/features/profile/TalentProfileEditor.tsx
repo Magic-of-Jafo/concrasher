@@ -235,6 +235,7 @@ export default function TalentProfileEditor({
 
             <ProfileStrengthMeter
                 title="Talent profile strength"
+                dismissKey="talent"
                 strength={talentStrength({
                     displayName: formData.displayName,
                     profilePictureUrl: formData.profilePictureUrl,
