@@ -32,9 +32,10 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { setFeaturedConvention, deleteConvention } from '@/lib/actions';
+import { profileSurfaceSx } from '@/components/ui/profileTheme';
 
-// Production-office surface (Two Rooms Rule): plain, dense, calm. No House
-// Lights chrome here — this is the admin's workbench, not the auditorium.
+// The admin's convention workbench — dense and calm, but on the House Lights
+// surface so it matches the rest of the themed admin area.
 
 export interface AdminConventionRow {
     id: string;
@@ -152,11 +153,20 @@ export default function AdminConventionsTable({
     };
 
     return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
+        <Box
+            component="main"
+            sx={{
+                backgroundColor: 'var(--cc-bg)',
+                backgroundImage: 'var(--cc-field)',
+                backgroundRepeat: 'no-repeat',
+                minHeight: '100vh',
+            }}
+        >
+        <Container maxWidth="lg" sx={{ py: 4, ...profileSurfaceSx }}>
+            <Typography variant="h4" component="h1" gutterBottom sx={{ color: 'var(--cc-ink)', fontWeight: 800 }}>
                 Manage Conventions
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ mb: 3, color: 'var(--cc-muted)' }}>
                 Every convention on the site. The Featured radio picks the front page&apos;s
                 headline slot; Automatic lets the site choose (majors first, then artwork,
                 then soonest).
@@ -185,7 +195,7 @@ export default function AdminConventionsTable({
                     <MenuItem value="PAST">Past</MenuItem>
                     <MenuItem value="CANCELLED">Cancelled</MenuItem>
                 </TextField>
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
+                <Typography variant="body2" sx={{ ml: 'auto', color: 'var(--cc-muted)' }}>
                     {visible.length} of {rows.length} shown
                 </Typography>
             </Box>
@@ -202,7 +212,7 @@ export default function AdminConventionsTable({
                 label={<Typography variant="body2">Automatic featured selection (no manual pick)</Typography>}
             />
 
-            <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <TableContainer sx={{ border: '1px solid var(--cc-panel-border)', backgroundColor: 'var(--cc-panel)', borderRadius: '12px' }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -307,7 +317,7 @@ export default function AdminConventionsTable({
                         {visible.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6}>
-                                    <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                                    <Typography variant="body2" sx={{ py: 3, textAlign: 'center', color: 'var(--cc-muted)' }}>
                                         No conventions match the current filters.
                                     </Typography>
                                 </TableCell>
@@ -318,16 +328,20 @@ export default function AdminConventionsTable({
             </TableContainer>
 
             {/* delete confirm */}
-            <Dialog open={!!confirmDelete} onClose={() => !busy && setConfirmDelete(null)}>
-                <DialogTitle>Delete this convention?</DialogTitle>
+            <Dialog
+                open={!!confirmDelete}
+                onClose={() => !busy && setConfirmDelete(null)}
+                slotProps={{ paper: { sx: { backgroundColor: 'var(--cc-bg)', backgroundImage: 'none', color: 'var(--cc-ink)', border: '1px solid var(--cc-panel-border)' } } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>Delete this convention?</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
+                    <DialogContentText sx={{ color: 'var(--cc-muted)' }}>
                         &quot;{confirmDelete?.name}&quot; will be permanently deleted, including its
                         schedule, pricing, venues, and media records. This cannot be undone.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setConfirmDelete(null)} disabled={busy}>Cancel</Button>
+                    <Button onClick={() => setConfirmDelete(null)} disabled={busy} sx={{ color: 'var(--cc-muted)' }}>Cancel</Button>
                     <Button onClick={handleDelete} color="error" variant="contained" disabled={busy}>
                         {busy ? 'Deleting…' : 'Delete permanently'}
                     </Button>
@@ -345,5 +359,6 @@ export default function AdminConventionsTable({
                 </Alert>
             </Snackbar>
         </Container>
+        </Box>
     );
 }

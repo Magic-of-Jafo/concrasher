@@ -26,6 +26,7 @@ const AboutTab: React.FC<AboutTabProps> = ({ talentProfile }) => {
                     </Typography>
                     <Typography
                         variant="body1"
+                        component="div"  // bio HTML contains <p> tags; a <p> wrapper would nest <p> in <p> and break hydration
                         sx={{
                             lineHeight: 1.6,
                             '& p': { margin: 0, mb: 1 },
@@ -120,7 +121,10 @@ const AboutTab: React.FC<AboutTabProps> = ({ talentProfile }) => {
                             {new Date(talentProfile.createdAt).toLocaleDateString('en-US', {
                                 month: 'long',
                                 day: 'numeric',
-                                year: 'numeric'
+                                year: 'numeric',
+                                // Format in UTC so the server and browser agree (avoids a
+                                // React hydration mismatch from timezone-shifted dates).
+                                timeZone: 'UTC',
                             })}
                         </Typography>
                     </Box>

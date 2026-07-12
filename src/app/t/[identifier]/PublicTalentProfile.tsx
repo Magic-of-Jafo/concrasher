@@ -11,8 +11,6 @@ import {
     Tabs,
     Tab,
     Divider,
-    useMediaQuery,
-    useTheme,
     IconButton,
 } from '@mui/material';
 import {
@@ -80,8 +78,6 @@ interface PublicTalentProfileProps {
 const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile, currentUserId }) => {
     const [currentTab, setCurrentTab] = useState(0);
     const [profileData, setProfileData] = useState(talentProfile);
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     const isOwner = currentUserId === talentProfile.userId;
 
@@ -273,7 +269,8 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                     <Typography variant="body2" color="text.secondary">
                         Talent since {new Date(talentProfile.createdAt).toLocaleDateString('en-US', {
                             month: 'long',
-                            year: 'numeric'
+                            year: 'numeric',
+                            timeZone: 'UTC',
                         })}
                     </Typography>
                 </Box>
@@ -347,8 +344,10 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                         }}
                     >
                         <Tab label="About" />
-                        <Tab label={isMobile ? "Media" : "Media"} />
-                        <Tab label={isMobile ? "Appearances" : "Upcoming Appearances"} />
+                        <Tab label="Media" />
+                        {/* Static labels: a useMediaQuery-driven label renders
+                            differently on server vs client and breaks hydration. */}
+                        <Tab label="Upcoming Appearances" />
                         <Tab label="Contact" />
                     </Tabs>
 

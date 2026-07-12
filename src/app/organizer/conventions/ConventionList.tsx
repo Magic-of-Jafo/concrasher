@@ -160,6 +160,25 @@ export default function ConventionList({ conventions, isAdmin, viewMode = "activ
           hideFooter
           paginationModel={{ pageSize: Math.max(gridRows.length, 1), page: 0 }}
           getRowId={(row) => row.id}
+          sx={{
+            // House Lights theming for the grid (DataGrid uses its own classes,
+            // so it doesn't inherit the shared table styles).
+            color: 'var(--cc-ink)',
+            border: '1px solid var(--cc-panel-border)',
+            borderRadius: '12px',
+            backgroundColor: 'var(--cc-panel)',
+            '--DataGrid-rowBorderColor': 'var(--cc-hairline)',
+            '--DataGrid-containerBackground': 'var(--cc-header-bg)',
+            '& .MuiDataGrid-columnHeaders': { color: 'var(--cc-muted)' },
+            '& .MuiDataGrid-columnHeader': { backgroundColor: 'var(--cc-header-bg)' },
+            '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700, color: 'var(--cc-muted)' },
+            '& .MuiDataGrid-cell': { borderColor: 'var(--cc-hairline)', color: 'var(--cc-ink)' },
+            '& .MuiDataGrid-row:hover': { backgroundColor: 'var(--cc-panel)' },
+            '& .MuiDataGrid-columnSeparator': { color: 'var(--cc-panel-border)' },
+            '& .MuiDataGrid-menuIcon, & .MuiDataGrid-sortIcon, & .MuiDataGrid-filterIcon, & .MuiDataGrid-iconButtonContainer': { color: 'var(--cc-muted)' },
+            '& .MuiDataGrid-overlay': { backgroundColor: 'transparent', color: 'var(--cc-muted)' },
+            '& .MuiDataGrid-columnHeader:focus, & .MuiDataGrid-columnHeader:focus-within, & .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
+          }}
         />
       </Box>
     </Box>

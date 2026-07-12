@@ -195,23 +195,61 @@ export interface ClaimCandidate {
     aliases: string[];
     profilePictureUrl: string | null;
     conventions: { convention: { name: string } }[];
+    /** True when matched by approximate spelling — the UI should confirm ("is
+     *  this you?") rather than assert. */
+    fuzzy: boolean;
 }
 
-/** Unclaimed profiles matching a person's name — for the "is this you?" nudge. */
+/**
+ * Unclaimed profiles matching a person's name — for the "is this you?" nudge.
+ *
+ * Human-written schedules misspell names ("Michael Amar" for "Michael Ammar"),
+ * so we match exactly first, then fuzzily (small whole-name edit distance).
+ * Fuzzy hits are flagged so the claim UI confirms rather than asserts. Fuzziness
+ * is safe *here* because a person confirms every claim; we deliberately do NOT
+ * fuzzy-match in findOrCreateUnclaimedTalent (creation), where a wrong merge
+ * would silently fuse two different people with no human in the loop.
+ *
+ * Naive full scan of unclaimed profiles — fine at current scale (hundreds);
+ * swap for a token-prefix index if the table grows large.
+ */
 export async function findClaimCandidates(name: string, limit = 5): Promise<ClaimCandidate[]> {
     const n = normalizeName(name);
     if (!n) return [];
-    return prisma.talentProfile.findMany({
-        where: { userId: null, normalizedNames: { has: n } },
+    const tol = Math.min(2, fuzzyTolerance(n.length));
+    const unclaimed = await prisma.talentProfile.findMany({
+        where: { userId: null },
         select: {
             id: true,
             displayName: true,
             aliases: true,
             profilePictureUrl: true,
+            normalizedNames: true,
             conventions: { select: { convention: { select: { name: true } } }, take: 5 },
         },
-        take: limit,
     });
+    return unclaimed
+        .map((t) => {
+            const names = t.normalizedNames.length ? t.normalizedNames : [normalizeName(t.displayName)];
+            let dist = Infinity;
+            for (const cand of names) {
+                if (!cand) continue;
+                const d = cand === n ? 0 : levenshtein(cand, n);
+                if (d < dist) dist = d;
+            }
+            return { t, dist };
+        })
+        .filter((s) => s.dist <= tol)
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, limit)
+        .map(({ t, dist }) => ({
+            id: t.id,
+            displayName: t.displayName,
+            aliases: t.aliases,
+            profilePictureUrl: t.profilePictureUrl,
+            conventions: t.conventions,
+            fuzzy: dist > 0,
+        }));
 }
 
 export interface EventPerformerInput {

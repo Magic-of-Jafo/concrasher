@@ -53,8 +53,16 @@ export const profileSurfaceSx = {
         backgroundColor: 'var(--cc-gold)', opacity: 0.6,
     },
 
-    // Checkboxes (e.g. role requests) — the default border is invisible on dark.
+    // Checkboxes and radios — the default outline is invisible on dark.
     '& .MuiCheckbox-root': { color: 'var(--cc-soft)', '&.Mui-checked': { color: 'var(--cc-gold)' } },
+    '& .MuiRadio-root': { color: 'var(--cc-soft)', '&.Mui-checked': { color: 'var(--cc-gold)' } },
+
+    // Sortable table headers.
+    '& .MuiTableSortLabel-root': {
+        color: 'var(--cc-muted)',
+        '&:hover, &.Mui-active': { color: 'var(--cc-ink)' },
+        '& .MuiTableSortLabel-icon': { color: 'var(--cc-gold) !important' },
+    },
 
     // The tabs wrap content in Paper; on the themed surface those opaque cards
     // would read as white blocks, so make them transparent (modals render in a

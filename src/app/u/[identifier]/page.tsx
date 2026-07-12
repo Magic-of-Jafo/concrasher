@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth/next';
@@ -81,6 +81,12 @@ export default async function PublicUserProfilePage({ params }: PublicUserProfil
 
   if (!user) {
     notFound();
+  }
+
+  // Talent-centric consolidation: for a claimed, active talent, the canonical
+  // public page is /t/. Send /u/ there so there is a single public destination.
+  if (user.talentProfile?.isActive) {
+    redirect(`/t/${user.talentProfile.id}`);
   }
 
   return <PublicUserProfile user={user} currentUserId={currentUserId} />;
