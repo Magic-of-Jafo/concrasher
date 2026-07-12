@@ -7,7 +7,7 @@ import { setEventTalent, findClaimCandidates, claimTalent, type ClaimCandidate }
 import { memberStrength, gateStatus, TALENT_APPLY_REQUIREMENTS } from "@/lib/profile-strength";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
-import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType } from "@prisma/client"; // Added import
+import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType, MediaType } from "@prisma/client"; // Added import
 import { Prisma } from '@prisma/client'; // For types if needed
 import {
   ConventionScheduleItemCreateSchema,
@@ -2729,5 +2729,74 @@ export async function claimTalentProfile(talentId: string): Promise<{ success: b
   if (!result.ok) return { success: false, error: result.error };
   revalidatePath('/profile');
   revalidatePath(`/t/${talentId}`);
+  return { success: true };
+}
+
+export interface TalentMediaItem {
+  id: string;
+  url: string;
+  type: MediaType;
+  caption: string | null;
+  order: number | null;
+}
+
+/** Add a photo (already uploaded to S3) or a video link to the current user's talent gallery. */
+export async function addTalentMedia(input: {
+  url: string;
+  type: 'IMAGE' | 'VIDEO_LINK';
+  caption?: string;
+}): Promise<{ success: boolean; media?: TalentMediaItem; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Please log in.' };
+  const url = (input.url || '').trim();
+  if (!url) return { success: false, error: 'A URL is required.' };
+  if (input.type === 'VIDEO_LINK' && !/^https?:\/\/.+/i.test(url)) {
+    return { success: false, error: 'Enter a valid video URL (starting with http).' };
+  }
+  const profile = await db.talentProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, _count: { select: { media: true } } },
+  });
+  if (!profile) return { success: false, error: 'Create your talent profile first.' };
+
+  const media = await db.talentProfileMedia.create({
+    data: {
+      talentProfileId: profile.id,
+      url,
+      type: input.type as MediaType,
+      caption: input.caption?.trim() || null,
+      order: profile._count.media,
+    },
+    select: { id: true, url: true, type: true, caption: true, order: true },
+  });
+  revalidatePath('/profile');
+  return { success: true, media };
+}
+
+/** Remove a talent media item (owner or admin); best-effort S3 cleanup for uploaded images. */
+export async function removeTalentMedia(mediaId: string): Promise<{ success: boolean; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Please log in.' };
+  const media = await db.talentProfileMedia.findUnique({
+    where: { id: mediaId },
+    select: { id: true, url: true, type: true, talentProfile: { select: { userId: true } } },
+  });
+  if (!media) return { success: false, error: 'Media not found.' };
+  const isAdmin = (session.user as { roles?: string[] }).roles?.includes('ADMIN');
+  if (media.talentProfile.userId !== session.user.id && !isAdmin) {
+    return { success: false, error: 'You can only remove your own media.' };
+  }
+
+  await db.talentProfileMedia.delete({ where: { id: mediaId } });
+
+  if (media.type === 'IMAGE' && media.url.includes(`${BUCKET_NAME}.s3`)) {
+    try {
+      const key = new URL(media.url).pathname.replace(/^\//, '');
+      if (key) await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+    } catch (e) {
+      console.warn('[removeTalentMedia] S3 cleanup skipped:', e);
+    }
+  }
+  revalidatePath('/profile');
   return { success: true };
 }

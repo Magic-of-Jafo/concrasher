@@ -19,7 +19,9 @@ import { TalentProfileCreateInput, TalentProfileUpdateInput } from '@/lib/valida
 import TalentProfileImageUploader from './TalentProfileImageUploader';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ProfileStrengthMeter from './ProfileStrengthMeter';
+import TalentMediaManager from './TalentMediaManager';
 import { talentStrength } from '@/lib/profile-strength';
+import type { TalentMediaItem } from '@/lib/actions';
 
 interface TalentProfileEditorProps {
     userId: string;
@@ -66,6 +68,11 @@ export default function TalentProfileEditor({
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+    // Gallery media (photos + video links) is saved immediately by the media
+    // manager; we track the count here so the strength meter reflects it live.
+    const initialMedia = ((initialData as { media?: TalentMediaItem[] })?.media) ?? [];
+    const [mediaCount, setMediaCount] = useState<number>(initialMedia.length);
 
     const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
         setFormData(prev => ({
@@ -244,7 +251,7 @@ export default function TalentProfileEditor({
                     skills: formData.skills,
                     contactEmail: formData.contactEmail,
                     websiteUrl: formData.websiteUrl,
-                    media: (initialData as { media?: unknown[] })?.media?.length ?? 0,
+                    media: mediaCount,
                 })}
             />
 
@@ -412,6 +419,14 @@ export default function TalentProfileEditor({
                                 ))}
                             </Box>
                         )}
+                    </Paper>
+                </Grid>
+
+                {/* Photos & Videos */}
+                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
+                        <TalentMediaManager initialMedia={initialMedia} onCountChange={setMediaCount} />
                     </Paper>
                 </Grid>
 
