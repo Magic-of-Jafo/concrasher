@@ -32,6 +32,24 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
     const [isResending, setIsResending] = useState(false);
     const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+    // Mirror the name/bio fields locally so the strength meter updates the moment
+    // the form saves, without waiting for a page refetch of the `user` prop.
+    const [profileFields, setProfileFields] = useState({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        stageName: user.stageName,
+        bio: user.bio,
+    });
+
+    const handleProfileFieldsUpdate = (data: { firstName?: string | null; lastName?: string | null; stageName?: string | null; bio?: string | null }) => {
+        setProfileFields((prev) => ({
+            firstName: data.firstName ?? prev.firstName,
+            lastName: data.lastName ?? prev.lastName,
+            stageName: data.stageName ?? prev.stageName,
+            bio: data.bio ?? prev.bio,
+        }));
+    };
+
     const handleSuccess = () => {
         // Profile updated successfully - parent component will handle any refresh if needed
     };
@@ -81,10 +99,10 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
                 dismissKey="member"
                 strength={memberStrength({
                     image: currentImageUrl,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    stageName: user.stageName,
-                    bio: user.bio,
+                    firstName: profileFields.firstName,
+                    lastName: profileFields.lastName,
+                    stageName: profileFields.stageName,
+                    bio: profileFields.bio,
                 })}
             />
 
@@ -109,6 +127,7 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
                     currentBio={user.bio}
                     currentUseStageNamePublicly={user.useStageNamePublicly}
                     onSuccess={handleSuccess}
+                    onProfileUpdate={handleProfileFieldsUpdate}
                 />
             </Box>
 
