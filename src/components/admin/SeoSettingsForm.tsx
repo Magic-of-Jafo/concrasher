@@ -216,7 +216,7 @@ export default function SeoSettingsForm() {
             <Typography variant="h5" gutterBottom>
                 Organization Settings
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 2, color: 'var(--cc-muted)' }}>
                 This information helps search engines understand who your organization is. It will be used to generate site-wide structured data.
             </Typography>
 
@@ -300,7 +300,7 @@ export default function SeoSettingsForm() {
             <Typography variant="h5" gutterBottom>
                 Tracking & Analytics
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 2, color: 'var(--cc-muted)' }}>
                 Add script tags for analytics services like Google Analytics, Facebook Pixel, Microsoft Clarity, etc. These will be injected into the site's head.
             </Typography>
 

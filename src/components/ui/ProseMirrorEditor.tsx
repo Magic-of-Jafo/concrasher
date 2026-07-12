@@ -116,8 +116,10 @@ const ProseMirrorEditor: React.FC<ProseMirrorEditorProps> = ({ value, onChange, 
 
     return <Box ref={editorRef} sx={{
         border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 1,
+        // Adopt the House Lights border when the surrounding surface sets --cc-*;
+        // fall back to the MUI divider tone everywhere else (organizer editor).
+        borderColor: 'var(--cc-panel-border, rgba(0, 0, 0, 0.12))',
+        borderRadius: '8px',
         p: 1,
         '& .ProseMirror': {
             minHeight: '150px',

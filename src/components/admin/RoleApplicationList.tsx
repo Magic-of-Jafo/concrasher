@@ -59,7 +59,6 @@ export default function RoleApplicationList({ applications, onApplicationProcess
 
     return (
         <Box>
-            <Typography variant="h6" gutterBottom>Pending Role Applications</Typography>
             <List>
                 {applications.map((app) => (
                     <ListItem key={app.id} divider>

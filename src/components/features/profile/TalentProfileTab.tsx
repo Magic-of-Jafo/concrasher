@@ -139,12 +139,12 @@ export default function TalentProfileTab({ userId, user }: TalentProfileTabProps
     if (!talentProfile) {
         return (
             <Box sx={{ maxWidth: 600, mx: 'auto', p: 0, boxShadow: 'none', border: 'none' }}>
-                <Card>
+                <Card sx={{ backgroundColor: 'var(--cc-panel)', border: '1px solid var(--cc-panel-border)', borderRadius: '12px' }}>
                     <CardContent>
-                        <Typography variant="h5" gutterBottom>
+                        <Typography variant="h5" gutterBottom sx={{ color: 'var(--cc-ink)', fontWeight: 800 }}>
                             Initialize Your Talent Profile
                         </Typography>
-                        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                        <Typography variant="body1" sx={{ mb: 3, color: 'var(--cc-muted)' }}>
                             Click the button to create your Talent Profile page.
                         </Typography>
                     </CardContent>

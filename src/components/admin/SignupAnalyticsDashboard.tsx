@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     Box,
     Typography,
-    Paper,
     ToggleButton,
     ToggleButtonGroup,
-    Grid,
     Table,
     TableBody,
     TableCell,
@@ -17,8 +15,6 @@ import {
     TableRow,
     Alert,
     CircularProgress,
-    Card,
-    CardContent,
     FormControl,
     InputLabel,
     Select,
@@ -37,6 +33,31 @@ type DateRange = 'last7days' | 'last30days' | 'monthToDate' | 'lastMonth';
 const SignupAnalyticsDashboard: React.FC = () => {
     const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
     const [dateRange, setDateRange] = useState<DateRange>('last7days');
+
+    // Recharts renders SVG attributes, which can't read CSS variables, so pull the
+    // House Lights tokens at runtime and re-read them when the theme is toggled.
+    const [chartColors, setChartColors] = useState({
+        line: '#a8b3c4', grid: 'rgba(148,137,121,0.15)', text: '#8a8d94',
+        tipBg: '#222831', tipInk: '#dfd0b8', tipBorder: 'rgba(148,137,121,0.5)',
+    });
+    useEffect(() => {
+        const read = () => {
+            const cs = getComputedStyle(document.documentElement);
+            const v = (n: string, f: string) => (cs.getPropertyValue(n).trim() || f);
+            setChartColors({
+                line: v('--cc-cyan', '#a8b3c4'),
+                grid: v('--cc-hairline', 'rgba(148,137,121,0.15)'),
+                text: v('--cc-soft', '#8a8d94'),
+                tipBg: v('--cc-bg', '#222831'),
+                tipInk: v('--cc-ink', '#dfd0b8'),
+                tipBorder: v('--cc-panel-border', 'rgba(148,137,121,0.5)'),
+            });
+        };
+        read();
+        const obs = new MutationObserver(read);
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        return () => obs.disconnect();
+    }, []);
 
     // Calculate date range based on selection
     const getDateRange = (range: DateRange) => {
@@ -226,7 +247,7 @@ const SignupAnalyticsDashboard: React.FC = () => {
             <Typography variant="h6" gutterBottom>
                 User Signup Analytics
             </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
+            <Typography variant="body2" gutterBottom sx={{ mb: 3, color: 'var(--cc-muted)' }}>
                 Monitor user registration trends for the selected period
             </Typography>
 
@@ -248,61 +269,39 @@ const SignupAnalyticsDashboard: React.FC = () => {
                 </FormControl>
             </Box>
 
-            {/* KPIs Section */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="text.secondary" gutterBottom variant="body2">
-                                Signups Today
-                            </Typography>
-                            <Typography variant="h4" component="div">
-                                {kpis.signupsToday}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="text.secondary" gutterBottom variant="body2">
-                                This Month
-                            </Typography>
-                            <Typography variant="h4" component="div">
-                                {kpis.signupsThisMonth}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="text.secondary" gutterBottom variant="body2">
-                                Total {getKpiPeriodLabel(dateRange)}
-                            </Typography>
-                            <Typography variant="h4" component="div">
-                                {kpis.totalSignups}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="text.secondary" gutterBottom variant="body2">
-                                Daily Average
-                            </Typography>
-                            <Typography variant="h4" component="div">
-                                {kpis.averageDaily}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+            {/* KPIs Section — themed panels, 2-up on phones, 4-up on desktop. */}
+            <Box
+                sx={{
+                    mb: 3,
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+                }}
+            >
+                {[
+                    { label: 'Signups Today', value: kpis.signupsToday },
+                    { label: 'This Month', value: kpis.signupsThisMonth },
+                    { label: `Total ${getKpiPeriodLabel(dateRange)}`, value: kpis.totalSignups },
+                    { label: 'Daily Average', value: kpis.averageDaily },
+                ].map((kpi) => (
+                    <Box
+                        key={kpi.label}
+                        sx={{
+                            backgroundColor: 'var(--cc-panel)',
+                            border: '1px solid var(--cc-panel-border)',
+                            borderRadius: '12px',
+                            p: 2,
+                        }}
+                    >
+                        <Typography gutterBottom variant="body2" sx={{ color: 'var(--cc-muted)' }}>
+                            {kpi.label}
+                        </Typography>
+                        <Typography variant="h4" component="div" sx={{ color: 'var(--cc-ink)', fontWeight: 800 }}>
+                            {kpi.value}
+                        </Typography>
+                    </Box>
+                ))}
+            </Box>
 
             {/* Toggle Section */}
             <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -326,21 +325,32 @@ const SignupAnalyticsDashboard: React.FC = () => {
             </Box>
 
             {/* Chart/Table Content */}
-            <Paper sx={{ p: 2 }}>
+            <Box sx={{ p: 2, backgroundColor: 'var(--cc-panel)', border: '1px solid var(--cc-panel-border)', borderRadius: '12px' }}>
                 {viewMode === 'chart' ? (
                     <Box>
                         <ResponsiveContainer width="100%" height={400}>
                             <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
+                                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                                 <XAxis
                                     dataKey="formattedDate"
-                                    tick={{ fontSize: 12 }}
+                                    tick={{ fontSize: 12, fill: chartColors.text }}
+                                    stroke={chartColors.grid}
                                 />
                                 <YAxis
-                                    tick={{ fontSize: 12 }}
+                                    tick={{ fontSize: 12, fill: chartColors.text }}
+                                    stroke={chartColors.grid}
                                     allowDecimals={false}
                                 />
                                 <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: chartColors.tipBg,
+                                        border: `1px solid ${chartColors.tipBorder}`,
+                                        borderRadius: 8,
+                                        color: chartColors.tipInk,
+                                    }}
+                                    labelStyle={{ color: chartColors.tipInk }}
+                                    itemStyle={{ color: chartColors.tipInk }}
+                                    cursor={{ stroke: chartColors.line, strokeOpacity: 0.3 }}
                                     labelFormatter={(label, payload) => {
                                         if (payload && payload[0]) {
                                             const originalDate = payload[0].payload.date;
@@ -359,10 +369,10 @@ const SignupAnalyticsDashboard: React.FC = () => {
                                 <Line
                                     type="monotone"
                                     dataKey="count"
-                                    stroke="#1976d2"
+                                    stroke={chartColors.line}
                                     strokeWidth={2}
-                                    dot={{ fill: '#1976d2', strokeWidth: 2, r: 4 }}
-                                    activeDot={{ r: 6, stroke: '#1976d2', strokeWidth: 2 }}
+                                    dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
+                                    activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
                                 />
                             </LineChart>
                         </ResponsiveContainer>
@@ -388,7 +398,7 @@ const SignupAnalyticsDashboard: React.FC = () => {
                                 {chartData.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={2} align="center">
-                                            <Typography color="text.secondary">
+                                            <Typography sx={{ color: 'var(--cc-muted)' }}>
                                                 No signup data available for the selected period
                                             </Typography>
                                         </TableCell>
@@ -398,7 +408,7 @@ const SignupAnalyticsDashboard: React.FC = () => {
                         </Table>
                     </TableContainer>
                 )}
-            </Paper>
+            </Box>
         </Box>
     );
 };

@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import RoleApplicationList from '@/components/admin/RoleApplicationList';
 import ProfileTabs from "@/components/features/ProfileTabs";
@@ -109,12 +108,29 @@ export default function ProfilePage() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h1" component="h1" gutterBottom>
-        Profile
-      </Typography>
+    <Box
+      component="main"
+      sx={{
+        backgroundColor: 'var(--cc-bg)',
+        backgroundImage: 'var(--cc-field)',
+        backgroundRepeat: 'no-repeat',
+        minHeight: '100vh',
+      }}
+    >
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
+        <Typography
+          component="h1"
+          gutterBottom
+          sx={{
+            fontFamily: 'var(--font-montserrat), system-ui, arial, sans-serif',
+            fontWeight: 800,
+            fontSize: 'clamp(1.9rem, 6vw, 2.6rem)',
+            color: 'var(--cc-ink)',
+          }}
+        >
+          Profile
+        </Typography>
 
-      <Paper sx={{ p: { xs: 1, md: 2 }, boxShadow: 'none', border: 'none' }}>
         <ProfileTabs
           user={user}
           roleApplications={roleApplications}
@@ -124,8 +140,7 @@ export default function ProfilePage() {
           pendingApplications={pendingApplications}
           onApplicationProcessed={handleApplicationProcessed}
         />
-      </Paper>
-
-    </Container>
+      </Container>
+    </Box>
   );
 } 

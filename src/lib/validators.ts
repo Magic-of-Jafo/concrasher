@@ -70,7 +70,13 @@ export const ProfileSchema = z.object({
   firstName: z.string().max(50, { message: "First name must be 50 characters or less" }).optional().nullable(),
   lastName: z.string().max(50, { message: "Last name must be 50 characters or less" }).optional().nullable(),
   stageName: z.string().max(50, { message: "Stage name must be 50 characters or less" }).optional().nullable(),
-  bio: z.string().max(200, { message: "Bio must be 200 characters or less" }).optional().nullable(),
+  // The bio comes from a rich-text editor, so it's stored as HTML. Count the
+  // visible text (tags stripped), not the raw markup, and allow a real short bio.
+  bio: z.string()
+    .refine((v) => v.replace(/<[^>]*>/g, '').trim().length <= 1000, {
+      message: "Bio must be 1000 characters or less",
+    })
+    .optional().nullable(),
   useStageNamePublicly: z.boolean().optional(),
 });
 

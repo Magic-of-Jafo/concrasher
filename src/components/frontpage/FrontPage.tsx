@@ -11,8 +11,6 @@ import FrontHero from './FrontHero';
 import FrontMajors, { MajorData } from './FrontMajors';
 import FrontBilling, { pickFeatured } from './FrontBilling';
 import Front100Days from './Front100Days';
-import PaletteTester from './PaletteTester';
-import PatternTuner from './PatternTuner';
 
 // The Electric Night front page ("the Anchor layout"): masthead with the claim,
 // majors strip, Top Billing + up-next rail, first-timer pitch band, and the
@@ -349,9 +347,6 @@ export default function FrontPage({
                     <FrontFooter />
                 </Box>
             </Box>
-            {/* Temporary palette + wallpaper tools; render only on the dev server. */}
-            {process.env.NODE_ENV === 'development' && <PaletteTester />}
-            {process.env.NODE_ENV === 'development' && <PatternTuner />}
         </Box>
     );
 }

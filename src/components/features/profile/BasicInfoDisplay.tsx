@@ -144,29 +144,26 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
                     </Box>
                 )}
 
-                <Typography component="div" sx={{ mb: 2 }}>
-                    <strong>Roles:</strong>{' '}
+                <Box component="div" sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                    <Typography component="span" sx={{ fontWeight: 700 }}>Roles:</Typography>
                     {user.roles.map((role: Role) => (
                         <Box component="span" key={role} sx={{
                             display: 'inline-block',
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: '12px',
-                            fontSize: '0.875rem',
-                            mr: 1,
-                            backgroundColor:
-                                role === Role.ADMIN ? 'secondary.light' :
-                                    role === Role.ORGANIZER ? 'primary.light' :
-                                        role === Role.TALENT ? 'success.light' : 'grey.200',
-                            color:
-                                role === Role.ADMIN ? 'secondary.contrastText' :
-                                    role === Role.ORGANIZER ? 'primary.contrastText' :
-                                        role === Role.TALENT ? 'success.contrastText' : 'text.primary',
+                            px: 1.25,
+                            py: 0.35,
+                            borderRadius: '8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            border: '1px solid var(--cc-panel-border)',
+                            backgroundColor: 'var(--cc-panel)',
+                            color: 'var(--cc-muted)',
                         }}>
                             {role}
                         </Box>
                     ))}
-                </Typography>
+                </Box>
             </Box>
         </Box>
     );

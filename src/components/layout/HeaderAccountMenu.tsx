@@ -79,7 +79,7 @@ export default function HeaderAccountMenu({
       <Divider />
 
       {userId && (
-        <MenuItem component={Link} href={`/u/${userId}`} onClick={onClose}>
+        <MenuItem component={Link} href={`/u/${userId}`} target="_blank" rel="noopener noreferrer" onClick={onClose}>
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
           View Public Profile
         </MenuItem>

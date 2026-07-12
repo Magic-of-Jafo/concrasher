@@ -89,7 +89,7 @@ export default function AiSettingsForm() {
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 600 }}>
             <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ mb: 2, color: 'var(--cc-muted)' }}>
                     {keyConfigured
                         ? `OpenAI key configured (${maskedKey}). Enter a new key to replace it.`
                         : 'No OpenAI key configured yet. AI features are disabled until one is saved.'}

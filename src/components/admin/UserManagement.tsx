@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Box,
     Typography,
-    Paper,
     Table,
     TableBody,
     TableCell,
@@ -32,7 +31,6 @@ import {
     Person as PersonIcon,
     Delete as DeleteIcon,
     CheckCircle as VerifiedIcon,
-    Cancel as UnverifiedIcon,
     Clear as ClearIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
@@ -163,15 +161,13 @@ const UserManagement: React.FC = () => {
         });
     };
 
-    const getRoleColor = (role: string) => {
-        switch (role) {
-            case 'ADMIN': return 'error';
-            case 'ORGANIZER': return 'primary';
-            case 'TALENT': return 'success';
-            case 'BRAND_CREATOR': return 'info';
-            default: return 'default';
-        }
-    };
+    // Verified accounts get a green check; unverified show nothing (a verified
+    // badge graphic will replace the check later).
+    const renderStatus = (user: User) => (
+        user.emailVerified
+            ? <VerifiedIcon fontSize="small" titleAccess="Verified" sx={{ color: 'var(--cc-live)', flexShrink: 0 }} />
+            : null
+    );
 
     if (isLoading) {
         return (
@@ -199,7 +195,7 @@ const UserManagement: React.FC = () => {
             <Typography variant="h6" gutterBottom>
                 User Management
             </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
+            <Typography variant="body2" gutterBottom sx={{ mb: 3, color: 'var(--cc-muted)' }}>
                 Manage and monitor all platform users. Search, view profiles, and perform administrative actions.
             </Typography>
 
@@ -215,7 +211,7 @@ const UserManagement: React.FC = () => {
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon />
+                                <SearchIcon sx={{ color: 'var(--cc-soft)' }} />
                             </InputAdornment>
                         ),
                         endAdornment: searchTerm && (
@@ -236,19 +232,27 @@ const UserManagement: React.FC = () => {
             </Box>
 
             {/* User Statistics */}
-            <Box sx={{ mb: 3, display: 'flex', gap: 3, alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
+            <Box sx={{ mb: 3, display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Typography variant="body2" sx={{ color: 'var(--cc-muted)' }}>
                     <strong>Total Users:</strong> {pagination?.totalUsers || 0}
                 </Typography>
                 {debouncedSearchTerm && (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: 'var(--cc-muted)' }}>
                         <strong>Search Results:</strong> {users.length} users found
                     </Typography>
                 )}
             </Box>
 
-            {/* Users Table */}
-            <Paper>
+            {/* Desktop: full table. */}
+            <Box
+                sx={{
+                    display: { xs: 'none', md: 'block' },
+                    backgroundColor: 'var(--cc-panel)',
+                    border: '1px solid var(--cc-panel-border)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                }}
+            >
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -276,7 +280,7 @@ const UserManagement: React.FC = () => {
                                                 <Typography variant="subtitle2">
                                                     {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">
+                                                <Typography variant="caption" sx={{ color: 'var(--cc-soft)' }}>
                                                     ID: {user.id.slice(0, 8)}...
                                                 </Typography>
                                             </Box>
@@ -290,47 +294,26 @@ const UserManagement: React.FC = () => {
                                     <TableCell>
                                         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                                             {user.roles.map((role) => (
-                                                <Chip
-                                                    key={role}
-                                                    label={role}
-                                                    size="small"
-                                                    color={getRoleColor(role) as any}
-                                                    variant="outlined"
-                                                />
+                                                <Chip key={role} label={role} size="small" variant="outlined" />
                                             ))}
                                         </Box>
                                     </TableCell>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            {user.emailVerified ? (
-                                                <>
-                                                    <VerifiedIcon color="success" fontSize="small" />
-                                                    <Typography variant="caption" color="success.main">
-                                                        Verified
-                                                    </Typography>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <UnverifiedIcon color="warning" fontSize="small" />
-                                                    <Typography variant="caption" color="warning.main">
-                                                        Unverified
-                                                    </Typography>
-                                                </>
-                                            )}
-                                        </Box>
-                                    </TableCell>
+                                    <TableCell>{renderStatus(user)}</TableCell>
                                     <TableCell>
                                         <Typography variant="body2">
                                             {formatDate(user.createdAt)}
                                         </Typography>
                                     </TableCell>
                                     <TableCell align="right">
-                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                             <Button
                                                 component={Link}
                                                 href={`/u/${user.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
                                                 size="small"
                                                 variant="outlined"
+                                                sx={{ whiteSpace: 'nowrap' }}
                                             >
                                                 View Profile
                                             </Button>
@@ -349,7 +332,7 @@ const UserManagement: React.FC = () => {
                             {users.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                        <Typography color="text.secondary">
+                                        <Typography sx={{ color: 'var(--cc-muted)' }}>
                                             {debouncedSearchTerm
                                                 ? 'No users found matching your search criteria'
                                                 : 'No users found'
@@ -361,21 +344,90 @@ const UserManagement: React.FC = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+            </Box>
 
-                {/* Pagination */}
-                {pagination && pagination.totalPages > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                        <Pagination
-                            count={pagination.totalPages}
-                            page={pagination.currentPage}
-                            onChange={handlePageChange}
-                            color="primary"
-                            showFirstButton
-                            showLastButton
-                        />
+            {/* Mobile: one card per user. */}
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', gap: 1.5 }}>
+                {users.map((user) => (
+                    <Box
+                        key={user.id}
+                        sx={{
+                            backgroundColor: 'var(--cc-panel)',
+                            border: '1px solid var(--cc-panel-border)',
+                            borderRadius: '12px',
+                            p: 2,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1.25,
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Avatar
+                                src={user.image ? getS3ImageUrl(user.image) : undefined}
+                                sx={{ width: 44, height: 44 }}
+                            >
+                                <PersonIcon />
+                            </Avatar>
+                            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                                <Typography variant="subtitle2" sx={{ color: 'var(--cc-ink)' }}>
+                                    {`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: 'var(--cc-muted)', wordBreak: 'break-all' }}>
+                                    {user.email}
+                                </Typography>
+                            </Box>
+                            {renderStatus(user)}
+                        </Box>
+
+                        {user.roles.length > 0 && (
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                {user.roles.map((role) => (
+                                    <Chip key={role} label={role} size="small" variant="outlined" />
+                                ))}
+                            </Box>
+                        )}
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: 'var(--cc-soft)' }}>
+                                Joined {formatDate(user.createdAt)}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                                <Button component={Link} href={`/u/${user.id}`} target="_blank" rel="noopener noreferrer" size="small" variant="outlined">
+                                    View
+                                </Button>
+                                <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteClick(user)}
+                                    disabled={deleteUserMutation.isPending}
+                                >
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
+                            </Box>
+                        </Box>
                     </Box>
+                ))}
+                {users.length === 0 && (
+                    <Typography sx={{ color: 'var(--cc-muted)', textAlign: 'center', py: 4 }}>
+                        {debouncedSearchTerm
+                            ? 'No users found matching your search criteria'
+                            : 'No users found'}
+                    </Typography>
                 )}
-            </Paper>
+            </Box>
+
+            {/* Pagination (shared) */}
+            {pagination && pagination.totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <Pagination
+                        count={pagination.totalPages}
+                        page={pagination.currentPage}
+                        onChange={handlePageChange}
+                        showFirstButton
+                        showLastButton
+                    />
+                </Box>
+            )}
 
             {/* Delete Confirmation Dialog */}
             <Dialog
@@ -383,10 +435,11 @@ const UserManagement: React.FC = () => {
                 onClose={handleDeleteCancel}
                 maxWidth="sm"
                 fullWidth
+                slotProps={{ paper: { sx: { backgroundColor: 'var(--cc-bg)', backgroundImage: 'none', color: 'var(--cc-ink)', border: '1px solid var(--cc-panel-border)' } } }}
             >
-                <DialogTitle>Delete User</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>Delete User</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
+                    <DialogContentText sx={{ color: 'var(--cc-muted)' }}>
                         Are you sure you want to delete the user <strong>{userToDelete?.email}</strong>?
                         <br /><br />
                         This action will permanently delete the user account and cannot be undone.
@@ -397,6 +450,7 @@ const UserManagement: React.FC = () => {
                     <Button
                         onClick={handleDeleteCancel}
                         disabled={deleteUserMutation.isPending}
+                        sx={{ color: 'var(--cc-muted)', textTransform: 'none' }}
                     >
                         Cancel
                     </Button>

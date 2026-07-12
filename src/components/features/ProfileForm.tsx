@@ -10,6 +10,7 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
@@ -133,6 +134,10 @@ export default function ProfileForm({
         lastName: result.user.lastName || '',
         stageName: result.user.stageName || '',
         bio: result.user.bio || '',
+        // Include every field so the form is no longer "dirty" after a save —
+        // otherwise the Save button stays enabled and the save looks like it
+        // didn't take.
+        useStageNamePublicly: data.useStageNamePublicly ?? false,
       };
       reset(newValues);
       if (onProfileUpdate) {
@@ -151,15 +156,18 @@ export default function ProfileForm({
     }
   };
 
-  return (
-    <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mt: 1 }}>
-      {serverMessage && (
-        <Alert severity={serverMessage.type} sx={{ mb: 2 }}>
-          {serverMessage.message}
-        </Alert>
-      )}
+  // Validation failures otherwise block the submit silently (the bio has no
+  // inline error slot), so surface the first problem where the user can see it.
+  const onInvalid = (formErrors: typeof errors) => {
+    const firstMessage = Object.values(formErrors)
+      .map((e) => (e as { message?: string })?.message)
+      .find(Boolean);
+    setServerMessage({ type: 'error', message: firstMessage || 'Please fix the highlighted fields and try again.' });
+  };
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+  return (
+    <Box component="form" onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate sx={{ mt: 1 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
         <Controller
           name="firstName"
           control={control}
@@ -194,7 +202,7 @@ export default function ProfileForm({
         />
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 2 }, alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2 }}>
         <Controller
           name="stageName"
           control={control}
@@ -235,6 +243,17 @@ export default function ProfileForm({
         />
       </Box>
 
+      <Box sx={{ mb: 1 }}>
+        <Typography
+          component="label"
+          sx={{ display: 'block', fontWeight: 700, fontSize: '0.95rem', color: 'var(--cc-ink)' }}
+        >
+          Bio
+        </Typography>
+        <Typography sx={{ fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
+          A short introduction shown on your public profile. Share who you are and what you do.
+        </Typography>
+      </Box>
       <Controller
         name="bio"
         control={control}
@@ -246,21 +265,27 @@ export default function ProfileForm({
         )}
       />
 
-      <Box sx={{ display: 'flex', gap: 2, mt: 3, mb: 2 }}>
+      {serverMessage && (
+        <Alert severity={serverMessage.type} sx={{ mt: 3 }}>
+          {serverMessage.message}
+        </Alert>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 2, mt: 2, mb: 2 }}>
         <Button
           type="submit"
-          fullWidth
           variant="contained"
           disabled={isSubmitting || !isDirty}
+          sx={{ px: 4, minWidth: 160 }}
         >
           {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
         </Button>
         {onCancel && (
           <Button
-            fullWidth
             variant="outlined"
             onClick={onCancel}
             disabled={isSubmitting}
+            sx={{ px: 4 }}
           >
             Cancel
           </Button>

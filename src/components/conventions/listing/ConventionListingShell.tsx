@@ -378,6 +378,67 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     const switchTabRef = useRef(switchTab);
     useEffect(() => { switchTabRef.current = switchTab; }, [switchTab]);
 
+    // ---- linked-parallax tab bar ----
+    // The pane travels a full screen per tab; the bar only nudges enough to keep
+    // the active tab in view (centered, clamped to the ends). Because the bar's
+    // whole overflow is small, each step moves it "a little" while the pane moves
+    // "a lot" — and by the last tab the bar sits fully right, so a tab that hung
+    // off the edge (Media on narrow phones) is now fully on screen. During a
+    // thumb-swipe we interpolate the bar between neighbours so it tracks the drag.
+    const navRef = useRef<HTMLElement | null>(null);
+    const firstScrollRef = useRef(true);
+    const [edges, setEdges] = useState({ left: false, right: false });
+
+    // Deterministic scroll position that brings tab `index` into view, so the
+    // live drag can interpolate cleanly between two tabs' targets.
+    const scrollTargetFor = useCallback((index: number): number => {
+        const nav = navRef.current;
+        if (!nav) return 0;
+        const el = nav.children[index] as HTMLElement | undefined;
+        if (!el) return 0;
+        const maxScroll = nav.scrollWidth - nav.clientWidth;
+        if (maxScroll <= 0) return 0;
+        const navRect = nav.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const elLeftInContent = (elRect.left - navRect.left) + nav.scrollLeft;
+        const center = elLeftInContent + elRect.width / 2 - nav.clientWidth / 2;
+        return Math.max(0, Math.min(center, maxScroll));
+    }, []);
+
+    // Fade cues reflect real scroll position: show a side's fade only when there
+    // is more bar hidden that way.
+    const updateEdges = useCallback(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        const maxScroll = nav.scrollWidth - nav.clientWidth;
+        setEdges({ left: nav.scrollLeft > 1, right: nav.scrollLeft < maxScroll - 1 });
+    }, []);
+
+    // Glide the bar to the active tab whenever it changes (tap, swipe-commit,
+    // back/forward). First paint and reduced-motion jump without animating.
+    useEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        const idx = tabs.findIndex((t) => t.key === tab);
+        if (idx < 0) return;
+        const reduce = typeof window !== 'undefined'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        nav.scrollTo({ left: scrollTargetFor(idx), behavior: (firstScrollRef.current || reduce) ? 'auto' : 'smooth' });
+        firstScrollRef.current = false;
+    }, [tab, tabs, scrollTargetFor]);
+
+    useEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        updateEdges();
+        nav.addEventListener('scroll', updateEdges, { passive: true });
+        window.addEventListener('resize', updateEdges);
+        return () => {
+            nav.removeEventListener('scroll', updateEdges);
+            window.removeEventListener('resize', updateEdges);
+        };
+    }, [updateEdges, tabs]);
+
     useEffect(() => {
         const pane = paneRef.current;
         if (!pane) return;
@@ -410,7 +471,25 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; // within slop, undecided
                 gesture.mode = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'horizontal' : 'vertical';
             }
-            if (gesture.mode === 'horizontal') e.preventDefault();
+            if (gesture.mode === 'horizontal') {
+                e.preventDefault();
+                // Track the bar to the drag: interpolate its scroll between the
+                // current tab and the neighbour we're heading toward, by how far
+                // the pane has moved across the screen.
+                const nav = navRef.current;
+                if (nav) {
+                    const W = pane.clientWidth || window.innerWidth || 1;
+                    const list = tabsRef.current;
+                    const at = list.findIndex((x) => x.key === tabRef.current);
+                    const nextIdx = at + (dx < 0 ? 1 : -1);
+                    if (at >= 0 && nextIdx >= 0 && nextIdx < list.length) {
+                        const frac = Math.min(1, Math.abs(dx) / W);
+                        const cur = scrollTargetFor(at);
+                        const nb = scrollTargetFor(nextIdx);
+                        nav.scrollLeft = cur + (nb - cur) * frac;
+                    }
+                }
+            }
         };
 
         const onEnd = (e: TouchEvent) => {
@@ -418,17 +497,32 @@ export default function ConventionListingShell({ convention, canEdit = false, in
             gesture = null;
             if (!g || g.mode !== 'horizontal') return;
             const dx = e.changedTouches[0].clientX - g.x;
-            if (Math.abs(dx) < 60) return;
             const list = tabsRef.current;
             const at = list.findIndex((x) => x.key === tabRef.current);
-            const next = list[at + (dx < 0 ? 1 : -1)];
+            const next = Math.abs(dx) >= 60 ? list[at + (dx < 0 ? 1 : -1)] : undefined;
             if (next) {
+                // Commit: the tab-change effect glides the bar to the new target
+                // from wherever the drag left it.
                 setSlideDir(dx < 0 ? 1 : -1);
                 switchTabRef.current(next);
+            } else {
+                // Released short of the threshold: ease the bar back to the
+                // current tab so the parallax nudge doesn't strand it.
+                const nav = navRef.current;
+                if (nav && at >= 0) nav.scrollTo({ left: scrollTargetFor(at), behavior: 'smooth' });
             }
         };
 
-        const onCancel = () => { gesture = null; };
+        const onCancel = () => {
+            const g = gesture;
+            gesture = null;
+            if (g && g.mode === 'horizontal') {
+                const nav = navRef.current;
+                const list = tabsRef.current;
+                const at = list.findIndex((x) => x.key === tabRef.current);
+                if (nav && at >= 0) nav.scrollTo({ left: scrollTargetFor(at), behavior: 'smooth' });
+            }
+        };
 
         pane.addEventListener('touchstart', onStart, { passive: true });
         pane.addEventListener('touchmove', onMove, { passive: false });
@@ -441,7 +535,7 @@ export default function ConventionListingShell({ convention, canEdit = false, in
             pane.removeEventListener('touchcancel', onCancel);
         };
         // The pane node remounts per tab (key={tab}), so re-attach each switch.
-    }, [tab]);
+    }, [tab, scrollTargetFor]);
 
     const kicker = kickerFor(convention);
     const dates = convention.isTBD || !convention.startDate
@@ -632,14 +726,18 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                     nav itself reads as top:0 while stuck, so it can't be). */}
                 <Box ref={navAnchorRef} aria-hidden />
                 <Box
+                    sx={{
+                        position: 'sticky', top: 0, zIndex: 20, mt: 2.5,
+                        backgroundColor: 'var(--cc-bg)',
+                    }}
+                >
+                <Box
                     component="nav"
+                    ref={navRef}
                     aria-label="Listing sections"
                     sx={{
-                        position: 'sticky', top: 0, zIndex: 20,
                         display: 'flex', overflowX: 'auto',
-                        backgroundColor: 'var(--cc-bg)',
                         borderBottom: '2px solid var(--cc-hairline)',
-                        mt: 2.5,
                         scrollbarWidth: 'none',
                         '&::-webkit-scrollbar': { display: 'none' },
                     }}
@@ -673,6 +771,27 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                             {t.label}
                         </Box>
                     ))}
+                </Box>
+                    {/* Edge fades: a soft cue that the row scrolls, shown only
+                        when there's more bar hidden that way. */}
+                    <Box
+                        aria-hidden
+                        sx={{
+                            position: 'absolute', left: 0, top: 0, bottom: 2, width: 24,
+                            pointerEvents: 'none',
+                            background: 'linear-gradient(to right, var(--cc-bg), transparent)',
+                            opacity: edges.left ? 1 : 0, transition: 'opacity 0.15s ease',
+                        }}
+                    />
+                    <Box
+                        aria-hidden
+                        sx={{
+                            position: 'absolute', right: 0, top: 0, bottom: 2, width: 32,
+                            pointerEvents: 'none',
+                            background: 'linear-gradient(to left, var(--cc-bg), transparent)',
+                            opacity: edges.right ? 1 : 0, transition: 'opacity 0.15s ease',
+                        }}
+                    />
                 </Box>
 
                 <Box

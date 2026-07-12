@@ -273,16 +273,17 @@ export default function TalentProfileEditor({
                             Basic Information
                         </Typography>
 
-                        {/* User's Real Name Display */}
+                        {/* User's real name — read-only here (managed on Basic Info),
+                            but rendered as a field so its label matches the others. */}
                         {(user?.firstName || user?.lastName) && (
-                            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    Your Name
-                                </Typography>
-                                <Typography variant="body1">
-                                    {[user.firstName, user.lastName].filter(Boolean).join(' ')}
-                                </Typography>
-                            </Box>
+                            <TextField
+                                fullWidth
+                                label="Your Name"
+                                value={[user.firstName, user.lastName].filter(Boolean).join(' ')}
+                                InputProps={{ readOnly: true }}
+                                helperText="Managed on the Basic Info tab"
+                                sx={{ mb: 2 }}
+                            />
                         )}
 
                         <Grid container spacing={2}>
@@ -310,10 +311,10 @@ export default function TalentProfileEditor({
 
                             {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
                             <Grid item xs={12}>
-                                <Typography variant="subtitle1" gutterBottom>
+                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: 'var(--cc-ink)' }}>
                                     Bio
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                <Typography variant="body2" sx={{ mb: 1, color: 'var(--cc-muted)' }}>
                                     Tell convention organizers about yourself, your experience, and what you bring to events
                                 </Typography>
                                 <ProseMirrorEditor
@@ -358,7 +359,7 @@ export default function TalentProfileEditor({
                         <Typography variant="h6" gutterBottom>
                             List Your Lectures
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="body2" sx={{ mb: 2, color: 'var(--cc-muted)' }}>
                             This tells attendees what to expect at the convention.
                         </Typography>
 

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Typography, Button, Paper, Divider, Tabs, Tab } from '@mui/material';
+import { Box, Button, Divider, Tabs, Tab } from '@mui/material';
 import RoleApplicationList from '@/components/admin/RoleApplicationList';
 import SeoSettingsForm from '@/components/admin/SeoSettingsForm';
 import AiSettingsForm from '@/components/admin/AiSettingsForm';
 import SignupAnalyticsDashboard from '@/components/admin/SignupAnalyticsDashboard';
 import UserManagement from '@/components/admin/UserManagement';
+import { SectionHeading } from '@/components/ui/profileTheme';
 import Link from 'next/link';
 
 interface AdminSettingsTabProps {
@@ -54,14 +55,29 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
         setTabValue(newValue);
     };
 
-    return (
-        <Box sx={{ px: 0, mx: 0 }}>
-            <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-                Admin Panel
-            </Typography>
+    const sectionDivider = <Divider sx={{ my: 4 }} />;
 
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={tabValue} onChange={handleTabChange} aria-label="Admin panel tabs">
+    return (
+        <Box>
+            <Box sx={{ borderBottom: '2px solid var(--cc-hairline)' }}>
+                <Tabs
+                    value={tabValue}
+                    onChange={handleTabChange}
+                    aria-label="Admin panel tabs"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    allowScrollButtonsMobile
+                    sx={{
+                        minHeight: 44,
+                        '& .MuiTabs-indicator': { backgroundColor: 'var(--cc-gold)', height: 2 },
+                        '& .MuiTab-root': {
+                            fontFamily: 'var(--font-montserrat), system-ui, arial, sans-serif',
+                            fontWeight: 700, fontSize: '0.8rem', letterSpacing: '0.04em',
+                            textTransform: 'none', minHeight: 44, color: 'var(--cc-muted)',
+                            '&.Mui-selected': { color: 'var(--cc-gold)' },
+                        },
+                    }}
+                >
                     <Tab label="Settings" {...a11yProps(0)} />
                     <Tab label="Reports" {...a11yProps(1)} />
                     <Tab label="User Management" {...a11yProps(2)} />
@@ -71,39 +87,28 @@ export default function AdminSettingsTab({ applications, onApplicationProcessed 
             <AdminTabPanel value={tabValue} index={0}>
                 {/* Settings Tab Content */}
                 <Box>
-                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
-                        <Typography variant="h6" gutterBottom>
-                            Convention Management
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            component={Link}
-                            href="/admin/conventions"
-                        >
-                            Manage All Conventions
-                        </Button>
-                    </Paper>
-                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
-                        <Typography variant="h6" gutterBottom>
-                            Role Applications
-                        </Typography>
-                        <RoleApplicationList
-                            applications={applications}
-                            onApplicationProcessed={onApplicationProcessed}
-                        />
-                    </Paper>
-                    <Paper sx={{ p: '0 0', mb: 0, boxShadow: 'none', border: 'none' }}>
-                        <Typography variant="h6" gutterBottom>
-                            AI Settings
-                        </Typography>
-                        <AiSettingsForm />
-                    </Paper>
-                    <Paper sx={{ p: '0 0', boxShadow: 'none', border: 'none' }}>
-                        <Typography variant="h6" gutterBottom>
-                            Site-Wide SEO Settings
-                        </Typography>
-                        <SeoSettingsForm />
-                    </Paper>
+                    <SectionHeading title="Convention Management" description="Add, edit, feature, or remove any convention on the platform." />
+                    <Button variant="contained" component={Link} href="/admin/conventions">
+                        Manage All Conventions
+                    </Button>
+
+                    {sectionDivider}
+
+                    <SectionHeading title="Role Applications" description="Approve or reject requests for organizer, talent, and brand roles." />
+                    <RoleApplicationList
+                        applications={applications}
+                        onApplicationProcessed={onApplicationProcessed}
+                    />
+
+                    {sectionDivider}
+
+                    <SectionHeading title="AI Settings" description="The OpenAI key and model that power the Schedule Helper and enrichment." />
+                    <AiSettingsForm />
+
+                    {sectionDivider}
+
+                    <SectionHeading title="Site-Wide SEO Settings" description="Global metadata, organization details, and tracking scripts." />
+                    <SeoSettingsForm />
                 </Box>
             </AdminTabPanel>
 

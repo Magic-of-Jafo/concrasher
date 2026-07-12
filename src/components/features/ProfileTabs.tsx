@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab, Box, Paper } from '@mui/material';
+import ParallaxTabs from '@/components/ui/ParallaxTabs';
+import { profileSurfaceSx } from '@/components/ui/profileTheme';
 import SettingsTab from './profile/SettingsTab';
 import { Role } from '@prisma/client';
 import BasicInfoDisplay from './profile/BasicInfoDisplay';
@@ -185,12 +187,65 @@ export default function ProfileTabs({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requestedTab, tabDefs.length]);
 
-    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
-        setValue(newValue);
+    // Keep the deep-link URL (?tab=key) in sync on every switch, so refreshes and
+    // back/forward land on the same tab (parity with the listing's tab URLs).
+    const changeToKey = useCallback((key: string) => {
+        const idx = tabDefs.findIndex((t) => t.key === key);
+        if (idx < 0) return;
+        setValue(idx);
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', key);
+            window.history.pushState(null, '', url.toString());
+        } catch { /* history unavailable */ }
+    }, [tabDefs]);
+
+    const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
+        changeToKey(tabDefs[newValue]?.key ?? tabDefs[0].key);
     };
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
+    // Honor browser back/forward between tabs.
+    React.useEffect(() => {
+        const onPop = () => {
+            const key = new URLSearchParams(window.location.search).get('tab');
+            const idx = key ? tabDefs.findIndex((t) => t.key === key) : 0;
+            setValue(idx >= 0 ? idx : 0);
+        };
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, [tabDefs]);
+
+    // Reactive so a fold/rotate flips between the mobile parallax bar and the
+    // desktop sidebar without a reload.
+    const [isMobile, setIsMobile] = useState(false);
+    React.useEffect(() => {
+        const mq = window.matchMedia('(max-width: 600px)');
+        const sync = () => setIsMobile(mq.matches);
+        sync();
+        mq.addEventListener('change', sync);
+        return () => mq.removeEventListener('change', sync);
+    }, []);
+
     const safeValue = value < tabDefs.length ? value : 0;
+    const activeKey = tabDefs[safeValue]?.key ?? tabDefs[0].key;
+
+    // Mobile: the linked-parallax scroll-tab bar (same look/feel as the public
+    // listing). Desktop keeps the vertical sidebar below.
+    if (isMobile) {
+        return (
+            <ParallaxTabs
+                ariaLabel="Profile sections"
+                tabs={tabDefs.map((t) => ({ key: t.key, label: t.label }))}
+                value={activeKey}
+                onChange={changeToKey}
+                renderPane={(key) => (
+                    <Box sx={profileSurfaceSx}>
+                        {tabDefs.find((t) => t.key === key)?.render() ?? null}
+                    </Box>
+                )}
+            />
+        );
+    }
 
     return (
         <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 200px)', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -202,15 +257,21 @@ export default function ProfileTabs({
                 onChange={handleChange}
                 aria-label="Profile Settings Tabs"
                 sx={{
-                    borderRight: isMobile ? 0 : 1,
-                    borderBottom: isMobile ? 1 : 0,
-                    borderColor: 'divider',
-                    position: isMobile ? 'static' : 'sticky',
+                    borderRight: 1,
+                    borderColor: 'var(--cc-hairline)',
+                    position: 'sticky',
                     top: '20px',
-                    minWidth: isMobile ? '100%' : 180,
+                    minWidth: 180,
+                    '& .MuiTabs-indicator': { backgroundColor: 'var(--cc-gold)' },
                     '& .MuiTab-root': {
                         alignItems: 'flex-start',
-                    }
+                        textAlign: 'left',
+                        fontFamily: 'var(--font-montserrat), system-ui, arial, sans-serif',
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        color: 'var(--cc-muted)',
+                        '&.Mui-selected': { color: 'var(--cc-gold)' },
+                    },
                 }}
             >
                 {tabDefs.map((t, i) => (
@@ -218,7 +279,7 @@ export default function ProfileTabs({
                 ))}
             </Tabs>
 
-            <Box sx={{ flexGrow: 1 }}>
+            <Box sx={{ flexGrow: 1, ...profileSurfaceSx }}>
                 {tabDefs.map((t, i) => (
                     <CustomTabPanel key={t.key} value={safeValue} index={i}>
                         {t.render()}
