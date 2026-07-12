@@ -7,7 +7,7 @@
  * what's missing. See docs/profile-strength.md.
  */
 
-export type StrengthTier = 'Getting started' | 'Coming together' | 'Strong' | 'Headliner';
+export type StrengthTier = 'Getting started' | 'Coming together' | 'Strong' | 'Complete';
 
 export interface StrengthItem {
     /** Stable key, also used to define gate requirements. */
@@ -38,7 +38,7 @@ const isUrl = (s?: string | null): boolean => !!(s && /^https?:\/\/.+/i.test(s.t
 const hasImage = (s?: string | null): boolean => hasText(s);
 
 function tierFor(score: number): StrengthTier {
-    if (score >= 90) return 'Headliner';
+    if (score >= 90) return 'Complete';
     if (score >= 70) return 'Strong';
     if (score >= 40) return 'Coming together';
     return 'Getting started';

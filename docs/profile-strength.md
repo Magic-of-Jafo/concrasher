@@ -25,7 +25,7 @@ Implemented in [`src/lib/profile-strength.ts`](../src/lib/profile-strength.ts).
 | 0–39 | Getting started |
 | 40–69 | Coming together |
 | 70–89 | Strong |
-| 90–100 | Headliner |
+| 90–100 | Complete |
 
 Tier labels are a copy decision and the boundaries can shift without a data
 change (score is computed).
