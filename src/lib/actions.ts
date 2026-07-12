@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // Correctly import authOptions
 import { db } from "@/lib/db"; // Ensure db is imported
 import { setEventTalent, findClaimCandidates, claimTalent, type ClaimCandidate } from "@/lib/talent";
+import { memberStrength, gateStatus, TALENT_APPLY_REQUIREMENTS } from "@/lib/profile-strength";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
 import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType } from "@prisma/client"; // Added import
@@ -676,8 +677,51 @@ export async function activateTalentProfile(): Promise<{
     if (!talentProfile) {
       const user = await db.user.findUnique({
         where: { id: userId },
-        select: { firstName: true, lastName: true, stageName: true, useStageNamePublicly: true },
+        select: { firstName: true, lastName: true, stageName: true, useStageNamePublicly: true, image: true, bio: true },
       });
+
+      // Gate: require the profile essentials (photo, name, bio) before going
+      // public as talent. Concrete checklist, not an opaque threshold.
+      const gate = gateStatus(
+        memberStrength({
+          image: user?.image,
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          stageName: user?.stageName,
+          bio: user?.bio,
+        }),
+        TALENT_APPLY_REQUIREMENTS,
+      );
+      if (!gate.met) {
+        return {
+          success: false,
+          error: `Finish your profile first — you still need to: ${gate.missing.map((m) => m.label.toLowerCase()).join(', ')}.`,
+        };
+      }
+
+      // Claim-first: if a scraped, unclaimed profile exactly matches this user's
+      // name, claim it instead of creating a duplicate (schedule links and
+      // appearances come with it). Fuzzy matches are NOT auto-claimed here — they
+      // could be a different person; the "Is this you?" nudge confirms those.
+      const names = [
+        [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+        (user?.stageName || '').trim(),
+      ].filter(Boolean);
+      for (const name of names) {
+        const exact = (await findClaimCandidates(name)).find((c) => !c.fuzzy);
+        if (exact) {
+          const claimed = await claimTalent(userId, exact.id);
+          if (claimed.ok) {
+            await db.talentProfile.update({ where: { id: exact.id }, data: { isActive: true } });
+            revalidatePath("/profile");
+            return {
+              success: true,
+              message: `Claimed your existing profile "${exact.displayName}" — its listings came with it.`,
+              isActive: true,
+            };
+          }
+        }
+      }
 
       // Leave displayName blank as requested instead of defaulting to "Talent"
       const displayName = '';
