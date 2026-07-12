@@ -18,6 +18,8 @@ import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { TalentProfileCreateInput, TalentProfileUpdateInput } from '@/lib/validators';
 import TalentProfileImageUploader from './TalentProfileImageUploader';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
+import ProfileStrengthMeter from './ProfileStrengthMeter';
+import { talentStrength } from '@/lib/profile-strength';
 
 interface TalentProfileEditorProps {
     userId: string;
@@ -230,6 +232,20 @@ export default function TalentProfileEditor({
                     {success}
                 </Alert>
             )}
+
+            <ProfileStrengthMeter
+                title="Talent profile strength"
+                strength={talentStrength({
+                    displayName: formData.displayName,
+                    profilePictureUrl: formData.profilePictureUrl,
+                    bio: formData.bio,
+                    tagline: formData.tagline,
+                    skills: formData.skills,
+                    contactEmail: formData.contactEmail,
+                    websiteUrl: formData.websiteUrl,
+                    media: (initialData as { media?: unknown[] })?.media?.length ?? 0,
+                })}
+            />
 
             <Grid container spacing={3}>
                 {/* Profile Picture */}

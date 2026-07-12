@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // Correctly import authOptions
 import { db } from "@/lib/db"; // Ensure db is imported
-import { setEventTalent } from "@/lib/talent";
+import { setEventTalent, findClaimCandidates, claimTalent, type ClaimCandidate } from "@/lib/talent";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
 import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType } from "@prisma/client"; // Added import
@@ -2641,4 +2641,49 @@ export async function setFeaturedConvention(conventionId: string | null): Promis
     console.error('Error setting featured convention:', error);
     return { success: false, error: 'A database error occurred.' };
   }
+}
+
+/**
+ * Claim flow — the "is this you?" nudge. Returns unclaimed talent profiles whose
+ * name matches the current user's (exact + fuzzy, so a schedule misspelling
+ * still surfaces the profile). Empty when the user already owns a talent profile
+ * or hasn't entered a name yet.
+ */
+export async function getClaimCandidatesForCurrentUser(): Promise<ClaimCandidate[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return [];
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      firstName: true,
+      lastName: true,
+      stageName: true,
+      talentProfile: { select: { id: true } },
+    },
+  });
+  if (!user || user.talentProfile) return []; // already owns a profile — nothing to claim
+  const names = [
+    [user.firstName, user.lastName].filter(Boolean).join(' ').trim(),
+    (user.stageName || '').trim(),
+  ].filter(Boolean);
+  if (names.length === 0) return [];
+
+  const byId = new Map<string, ClaimCandidate>();
+  for (const name of names) {
+    for (const c of await findClaimCandidates(name)) {
+      if (!byId.has(c.id)) byId.set(c.id, c);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+/** Claim an unclaimed talent profile for the current user (guards in claimTalent). */
+export async function claimTalentProfile(talentId: string): Promise<{ success: boolean; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Please log in to claim a profile.' };
+  const result = await claimTalent(session.user.id, talentId);
+  if (!result.ok) return { success: false, error: result.error };
+  revalidatePath('/profile');
+  revalidatePath(`/t/${talentId}`);
+  return { success: true };
 }

@@ -5,6 +5,9 @@ import { Box, Typography, Divider, Button, Chip, Alert, CircularProgress } from 
 import { Email as EmailIcon, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import ProfileForm from '@/components/features/ProfileForm';
 import UserProfilePictureUploader from './UserProfilePictureUploader';
+import ClaimNudge from './ClaimNudge';
+import ProfileStrengthMeter from './ProfileStrengthMeter';
+import { memberStrength } from '@/lib/profile-strength';
 import { User, Role } from '@prisma/client';
 import { useState } from 'react';
 
@@ -70,6 +73,20 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
 
     return (
         <Box>
+            {/* "Is this you?" — offer to claim a matching scraped talent profile. */}
+            <ClaimNudge />
+
+            {/* Owner-only completion meter (motivation, not shown publicly). */}
+            <ProfileStrengthMeter
+                strength={memberStrength({
+                    image: currentImageUrl,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    stageName: user.stageName,
+                    bio: user.bio,
+                })}
+            />
+
             {/* Profile Picture Upload - Top Priority */}
             {currentImageUrl !== undefined && onImageUpdate && (
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
