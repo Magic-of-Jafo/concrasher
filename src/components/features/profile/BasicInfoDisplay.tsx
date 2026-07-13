@@ -98,7 +98,10 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
     };
 
     return (
-        <Box>
+        // Cap the Basic Info pane: edit forms read better narrow, and full-bleed
+        // inputs across a wide desktop pane leave a first name floating in a huge
+        // field. Keeps the form, divider, and account rows aligned to one column.
+        <Box sx={{ maxWidth: 640 }}>
             {/* "Is this you?" — offer to claim a matching scraped talent profile. */}
             <ClaimNudge />
 

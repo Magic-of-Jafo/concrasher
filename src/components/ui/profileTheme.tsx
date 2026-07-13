@@ -57,6 +57,21 @@ export const profileSurfaceSx = {
     '& .MuiCheckbox-root': { color: 'var(--cc-soft)', '&.Mui-checked': { color: 'var(--cc-gold)' } },
     '& .MuiRadio-root': { color: 'var(--cc-soft)', '&.Mui-checked': { color: 'var(--cc-gold)' } },
 
+    // Disabled controls: MUI's default disabled tint is a near-black alpha that
+    // disappears against the slate surface. Use the neutral-grey --cc-soft so a
+    // disabled control reads as clearly "off" — desaturated grey against the warm
+    // cream of an active control — while staying legible. (An active outlined
+    // button is bright --cc-ink; the disabled one must not look nearly the same.)
+    // Extra class in the label selector out-specifies MUI's own (0,3,0) rule,
+    // which is injected later and would otherwise win the tie.
+    '& .MuiFormControlLabel-root.Mui-disabled .MuiFormControlLabel-label': { color: 'var(--cc-soft)' },
+    '& .MuiCheckbox-root.Mui-disabled, & .MuiRadio-root.Mui-disabled': { color: 'var(--cc-soft)' },
+    '& .MuiButton-outlined.Mui-disabled': { color: 'var(--cc-soft)', borderColor: 'var(--cc-hairline)' },
+    '& .MuiButton-text.Mui-disabled': { color: 'var(--cc-soft)' },
+    // Disabled text fields still display a value, so keep those readable (--cc-muted).
+    '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: 'var(--cc-muted)' },
+    '& .MuiInputLabel-root.Mui-disabled': { color: 'var(--cc-muted)' },
+
     // Sortable table headers.
     '& .MuiTableSortLabel-root': {
         color: 'var(--cc-muted)',

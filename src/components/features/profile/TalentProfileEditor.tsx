@@ -7,7 +7,6 @@ import {
     TextField,
     Button,
     Paper,
-    Grid,
     Chip,
     IconButton,
     Alert,
@@ -227,7 +226,7 @@ export default function TalentProfileEditor({
     };
 
     return (
-        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, pb: 2.5 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 640, pb: 2.5 }}>
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
@@ -255,10 +254,9 @@ export default function TalentProfileEditor({
                 })}
             />
 
-            <Grid container spacing={3}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Profile Picture */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sx={{
+                <Box sx={{
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
@@ -287,11 +285,10 @@ export default function TalentProfileEditor({
                             onDeleteDialogStateChange={handleDeleteDialogStateChange}
                         />
                     </Paper>
-                </Grid>
+                </Box>
 
                 {/* Basic Information */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
+                <Box>
                     <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Basic Information
@@ -310,49 +307,39 @@ export default function TalentProfileEditor({
                             />
                         )}
 
-                        <Grid container spacing={2}>
-                            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Display Name"
-                                    value={formData.displayName}
-                                    onChange={(e) => handleInputChange('displayName', e.target.value)}
-                                    helperText="Your stage name or professional name as you want to appear to convention organizers"
-                                />
-                            </Grid>
-                            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Tagline"
-                                    value={formData.tagline}
-                                    onChange={(e) => handleInputChange('tagline', e.target.value)}
-                                    helperText="A short, catchy description (max 100 characters)"
-                                    inputProps={{ maxLength: 100 }}
-                                />
-                            </Grid>
+                        <TextField
+                            fullWidth
+                            label="Display Name"
+                            value={formData.displayName}
+                            onChange={(e) => handleInputChange('displayName', e.target.value)}
+                            helperText="Your stage name or professional name as you want to appear to convention organizers"
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Tagline"
+                            value={formData.tagline}
+                            onChange={(e) => handleInputChange('tagline', e.target.value)}
+                            helperText="A short, catchy description (max 100 characters)"
+                            inputProps={{ maxLength: 100 }}
+                            sx={{ mb: 2 }}
+                        />
 
-                            {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: 'var(--cc-ink)' }}>
-                                    Bio
-                                </Typography>
-                                <Typography variant="body2" sx={{ mb: 1, color: 'var(--cc-muted)' }}>
-                                    Tell convention organizers about yourself, your experience, and what you bring to events
-                                </Typography>
-                                <ProseMirrorEditor
-                                    value={formData.bio}
-                                    onChange={(content) => handleInputChange('bio', content)}
-                                />
-                            </Grid>
-                        </Grid>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: 'var(--cc-ink)' }}>
+                            Bio
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 1, color: 'var(--cc-muted)' }}>
+                            Tell convention organizers about yourself, your experience, and what you bring to events
+                        </Typography>
+                        <ProseMirrorEditor
+                            value={formData.bio}
+                            onChange={(content) => handleInputChange('bio', content)}
+                        />
                     </Paper>
-                </Grid>
+                </Box>
 
                 {/* Contact Information */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
+                <Box>
                     <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             Contact Information
@@ -374,11 +361,10 @@ export default function TalentProfileEditor({
                             sx={{ mt: 2 }}
                         />
                     </Paper>
-                </Grid>
+                </Box>
 
                 {/* List Your Lectures */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
+                <Box>
                     <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <Typography variant="h6" gutterBottom>
                             List Your Lectures
@@ -420,19 +406,17 @@ export default function TalentProfileEditor({
                             </Box>
                         )}
                     </Paper>
-                </Grid>
+                </Box>
 
                 {/* Photos & Videos */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12}>
+                <Box>
                     <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
                         <TalentMediaManager initialMedia={initialMedia} onCountChange={setMediaCount} />
                     </Paper>
-                </Grid>
+                </Box>
 
                 {/* Action Buttons */}
-                {/* @ts-ignore - MUI Grid 'item' prop is causing a persistent TS error */}
-                <Grid item xs={12} sx={{
+                <Box sx={{
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
@@ -462,8 +446,8 @@ export default function TalentProfileEditor({
                             {isLoading ? 'Saving...' : 'Save Profile'}
                         </Button>
                     </Box>
-                </Grid>
-            </Grid>
+                </Box>
+            </Box>
         </Box>
     );
 } 
