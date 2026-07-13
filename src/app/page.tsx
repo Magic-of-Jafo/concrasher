@@ -246,14 +246,14 @@ async function pickHeroImage(): Promise<string | null> {
   }
 }
 
-// The admin's Featured pick (set in /admin/conventions); '' or missing means
-// automatic selection.
-async function getFeaturedConventionId(): Promise<string | null> {
+// The admin's Featured pool (set in /admin/conventions), stored comma-joined;
+// '' or missing means automatic selection. One is chosen at random per load.
+async function getFeaturedConventionIds(): Promise<string[]> {
   try {
     const row = await db.siteSetting.findUnique({ where: { key: 'featured_convention_id' } });
-    return row?.value || null;
+    return (row?.value || '').split(',').map((s) => s.trim()).filter(Boolean);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -264,7 +264,13 @@ export default async function Home() {
   const heroMessage = pickHeroMessage();
   const heroImage = await pickHeroImage();
   const majors = await getMajors();
-  const featuredId = await getFeaturedConventionId();
+  // Rotate the featured convention: pick one at random from the admin's pool
+  // that is still live on the page (conventions is already upcoming-only).
+  const featuredIds = await getFeaturedConventionIds();
+  const featuredPool = featuredIds.filter((id) => conventions.some((c) => c.id === id));
+  const featuredId = featuredPool.length
+    ? featuredPool[Math.floor(Math.random() * featuredPool.length)]
+    : null;
   return (
     <FrontPage
       conventions={conventions}

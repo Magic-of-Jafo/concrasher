@@ -61,7 +61,7 @@ export default async function AdminConventionsPage() {
     return (
         <AdminConventionsTable
             rows={serialized}
-            initialFeaturedId={featuredSetting?.value || null}
+            initialFeaturedIds={(featuredSetting?.value || '').split(',').map((s) => s.trim()).filter(Boolean)}
         />
     );
 }

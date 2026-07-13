@@ -270,11 +270,13 @@ export default function FrontPage({
     /** Admin's Featured pick (from /admin/conventions); null = automatic. */
     featuredId?: string | null;
 }) {
-    // The rail trio and the featured pick appear only in their own sections;
-    // the 100-days list skips them (no duplicate listings on the page).
+    // The rail trio is the only thing pulled out of the 100-days list, so the
+    // listings stay identical no matter which convention is featured. The
+    // featured pick rotates, so it is intentionally NOT excluded — it may also
+    // appear in its normal chronological spot (accepted redundancy).
     const rail = conventions.slice(0, 3);
     const billing = pickFeatured(conventions, featuredId);
-    const excludeIds = [...rail.map((c) => c.id), ...(billing ? [billing.id] : [])];
+    const excludeIds = rail.map((c) => c.id);
 
     return (
         <Box

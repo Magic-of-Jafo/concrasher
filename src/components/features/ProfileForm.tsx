@@ -12,9 +12,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
+import Autocomplete from '@mui/material/Autocomplete';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
+import { FuzzyStateInput } from '@/components/ui/FuzzyStateInput';
+import { COUNTRIES } from '@/lib/countries';
 
 interface ProfileFormProps {
   currentFirstName?: string | null;
@@ -22,6 +25,10 @@ interface ProfileFormProps {
   currentStageName?: string | null;
   currentBio?: string | null;
   currentUseStageNamePublicly?: boolean | null;
+  currentHomeCity?: string | null;
+  currentHomeStateName?: string | null;
+  currentHomeStateAbbreviation?: string | null;
+  currentHomeCountry?: string | null;
   onProfileUpdate?: (updatedData: ProfileSchemaInput) => void;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -33,6 +40,10 @@ export default function ProfileForm({
   currentStageName,
   currentBio,
   currentUseStageNamePublicly,
+  currentHomeCity,
+  currentHomeStateName,
+  currentHomeStateAbbreviation,
+  currentHomeCountry,
   onProfileUpdate,
   onSuccess,
   onCancel
@@ -56,10 +67,16 @@ export default function ProfileForm({
       stageName: currentStageName || '',
       bio: currentBio || '',
       useStageNamePublicly: currentUseStageNamePublicly || false,
+      homeCity: currentHomeCity || '',
+      homeStateName: currentHomeStateName || '',
+      homeStateAbbreviation: currentHomeStateAbbreviation || '',
+      homeCountry: currentHomeCountry || '',
     },
   });
 
   const useStageNamePublicly = watch('useStageNamePublicly');
+  const homeCountry = watch('homeCountry');
+  const homeStateName = watch('homeStateName');
 
   useEffect(() => {
     reset({
@@ -68,8 +85,12 @@ export default function ProfileForm({
       stageName: currentStageName || '',
       bio: currentBio || '',
       useStageNamePublicly: currentUseStageNamePublicly || false,
+      homeCity: currentHomeCity || '',
+      homeStateName: currentHomeStateName || '',
+      homeStateAbbreviation: currentHomeStateAbbreviation || '',
+      homeCountry: currentHomeCountry || '',
     });
-  }, [currentFirstName, currentLastName, currentStageName, currentBio, currentUseStageNamePublicly, reset]);
+  }, [currentFirstName, currentLastName, currentStageName, currentBio, currentUseStageNamePublicly, currentHomeCity, currentHomeStateName, currentHomeStateAbbreviation, currentHomeCountry, reset]);
 
   // Auto-save the stage name toggle immediately when changed
   const handleToggleChange = async (newValue: boolean) => {
@@ -138,6 +159,10 @@ export default function ProfileForm({
         // otherwise the Save button stays enabled and the save looks like it
         // didn't take.
         useStageNamePublicly: data.useStageNamePublicly ?? false,
+        homeCity: result.user.homeCity || '',
+        homeStateName: result.user.homeStateName || '',
+        homeStateAbbreviation: result.user.homeStateAbbreviation || '',
+        homeCountry: result.user.homeCountry || '',
       };
       reset(newValues);
       if (onProfileUpdate) {
@@ -238,6 +263,96 @@ export default function ProfileForm({
                   {isUpdatingToggle && <CircularProgress size={16} />}
                 </Box>
               }
+            />
+          )}
+        />
+      </Box>
+
+      {/* Home base — private. Powers "conventions near me" search and distance
+          alerts; never shown on the public profile. */}
+      <Box sx={{ mb: 1 }}>
+        <Typography
+          component="label"
+          sx={{ display: 'block', fontWeight: 700, fontSize: '0.95rem', color: 'var(--cc-ink)' }}
+        >
+          Home base
+        </Typography>
+        <Typography sx={{ fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
+          Find conventions near you - just tell us where you are. This information is kept private and never shared.
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
+        <Controller
+          name="homeCountry"
+          control={control}
+          render={({ field }) => (
+            <Autocomplete
+              fullWidth
+              freeSolo
+              options={COUNTRIES}
+              autoHighlight
+              value={COUNTRIES.find((opt) => opt.label === field.value) || field.value || null}
+              getOptionLabel={(opt) => (typeof opt === 'string' ? opt : opt.label)}
+              isOptionEqualToValue={(opt, val) => opt.label === (typeof val === 'string' ? val : val?.label)}
+              onChange={(_, newValue) => {
+                const label = typeof newValue === 'string' ? newValue : newValue?.label || '';
+                field.onChange(label);
+                // State/abbreviation only make sense for the US picker; clear
+                // them when the country changes away from it.
+                if (label !== 'United States') {
+                  setValue('homeStateName', '', { shouldDirty: true });
+                  setValue('homeStateAbbreviation', '', { shouldDirty: true });
+                }
+              }}
+              onInputChange={(_, newInputValue, reason) => {
+                if (reason === 'input') field.onChange(newInputValue);
+              }}
+              disabled={isSubmitting}
+              renderInput={(params) => (
+                <TextField {...params} label="Country" autoComplete="country-name" />
+              )}
+              sx={{ flex: 1 }}
+            />
+          )}
+        />
+        {homeCountry === 'United States' ? (
+          <FuzzyStateInput
+            value={homeStateName || ''}
+            onChange={(name, abbr) => {
+              setValue('homeStateName', name, { shouldDirty: true });
+              setValue('homeStateAbbreviation', abbr, { shouldDirty: true });
+            }}
+            disabled={isSubmitting}
+            sx={{ flex: 1 }}
+          />
+        ) : (
+          <Controller
+            name="homeStateName"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                value={field.value || ''}
+                fullWidth
+                label="State / Province / Region"
+                disabled={isSubmitting}
+                sx={{ flex: 1 }}
+              />
+            )}
+          />
+        )}
+        <Controller
+          name="homeCity"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              {...field}
+              value={field.value || ''}
+              fullWidth
+              label="City"
+              autoComplete="address-level2"
+              disabled={isSubmitting}
+              sx={{ flex: 1 }}
             />
           )}
         />

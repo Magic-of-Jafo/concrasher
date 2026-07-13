@@ -58,13 +58,17 @@ export interface MemberFields {
     lastName?: string | null;
     stageName?: string | null;
     bio?: string | null;
+    homeCity?: string | null;
+    homeCountry?: string | null;
 }
 
 export function memberStrength(u: MemberFields): ProfileStrength {
     return assemble([
-        { key: 'photo', label: 'Add a profile photo', weight: 40, done: hasImage(u.image) },
-        { key: 'name', label: 'Add your name', weight: 25, done: (hasText(u.firstName) && hasText(u.lastName)) || hasText(u.stageName) },
-        { key: 'bio', label: 'Write a short bio', weight: 35, done: visibleLen(u.bio) >= BIO_MIN_CHARS },
+        { key: 'photo', label: 'Add a profile photo', weight: 35, done: hasImage(u.image) },
+        { key: 'name', label: 'Add your name', weight: 20, done: (hasText(u.firstName) && hasText(u.lastName)) || hasText(u.stageName) },
+        { key: 'bio', label: 'Write a short bio', weight: 30, done: visibleLen(u.bio) >= BIO_MIN_CHARS },
+        // Home base powers "conventions near me"; needs at least a city and country.
+        { key: 'location', label: 'Set your home base', weight: 15, done: hasText(u.homeCity) && hasText(u.homeCountry) },
     ]);
 }
 

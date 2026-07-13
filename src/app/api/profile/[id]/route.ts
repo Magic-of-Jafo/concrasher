@@ -30,6 +30,10 @@ export async function GET(
                 roles: true,
                 emailVerified: true,
                 useStageNamePublicly: true,
+                homeCity: true,
+                homeStateName: true,
+                homeStateAbbreviation: true,
+                homeCountry: true,
                 talentProfile: {
                     select: {
                         isActive: true,

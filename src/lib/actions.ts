@@ -333,6 +333,10 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
         stageName: validatedData.data.stageName,
         bio: validatedData.data.bio,
         useStageNamePublicly: validatedData.data.useStageNamePublicly,
+        homeCity: validatedData.data.homeCity,
+        homeStateName: validatedData.data.homeStateName,
+        homeStateAbbreviation: validatedData.data.homeStateAbbreviation,
+        homeCountry: validatedData.data.homeCountry,
       },
     });
 
@@ -349,6 +353,10 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
         email: user.email,
         bio: user.bio,
         image: user.image,
+        homeCity: user.homeCity,
+        homeStateName: user.homeStateName,
+        homeStateAbbreviation: user.homeStateAbbreviation,
+        homeCountry: user.homeCountry,
       }
     };
   } catch (error) {
@@ -2650,7 +2658,12 @@ export async function deletePerformance(itemId: string) {
  * return to automatic selection). Stored as a SiteSetting so exactly one
  * value exists — radio semantics for free.
  */
-export async function setFeaturedConvention(conventionId: string | null): Promise<{
+/**
+ * Set the pool of featured conventions (the front page rotates one at random per
+ * load). Stored comma-joined in the 'featured_convention_id' SiteSetting; empty
+ * means automatic selection. A single legacy id reads back as a one-item pool.
+ */
+export async function setFeaturedConventions(conventionIds: string[]): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -2666,23 +2679,26 @@ export async function setFeaturedConvention(conventionId: string | null): Promis
   }
 
   try {
-    if (conventionId) {
-      const conv = await db.convention.findFirst({
-        where: { id: conventionId, deletedAt: null },
+    const clean = Array.from(new Set((conventionIds || []).map((s) => s.trim()).filter(Boolean)));
+    let valid: string[] = [];
+    if (clean.length) {
+      const found = await db.convention.findMany({
+        where: { id: { in: clean }, deletedAt: null },
         select: { id: true },
       });
-      if (!conv) return { success: false, error: "Convention not found." };
+      const ok = new Set(found.map((f) => f.id));
+      valid = clean.filter((id) => ok.has(id)); // keep caller order, drop stale ids
     }
     await db.siteSetting.upsert({
       where: { key: 'featured_convention_id' },
-      update: { value: conventionId ?? '' },
-      create: { key: 'featured_convention_id', value: conventionId ?? '' },
+      update: { value: valid.join(',') },
+      create: { key: 'featured_convention_id', value: valid.join(',') },
     });
     revalidatePath('/');
     revalidatePath('/admin/conventions');
     return { success: true };
   } catch (error) {
-    console.error('Error setting featured convention:', error);
+    console.error('Error setting featured conventions:', error);
     return { success: false, error: 'A database error occurred.' };
   }
 }

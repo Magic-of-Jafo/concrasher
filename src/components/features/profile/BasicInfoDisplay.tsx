@@ -23,6 +23,10 @@ interface BasicInfoDisplayProps {
         roles: Role[];
         emailVerified?: Date | null;
         useStageNamePublicly?: boolean | null;
+        homeCity?: string | null;
+        homeStateName?: string | null;
+        homeStateAbbreviation?: string | null;
+        homeCountry?: string | null;
     };
     currentImageUrl?: string | null;
     onImageUpdate?: (url: string | null) => void;
@@ -39,14 +43,18 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
         lastName: user.lastName,
         stageName: user.stageName,
         bio: user.bio,
+        homeCity: user.homeCity ?? null,
+        homeCountry: user.homeCountry ?? null,
     });
 
-    const handleProfileFieldsUpdate = (data: { firstName?: string | null; lastName?: string | null; stageName?: string | null; bio?: string | null }) => {
+    const handleProfileFieldsUpdate = (data: { firstName?: string | null; lastName?: string | null; stageName?: string | null; bio?: string | null; homeCity?: string | null; homeCountry?: string | null }) => {
         setProfileFields((prev) => ({
             firstName: data.firstName ?? prev.firstName,
             lastName: data.lastName ?? prev.lastName,
             stageName: data.stageName ?? prev.stageName,
             bio: data.bio ?? prev.bio,
+            homeCity: data.homeCity ?? prev.homeCity,
+            homeCountry: data.homeCountry ?? prev.homeCountry,
         }));
     };
 
@@ -103,6 +111,8 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
                     lastName: profileFields.lastName,
                     stageName: profileFields.stageName,
                     bio: profileFields.bio,
+                    homeCity: profileFields.homeCity,
+                    homeCountry: profileFields.homeCountry,
                 })}
             />
 
@@ -126,6 +136,10 @@ const BasicInfoDisplay: React.FC<BasicInfoDisplayProps> = ({ user, currentImageU
                     currentStageName={user.stageName}
                     currentBio={user.bio}
                     currentUseStageNamePublicly={user.useStageNamePublicly}
+                    currentHomeCity={user.homeCity}
+                    currentHomeStateName={user.homeStateName}
+                    currentHomeStateAbbreviation={user.homeStateAbbreviation}
+                    currentHomeCountry={user.homeCountry}
                     onSuccess={handleSuccess}
                     onProfileUpdate={handleProfileFieldsUpdate}
                 />

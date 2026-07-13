@@ -78,6 +78,11 @@ export const ProfileSchema = z.object({
     })
     .optional().nullable(),
   useStageNamePublicly: z.boolean().optional(),
+  // Home base — optional; used later for "conventions near me" and distance alerts.
+  homeCity: z.string().max(100, { message: "City must be 100 characters or less" }).optional().nullable(),
+  homeStateName: z.string().max(100, { message: "State must be 100 characters or less" }).optional().nullable(),
+  homeStateAbbreviation: z.string().max(10, { message: "State must be 10 characters or less" }).optional().nullable(),
+  homeCountry: z.string().max(100, { message: "Country must be 100 characters or less" }).optional().nullable(),
 });
 
 export type ProfileSchemaInput = z.infer<typeof ProfileSchema>;

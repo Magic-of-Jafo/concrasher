@@ -5,6 +5,7 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     Chip,
     Container,
     Dialog,
@@ -12,10 +13,8 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
-    FormControlLabel,
     Link as MuiLink,
     MenuItem,
-    Radio,
     Snackbar,
     Table,
     TableBody,
@@ -31,7 +30,7 @@ import Link from 'next/link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { setFeaturedConvention, deleteConvention } from '@/lib/actions';
+import { setFeaturedConventions, deleteConvention } from '@/lib/actions';
 import { profileSurfaceSx } from '@/components/ui/profileTheme';
 
 // The admin's convention workbench — dense and calm, but on the House Lights
@@ -87,13 +86,13 @@ type SortBy = 'date' | 'name' | 'status';
 
 export default function AdminConventionsTable({
     rows: initialRows,
-    initialFeaturedId,
+    initialFeaturedIds,
 }: {
     rows: AdminConventionRow[];
-    initialFeaturedId: string | null;
+    initialFeaturedIds: string[];
 }) {
     const [rows, setRows] = useState(initialRows);
-    const [featuredId, setFeaturedId] = useState<string | null>(initialFeaturedId);
+    const [featuredIds, setFeaturedIds] = useState<Set<string>>(() => new Set(initialFeaturedIds));
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('PUBLISHED');
     const [sortBy, setSortBy] = useState<SortBy>('date');
@@ -124,16 +123,28 @@ export default function AdminConventionsTable({
         else { setSortBy(by); setSortAsc(true); }
     };
 
-    const handleFeature = async (id: string | null) => {
-        const previous = featuredId;
-        setFeaturedId(id); // optimistic — a radio must feel instant
-        const result = await setFeaturedConvention(id);
+    // Persist the whole pool; the front page rotates one at random per load.
+    const persistFeatured = async (next: Set<string>, successMsg: string) => {
+        const previous = featuredIds;
+        setFeaturedIds(next); // optimistic — a toggle must feel instant
+        const result = await setFeaturedConventions([...next]);
         if (result.success) {
-            setToast({ message: id ? 'Featured convention updated.' : 'Featured selection returned to automatic.', severity: 'success' });
+            setToast({ message: successMsg, severity: 'success' });
         } else {
-            setFeaturedId(previous);
-            setToast({ message: result.error || 'Could not update the featured convention.', severity: 'error' });
+            setFeaturedIds(previous);
+            setToast({ message: result.error || 'Could not update the featured conventions.', severity: 'error' });
         }
+    };
+
+    const handleToggleFeature = (id: string) => {
+        const next = new Set(featuredIds);
+        const adding = !next.has(id);
+        if (adding) next.add(id); else next.delete(id);
+        persistFeatured(next, adding ? 'Added to featured rotation.' : 'Removed from featured rotation.');
+    };
+
+    const handleClearFeatured = () => {
+        persistFeatured(new Set(), 'Featured cleared — the site now auto-picks.');
     };
 
     const handleDelete = async () => {
@@ -145,7 +156,14 @@ export default function AdminConventionsTable({
         setConfirmDelete(null);
         if (result.success) {
             setRows((prev) => prev.filter((r) => r.id !== target.id));
-            if (featuredId === target.id) setFeaturedId(null);
+            // If the deleted convention was in the featured rotation, drop it and
+            // persist the trimmed pool so the stored setting stays clean.
+            if (featuredIds.has(target.id)) {
+                const next = new Set(featuredIds);
+                next.delete(target.id);
+                setFeaturedIds(next);
+                void setFeaturedConventions([...next]);
+            }
             setToast({ message: `Deleted "${target.name}".`, severity: 'success' });
         } else {
             setToast({ message: result.error || 'Delete failed.', severity: 'error' });
@@ -167,9 +185,10 @@ export default function AdminConventionsTable({
                 Manage Conventions
             </Typography>
             <Typography variant="body2" sx={{ mb: 3, color: 'var(--cc-muted)' }}>
-                Every convention on the site. The Featured radio picks the front page&apos;s
-                headline slot; Automatic lets the site choose (majors first, then artwork,
-                then soonest).
+                Every convention on the site. Tick the Featured box on any conventions you
+                want in the front page&apos;s headline slot &mdash; one is shown at random on
+                each visit. With none ticked, the site auto-picks (majors first, then
+                artwork, then soonest).
             </Typography>
 
             {/* controls */}
@@ -200,17 +219,18 @@ export default function AdminConventionsTable({
                 </Typography>
             </Box>
 
-            <FormControlLabel
-                sx={{ mb: 1 }}
-                control={
-                    <Radio
-                        checked={featuredId === null}
-                        onChange={() => handleFeature(null)}
-                        inputProps={{ 'aria-label': 'Automatic featured selection' }}
-                    />
-                }
-                label={<Typography variant="body2">Automatic featured selection (no manual pick)</Typography>}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: 'var(--cc-muted)' }}>
+                    {featuredIds.size === 0
+                        ? 'No conventions featured — the site auto-picks.'
+                        : `${featuredIds.size} featured — one shown at random per visit.`}
+                </Typography>
+                {featuredIds.size > 0 && (
+                    <Button size="small" variant="outlined" onClick={handleClearFeatured}>
+                        Clear all
+                    </Button>
+                )}
+            </Box>
 
             <TableContainer sx={{ border: '1px solid var(--cc-panel-border)', backgroundColor: 'var(--cc-panel)', borderRadius: '12px' }}>
                 <Table size="small">
@@ -252,15 +272,15 @@ export default function AdminConventionsTable({
                         {visible.map((row) => {
                             const featurable = isFeaturable(row);
                             return (
-                                <TableRow key={row.id} hover selected={featuredId === row.id}>
+                                <TableRow key={row.id} hover selected={featuredIds.has(row.id)}>
                                     <TableCell align="center">
-                                        <Radio
+                                        <Checkbox
                                             size="small"
-                                            checked={featuredId === row.id}
-                                            onChange={() => handleFeature(row.id)}
+                                            checked={featuredIds.has(row.id)}
+                                            onChange={() => handleToggleFeature(row.id)}
                                             disabled={!featurable}
                                             inputProps={{ 'aria-label': `Feature ${row.name}` }}
-                                            title={featurable ? 'Feature on the front page' : 'Only published, upcoming conventions can be featured'}
+                                            title={featurable ? 'Show in the featured rotation' : 'Only published, upcoming conventions can be featured'}
                                         />
                                     </TableCell>
                                     <TableCell>

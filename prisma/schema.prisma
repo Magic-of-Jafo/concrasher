@@ -40,6 +40,15 @@ model User {
   lastName         String?
   stageName        String?
   useStageNamePublicly Boolean?        @default(false)
+  // Home base: powers "conventions near me" search and distance alerts. Captured
+  // as text (matching the convention location fields); lat/lng are geocoded from
+  // it later, so they stay null until that step ships.
+  homeCity              String?
+  homeStateName         String?
+  homeStateAbbreviation String?
+  homeCountry           String?
+  homeLatitude          Float?
+  homeLongitude         Float?
   accounts         Account[]
   ownedBrands      Brand[]            @relation("BrandOwner")
   brandMemberships BrandUser[]

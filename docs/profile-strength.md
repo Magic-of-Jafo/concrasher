@@ -36,9 +36,10 @@ change (score is computed).
 
 | Field | Weight | Done when |
 |---|---|---|
-| Profile photo | 40 | a non-default image is set |
-| Name | 25 | first + last, or a stage name |
-| Bio | 35 | ≥ 40 chars of visible text |
+| Profile photo | 35 | a non-default image is set |
+| Name | 20 | first + last, or a stage name |
+| Bio | 30 | ≥ 40 chars of visible text |
+| Home base | 15 | city + country set (powers "conventions near me") |
 
 ### Talent profile — once talent
 
