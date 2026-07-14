@@ -526,6 +526,19 @@ model ConventionTalent {
   talentProfileId     String
   overrideDisplayName String?
   overrideBio         String?
+  // Talent-tab arrangement (2026-07): the organizer's billing order (null =
+  // unarranged, sorts after arranged), card visibility on the public tab, and
+  // the chosen card image. imageUrl semantics: when the talent has PROMO_IMAGE
+  // photos it must be one of them (talent controls their promotion — resolved
+  // and re-validated at render time so a new promo photo takes over instantly);
+  // only when they have none may it be an organizer-uploaded image.
+  order               Int?
+  isVisible           Boolean       @default(true)
+  // Headliners are an explicit organizer choice (starred / dragged into the
+  // headliner zone) — never inferred from list position. Zero headliners =
+  // a uniform public grid; nobody gets accidental top billing.
+  isHeadliner         Boolean       @default(false)
+  imageUrl            String?
   assignedAt          DateTime      @default(now())
   convention          Convention    @relation(fields: [conventionId], references: [id], onDelete: Cascade)
   talentProfile       TalentProfile @relation(fields: [talentProfileId], references: [id], onDelete: Cascade)
@@ -600,4 +613,8 @@ enum ProfileType {
 enum MediaType {
   IMAGE
   VIDEO_LINK
+  // Promo photo: the talent-controlled image organizers must use when
+  // featuring this person at a convention (max 3; first = default).
+  // Distinct from IMAGE (the profile gallery) by design.
+  PROMO_IMAGE
 }

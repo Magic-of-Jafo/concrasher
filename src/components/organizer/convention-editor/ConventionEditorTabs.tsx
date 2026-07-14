@@ -11,6 +11,7 @@ import VenueHotelTab from './VenueHotelTab';
 import { type VenueHotelTabData, createDefaultVenueHotelTabData } from '@/lib/validators';
 import ScheduleTab from './ScheduleTab';
 import DealersTab from './DealersTab';
+import TalentTab from './TalentTab';
 import { MediaTab } from './MediaTab';
 import { type ConventionMediaData } from '@/lib/validators';
 import { SettingsTab } from './SettingsTab';
@@ -499,14 +500,13 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
       </TabPanel>
 
       <TabPanel value={activeTab} index={4}>
-        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom>
-            Talent
-          </Typography>
-          <Typography color="text.secondary">
-            Talent selection will be available here in a future update.
-          </Typography>
-        </Paper>
+        {conventionId ? (
+          <TalentTab conventionId={conventionId} />
+        ) : (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="text.secondary">Save the convention first to manage talent.</Typography>
+          </Box>
+        )}
       </TabPanel>
 
       <TabPanel value={activeTab} index={5}>

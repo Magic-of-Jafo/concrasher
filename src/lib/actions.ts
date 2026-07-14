@@ -3,8 +3,9 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // Correctly import authOptions
 import { db } from "@/lib/db"; // Ensure db is imported
-import { setEventTalent, findClaimCandidates, claimTalent, type ClaimCandidate } from "@/lib/talent";
+import { setEventTalent, findClaimCandidates, claimTalent, findOrCreateUnclaimedTalent, type ClaimCandidate } from "@/lib/talent";
 import { memberStrength, gateStatus, TALENT_APPLY_REQUIREMENTS } from "@/lib/profile-strength";
+import { PROMO_PHOTO_LIMIT, resolveTalentCardImage, billingSort, type ResolvedTalentCardImage } from "@/lib/talent-cards";
 import { ProfileSchema, type ProfileSchemaInput } from "./validators";
 import { revalidatePath } from "next/cache";
 import { Role, RequestedRole, ApplicationStatus, User, Convention, ScheduleDay, ConventionScheduleItem, ConventionType, MediaType } from "@prisma/client"; // Added import
@@ -2763,10 +2764,10 @@ export interface TalentMediaItem {
   order: number | null;
 }
 
-/** Add a photo (already uploaded to S3) or a video link to the current user's talent gallery. */
+/** Add a gallery photo, video link, or promo photo to the current user's talent profile. */
 export async function addTalentMedia(input: {
   url: string;
-  type: 'IMAGE' | 'VIDEO_LINK';
+  type: 'IMAGE' | 'VIDEO_LINK' | 'PROMO_IMAGE';
   caption?: string;
 }): Promise<{ success: boolean; media?: TalentMediaItem; error?: string }> {
   const session = await getServerSession(authOptions);
@@ -2782,13 +2783,27 @@ export async function addTalentMedia(input: {
   });
   if (!profile) return { success: false, error: 'Create your talent profile first.' };
 
+  // Promo photos are capped (they're a curated set, not a gallery) and ordered
+  // within their own type — the first promo photo is the talent's default card
+  // image everywhere they're featured.
+  let order = profile._count.media;
+  if (input.type === 'PROMO_IMAGE') {
+    const promoCount = await db.talentProfileMedia.count({
+      where: { talentProfileId: profile.id, type: 'PROMO_IMAGE' },
+    });
+    if (promoCount >= PROMO_PHOTO_LIMIT) {
+      return { success: false, error: `You can have up to ${PROMO_PHOTO_LIMIT} promo photos. Remove one first.` };
+    }
+    order = promoCount;
+  }
+
   const media = await db.talentProfileMedia.create({
     data: {
       talentProfileId: profile.id,
       url,
       type: input.type as MediaType,
       caption: input.caption?.trim() || null,
-      order: profile._count.media,
+      order,
     },
     select: { id: true, url: true, type: true, caption: true, order: true },
   });
@@ -2812,7 +2827,7 @@ export async function removeTalentMedia(mediaId: string): Promise<{ success: boo
 
   await db.talentProfileMedia.delete({ where: { id: mediaId } });
 
-  if (media.type === 'IMAGE' && media.url.includes(`${BUCKET_NAME}.s3`)) {
+  if ((media.type === 'IMAGE' || media.type === 'PROMO_IMAGE') && media.url.includes(`${BUCKET_NAME}.s3`)) {
     try {
       const key = new URL(media.url).pathname.replace(/^\//, '');
       if (key) await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
@@ -2822,4 +2837,186 @@ export async function removeTalentMedia(mediaId: string): Promise<{ success: boo
   }
   revalidatePath('/profile');
   return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Convention Talent tab (2026-07): the organizer's billing board. Rows are
+// auto-populated by the Schedule Helper (setEventTalent upserts
+// ConventionTalent); the organizer arranges order/visibility/card image here.
+// ---------------------------------------------------------------------------
+
+/** Organizer-or-admin guard shared by the talent-tab actions. */
+async function canEditConventionTalent(conventionId: string, userId: string): Promise<boolean> {
+  const convention = await db.convention.findUnique({
+    where: { id: conventionId },
+    select: { series: { select: { organizerUserId: true } } },
+  });
+  if (!convention) return false;
+  if (convention.series?.organizerUserId === userId) return true;
+  const user = await db.user.findUnique({ where: { id: userId }, select: { roles: true } });
+  return !!user?.roles.includes(Role.ADMIN);
+}
+
+export interface ConventionTalentRow {
+  linkId: string;
+  talentProfileId: string;
+  displayName: string;
+  order: number | null;
+  isVisible: boolean;
+  isHeadliner: boolean;
+  /** The stored (raw) choice — may be stale; use `resolved` for display. */
+  imageUrl: string | null;
+  resolved: ResolvedTalentCardImage;
+  promoPhotos: { id: string; url: string }[];
+  profilePictureUrl: string | null;
+  fromSchedule: boolean;
+  claimed: boolean;
+  assignedAt: string;
+}
+
+async function loadConventionTalentRows(conventionId: string): Promise<ConventionTalentRow[]> {
+  const links = await db.conventionTalent.findMany({
+    where: { conventionId },
+    select: {
+      id: true,
+      order: true,
+      isVisible: true,
+      isHeadliner: true,
+      imageUrl: true,
+      overrideDisplayName: true,
+      assignedAt: true,
+      talentProfile: {
+        select: {
+          id: true,
+          displayName: true,
+          profilePictureUrl: true,
+          userId: true,
+          media: {
+            where: { type: 'PROMO_IMAGE' },
+            orderBy: { order: 'asc' },
+            select: { id: true, url: true },
+          },
+          scheduleLinks: {
+            where: { scheduleItem: { conventionId } },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  const rows = links.map((l) => ({
+    linkId: l.id,
+    talentProfileId: l.talentProfile.id,
+    displayName: l.overrideDisplayName || l.talentProfile.displayName,
+    order: l.order,
+    isVisible: l.isVisible,
+    isHeadliner: l.isHeadliner,
+    imageUrl: l.imageUrl,
+    resolved: resolveTalentCardImage({
+      chosenUrl: l.imageUrl,
+      promoUrls: l.talentProfile.media.map((m) => m.url),
+      profilePictureUrl: l.talentProfile.profilePictureUrl,
+    }),
+    promoPhotos: l.talentProfile.media,
+    profilePictureUrl: l.talentProfile.profilePictureUrl,
+    fromSchedule: l.talentProfile.scheduleLinks.length > 0,
+    claimed: l.talentProfile.userId !== null,
+    assignedAt: l.assignedAt.toISOString(),
+  }));
+  return billingSort(rows);
+}
+
+/** The editor's Talent tab data: every talent attached to this convention, billing-sorted. */
+export async function getConventionTalentArrangement(conventionId: string): Promise<{
+  success: boolean;
+  rows?: ConventionTalentRow[];
+  error?: string;
+}> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!(await canEditConventionTalent(conventionId, session.user.id))) {
+    return { success: false, error: 'Permission denied.' };
+  }
+  return { success: true, rows: await loadConventionTalentRows(conventionId) };
+}
+
+/**
+ * Persist the organizer's arrangement. Image rule enforced server-side: when
+ * the talent has promo photos, the stored image must be one of them (anything
+ * else is coerced to null = "their default"); organizers may only store their
+ * own image for talent with no promo photos.
+ */
+export async function saveConventionTalentArrangement(
+  conventionId: string,
+  arrangement: Array<{ linkId: string; order: number; isVisible: boolean; isHeadliner: boolean; imageUrl: string | null }>,
+): Promise<{ success: boolean; rows?: ConventionTalentRow[]; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!(await canEditConventionTalent(conventionId, session.user.id))) {
+    return { success: false, error: 'Permission denied.' };
+  }
+
+  const links = await db.conventionTalent.findMany({
+    where: { conventionId },
+    select: {
+      id: true,
+      talentProfile: {
+        select: { media: { where: { type: 'PROMO_IMAGE' }, select: { url: true } } },
+      },
+    },
+  });
+  const byId = new Map(links.map((l) => [l.id, l]));
+
+  for (const item of arrangement) {
+    const link = byId.get(item.linkId);
+    if (!link) continue; // stale row from another session — skip, don't fail the save
+    const promoUrls = link.talentProfile.media.map((m) => m.url);
+    let imageUrl = item.imageUrl?.trim() || null;
+    if (promoUrls.length > 0) {
+      // Talent controls their promotion: only their own photos are storable.
+      if (imageUrl && !promoUrls.includes(imageUrl)) imageUrl = null;
+    }
+    await db.conventionTalent.update({
+      where: { id: item.linkId },
+      data: { order: item.order, isVisible: item.isVisible, isHeadliner: item.isHeadliner, imageUrl },
+    });
+  }
+
+  revalidatePath(`/conventions/${conventionId}`);
+  return { success: true, rows: await loadConventionTalentRows(conventionId) };
+}
+
+/**
+ * Attach a talent to the convention by picking an existing profile or typing a
+ * new name (which creates an unclaimed profile — the Schedule Helper pipeline).
+ */
+export async function addTalentToConvention(
+  conventionId: string,
+  input: { talentId?: string; name?: string },
+): Promise<{ success: boolean; rows?: ConventionTalentRow[]; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: 'Authentication required.' };
+  if (!(await canEditConventionTalent(conventionId, session.user.id))) {
+    return { success: false, error: 'Permission denied.' };
+  }
+
+  let talentId = input.talentId;
+  if (!talentId) {
+    const name = (input.name || '').trim();
+    if (!name) return { success: false, error: 'Enter a name.' };
+    const t = await findOrCreateUnclaimedTalent(name);
+    if (!t) return { success: false, error: 'Could not create that talent profile.' };
+    talentId = t.id;
+  }
+
+  await db.conventionTalent.upsert({
+    where: { conventionId_talentProfileId: { conventionId, talentProfileId: talentId } },
+    create: { conventionId, talentProfileId: talentId },
+    update: {},
+  });
+
+  revalidatePath(`/conventions/${conventionId}`);
+  return { success: true, rows: await loadConventionTalentRows(conventionId) };
 }

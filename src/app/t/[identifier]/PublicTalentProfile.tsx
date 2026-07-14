@@ -52,7 +52,7 @@ interface TalentProfileData {
     media: Array<{
         id: string;
         url: string;
-        type: 'IMAGE' | 'VIDEO_LINK';
+        type: 'IMAGE' | 'VIDEO_LINK' | 'PROMO_IMAGE';
         caption: string | null;
         order: number | null;
     }>;
@@ -127,6 +127,8 @@ function videoThumbnail(url: string): string | null {
 const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile, currentUserId }) => {
     const isOwner = currentUserId === talentProfile.userId;
     const bookingRef = React.useRef<HTMLDivElement>(null);
+    // Promo photos serve convention talent cards, not the profile gallery.
+    const galleryMedia = talentProfile.media.filter((m) => m.type !== 'PROMO_IMAGE');
 
     const scrollToBooking = () => {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -287,11 +289,11 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 }, minWidth: 0 }}>
 
                         {/* Media — leads because it sells. Hidden when empty. */}
-                        {talentProfile.media.length > 0 && (
+                        {galleryMedia.length > 0 && (
                             <Box sx={cardSx}>
                                 <Typography component="h2" sx={cardTitleSx}>Photos &amp; Videos</Typography>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1.5 }}>
-                                    {talentProfile.media.map((item) => {
+                                    {galleryMedia.map((item) => {
                                         const isVideo = item.type === 'VIDEO_LINK';
                                         const src = isVideo ? videoThumbnail(item.url) : (getS3ImageUrl(item.url) || item.url);
                                         return (

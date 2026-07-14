@@ -8,6 +8,7 @@
 
 export type ListingTabKey =
     | 'about'
+    | 'talent'
     | 'schedule'
     | 'pricing'
     | 'venue'
@@ -24,6 +25,8 @@ export interface ListingTab {
 
 export const LISTING_TABS: ListingTab[] = [
     { key: 'about', label: 'About', path: '' },
+    // Talent rides ahead of Schedule: faces sell the convention before times do.
+    { key: 'talent', label: 'Talent', path: 'talent' },
     { key: 'schedule', label: 'Schedule', path: 'schedule' },
     { key: 'pricing', label: 'Pricing', path: 'pricing' },
     { key: 'venue', label: 'Venue', path: 'venue' },

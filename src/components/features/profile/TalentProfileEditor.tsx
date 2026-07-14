@@ -19,6 +19,7 @@ import TalentProfileImageUploader from './TalentProfileImageUploader';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
 import ProfileStrengthMeter from './ProfileStrengthMeter';
 import TalentMediaManager from './TalentMediaManager';
+import PromoPhotoManager from './PromoPhotoManager';
 import { talentStrength } from '@/lib/profile-strength';
 import type { TalentMediaItem } from '@/lib/actions';
 
@@ -68,9 +69,12 @@ export default function TalentProfileEditor({
     const [success, setSuccess] = useState<string | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-    // Gallery media (photos + video links) is saved immediately by the media
-    // manager; we track the count here so the strength meter reflects it live.
-    const initialMedia = ((initialData as { media?: TalentMediaItem[] })?.media) ?? [];
+    // Media rows serve two managers: the gallery (photos + video links) and the
+    // promo photos (the talent-controlled convention-card images). Both save
+    // immediately; the gallery count feeds the strength meter.
+    const allMedia = ((initialData as { media?: TalentMediaItem[] })?.media) ?? [];
+    const initialMedia = allMedia.filter((m) => m.type !== 'PROMO_IMAGE');
+    const initialPromoPhotos = allMedia.filter((m) => m.type === 'PROMO_IMAGE');
     const [mediaCount, setMediaCount] = useState<number>(initialMedia.length);
 
     const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
@@ -405,6 +409,13 @@ export default function TalentProfileEditor({
                                 ))}
                             </Box>
                         )}
+                    </Paper>
+                </Box>
+
+                {/* Promo photos — the talent-controlled convention-card images. */}
+                <Box>
+                    <Paper sx={{ p: 0, boxShadow: 'none', border: 'none' }}>
+                        <PromoPhotoManager initialPhotos={initialPromoPhotos} />
                     </Paper>
                 </Box>
 

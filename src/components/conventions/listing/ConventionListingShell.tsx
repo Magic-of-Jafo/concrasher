@@ -17,6 +17,7 @@ import VenueSection from '@/components/conventions/detail/VenueSection';
 import HotelSection from '@/components/conventions/detail/HotelSection';
 import DealersSection from '@/components/conventions/detail/DealersSection';
 import MediaGallerySection from '@/components/conventions/detail/MediaGallerySection';
+import TalentSection, { visibleTalentRows, talentRowImage } from '@/components/conventions/detail/TalentSection';
 import { LISTING_TABS, ListingTab, ListingTabKey, tabKeyForPath } from './listing-tabs';
 
 // The public convention listing, "True Tabs" structure (prototype B,
@@ -176,7 +177,69 @@ function EngagementPanel() {
     );
 }
 
-function AboutPane({ convention }: { convention: any }) {
+/** The About pane's "Featuring" strip: a face pile that sells the talent tab.
+ *  Visitors shouldn't have to find the tab to learn who's coming. */
+function FeaturingStrip({ convention, onOpenTalent }: { convention: any; onOpenTalent: () => void }) {
+    const rows = visibleTalentRows(convention);
+    if (rows.length === 0) return null;
+    const faces = rows.slice(0, 5);
+    const names = rows.slice(0, 2).map((r: any) => r.overrideDisplayName || r.talentProfile.displayName);
+    const more = rows.length - names.length;
+    return (
+        <Box
+            component="button"
+            type="button"
+            onClick={onOpenTalent}
+            aria-label="See all featured talent"
+            sx={{
+                width: '100%', textAlign: 'left', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap',
+                borderRadius: '12px',
+                backgroundColor: 'var(--cc-panel)',
+                border: '1px solid var(--cc-panel-border)',
+                px: 2, py: 1.5, mb: 3,
+                transition: 'border-color 0.18s ease-out',
+                '&:hover': { borderColor: 'var(--cc-gold)' },
+                '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '2px' },
+            }}
+        >
+            <Box sx={{ display: 'flex' }}>
+                {faces.map((row: any, i: number) => {
+                    const url = talentRowImage(row);
+                    const name = row.overrideDisplayName || row.talentProfile.displayName;
+                    return (
+                        <Box
+                            key={row.id}
+                            sx={{
+                                width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
+                                border: '2px solid var(--cc-bg)', backgroundColor: 'var(--cc-bg)',
+                                ml: i === 0 ? 0 : -1.25, zIndex: faces.length - i, position: 'relative',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                        >
+                            {url ? (
+                                <Box component="img" src={getS3ImageUrl(url)} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                <Typography sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.8rem', color: 'var(--cc-soft)' }}>
+                                    {name.split(/\s+/).filter(Boolean).slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('')}
+                                </Typography>
+                            )}
+                        </Box>
+                    );
+                })}
+            </Box>
+            <Typography component="span" sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.92rem', color: 'var(--cc-ink)', flex: 1, minWidth: 180 }}>
+                Featuring {names.join(', ')}
+                {more > 0 && <Box component="span" sx={{ color: 'var(--cc-muted)' }}> and {more} more</Box>}
+            </Typography>
+            <Typography component="span" sx={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.85rem', color: 'var(--cc-gold)', whiteSpace: 'nowrap' }}>
+                See the talent →
+            </Typography>
+        </Box>
+    );
+}
+
+function AboutPane({ convention, onOpenTalent }: { convention: any; onOpenTalent?: () => void }) {
     const html = convention.descriptionMain || convention.descriptionShort;
     // The helpers write plain text with blank-line paragraph breaks; the rich
     // editor writes HTML. Render whichever this listing carries.
@@ -197,6 +260,8 @@ function AboutPane({ convention }: { convention: any }) {
     } as const;
 
     return (
+        <>
+        {onOpenTalent && <FeaturingStrip convention={convention} onOpenTalent={onOpenTalent} />}
         <Box
             sx={{
                 display: 'grid',
@@ -280,6 +345,7 @@ function AboutPane({ convention }: { convention: any }) {
                 <EngagementPanel />
             </Box>
         </Box>
+        </>
     );
 }
 
@@ -299,9 +365,10 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 }
                 if (t.key === 'dealers') return (convention.dealerLinks?.length ?? 0) > 0;
                 if (t.key === 'media') return (convention.media?.length ?? 0) > 0;
+                if (t.key === 'talent') return visibleTalentRows(convention).length > 0;
                 return true;
             }),
-        [convention.guestsStayAtPrimaryVenue, convention.hotels, convention.dealerLinks, convention.media],
+        [convention.guestsStayAtPrimaryVenue, convention.hotels, convention.dealerLinks, convention.media, convention.talent, convention],
     );
 
     const [tab, setTab] = useState<ListingTabKey>(
@@ -552,6 +619,8 @@ export default function ConventionListingShell({ convention, canEdit = false, in
 
     const pane = () => {
         switch (tab) {
+            case 'talent':
+                return <TalentSection convention={convention} />;
             case 'schedule':
                 return convention.type === 'FESTIVAL'
                     ? <FestivalSchedule convention={convention} />
@@ -566,8 +635,15 @@ export default function ConventionListingShell({ convention, canEdit = false, in
                 return <DealersSection convention={convention} />;
             case 'media':
                 return <MediaGallerySection convention={convention} />;
-            default:
-                return <AboutPane convention={convention} />;
+            default: {
+                const talentTab = tabs.find((t) => t.key === 'talent');
+                return (
+                    <AboutPane
+                        convention={convention}
+                        onOpenTalent={talentTab ? () => switchTab(talentTab) : undefined}
+                    />
+                );
+            }
         }
     };
 

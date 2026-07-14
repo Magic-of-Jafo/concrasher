@@ -138,14 +138,24 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
           }
         },
 
-        // Talent information
+        // Talent information — with each talent's promo photos so the listing
+        // can resolve card images, in the organizer's billing order (unarranged
+        // rows fall to the end in assignment order).
         talent: {
           include: {
-            talentProfile: true
+            talentProfile: {
+              include: {
+                media: {
+                  where: { type: 'PROMO_IMAGE' },
+                  orderBy: { order: 'asc' },
+                },
+              },
+            },
           },
-          orderBy: {
-            assignedAt: 'asc'
-          }
+          orderBy: [
+            { order: { sort: 'asc', nulls: 'last' } },
+            { assignedAt: 'asc' },
+          ],
         }
       }
     });
