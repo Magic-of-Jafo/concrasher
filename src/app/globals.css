@@ -119,6 +119,21 @@ a {
   --cc-field:
     radial-gradient(ellipse 75% 34% at 50% -4%, rgba(57, 62, 70, 0.8), transparent 65%),
     radial-gradient(ellipse 40% 22% at 88% 20%, rgba(148, 137, 121, 0.18), transparent 70%);
+  /* Profile identity cards (user-picked 2026-07-14): the at-a-glance cue for
+     which profile type you're on. Talent = warm umber, Member = steel blue.
+     The sheen is one shared "machined metal" overlay — a light catch at the
+     top-left falling to a shadow at the bottom-right — laid over whichever
+     base color, so all four theme/type combos share the same finish. Defined
+     once here; the light theme only overrides the two base colors. */
+  --cc-id-talent: #413a2e;
+  --cc-id-member: #2e3947;
+  --cc-id-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.03) 30%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.10) 100%
+  );
   /* The site header: deliberately its own surface, distinct from the page.
      Dark = deeper slate panel over the stage, taupe hairline underneath. */
   --cc-header-bg: #1a1f26;
@@ -175,6 +190,11 @@ a {
   --cc-glow-art: none;
   --cc-glow-logo: none;
   --cc-field: radial-gradient(ellipse 75% 30% at 50% -4%, rgba(71, 139, 141, 0.14), transparent 65%);
+  /* Profile identity cards in daylight (user-picked 2026-07-14): gold wash
+     for Talent, cool blue wash for Member. The metallic sheen overlay is
+     inherited from :root — same finish in both themes. */
+  --cc-id-talent: #f0e8d4;
+  --cc-id-member: #dfeaf1;
   /* Light header: Abyss navy bar, strongly distinct from the pale page. */
   --cc-header-bg: #294669;
   --cc-header-ink: #f1f6f5;
