@@ -292,7 +292,8 @@ export async function setEventTalent(
 
 /**
  * Claim an unclaimed profile for a user. Guards: the user can't already own a
- * profile, and the target must still be unclaimed.
+ * profile, and the target must still be unclaimed. After claiming, a scraped
+ * misspelling in the display name is corrected toward the user's own name.
  */
 export async function claimTalent(userId: string, talentId: string): Promise<{ ok: boolean; error?: string }> {
     const ownedByUser = await prisma.talentProfile.findUnique({ where: { userId }, select: { id: true } });
@@ -301,5 +302,66 @@ export async function claimTalent(userId: string, talentId: string): Promise<{ o
     if (!talent) return { ok: false, error: 'Profile not found.' };
     if (talent.userId) return { ok: false, error: 'This profile has already been claimed.' };
     await prisma.talentProfile.update({ where: { id: talentId }, data: { userId, claimedAt: new Date() } });
+    // Best-effort: a failure here must not undo a successful claim.
+    try {
+        await correctClaimedDisplayName(userId, talentId);
+    } catch (e) {
+        console.error('claimTalent: name correction failed (claim itself succeeded):', e);
+    }
     return { ok: true };
+}
+
+/**
+ * Scraped schedules misspell names ("Michael Amar"); the person claiming knows
+ * their own spelling. If the claimed profile's display name is a NEAR-miss of a
+ * name the user entered (the only way a fuzzy claim candidate surfaces), replace
+ * it with the user's spelling and keep the old one as an alias so existing
+ * schedule links and future re-scrapes of the misspelling still resolve here.
+ *
+ * Deliberately does nothing when the display name matches exactly, or when it's
+ * far from every user name (a claim matched via alias — e.g. a stage name like
+ * "Lucy Darling" claimed by "Carissa Hendrix" — must keep its stage name).
+ */
+async function correctClaimedDisplayName(userId: string, talentId: string): Promise<void> {
+    const [user, talent] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: userId },
+            select: { firstName: true, lastName: true, stageName: true },
+        }),
+        prisma.talentProfile.findUnique({
+            where: { id: talentId },
+            select: { displayName: true, aliases: true },
+        }),
+    ]);
+    if (!user || !talent) return;
+
+    const userNames = [
+        [user.firstName, user.lastName].filter(Boolean).join(' ').trim(),
+        (user.stageName || '').trim(),
+    ].filter(Boolean);
+    if (userNames.length === 0) return;
+
+    const dispNorm = normalizeName(talent.displayName);
+    if (!dispNorm) return;
+    // Exact match (either name) — nothing to correct.
+    if (userNames.some((n) => normalizeName(n) === dispNorm)) return;
+
+    // Correct only when the display name is a small edit away from a user name.
+    const tol = Math.min(2, fuzzyTolerance(dispNorm.length));
+    let best: { name: string; dist: number } | null = null;
+    for (const n of userNames) {
+        const d = levenshtein(normalizeName(n), dispNorm);
+        if (d <= tol && (!best || d < best.dist)) best = { name: n, dist: d };
+    }
+    if (!best) return;
+
+    const mergedAliases = Array.from(new Set([...talent.aliases, talent.displayName]));
+    await prisma.talentProfile.update({
+        where: { id: talentId },
+        data: {
+            displayName: best.name,
+            aliases: mergedAliases,
+            normalizedNames: nameVariants(best.name, mergedAliases),
+        },
+    });
 }

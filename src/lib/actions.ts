@@ -722,6 +722,7 @@ export async function activateTalentProfile(): Promise<{
           if (claimed.ok) {
             await db.talentProfile.update({ where: { id: exact.id }, data: { isActive: true } });
             revalidatePath("/profile");
+            revalidatePath(`/t/${exact.id}`);
             return {
               success: true,
               message: `Claimed your existing profile "${exact.displayName}" — its listings came with it.`,
@@ -769,10 +770,13 @@ export async function activateTalentProfile(): Promise<{
     const updatedProfile = await db.talentProfile.update({
       where: { userId },
       data: { isActive: true },
-      select: { isActive: true },
+      select: { id: true, isActive: true },
     });
 
     revalidatePath("/profile");
+    // The public page caches (revalidate = 3600); bust it so the profile
+    // reappears immediately.
+    revalidatePath(`/t/${updatedProfile.id}`);
 
     return {
       success: true,
@@ -831,10 +835,13 @@ export async function deactivateTalentProfile(): Promise<{
     const updatedProfile = await db.talentProfile.update({
       where: { userId },
       data: { isActive: false },
-      select: { isActive: true },
+      select: { id: true, isActive: true },
     });
 
     revalidatePath("/profile");
+    // The public page caches (revalidate = 3600); bust it so the profile is
+    // hidden immediately, not up to an hour later.
+    revalidatePath(`/t/${updatedProfile.id}`);
 
     return {
       success: true,

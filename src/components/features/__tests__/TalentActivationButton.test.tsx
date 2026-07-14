@@ -3,139 +3,79 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import TalentActivationButton from '../TalentActivationButton';
-import { Role } from '@prisma/client';
-import * as actions from '@/lib/actions'; // To mock server actions
+import * as actions from '@/lib/actions';
 
-// Mock the server action
+// Mock the server actions the component calls.
 jest.mock('@/lib/actions', () => ({
-  activateTalentRole: jest.fn(),
-  deactivateTalentRole: jest.fn(),
+  activateTalentProfile: jest.fn(),
+  deactivateTalentProfile: jest.fn(),
 }));
 
-const mockActivateTalentRole = actions.activateTalentRole as jest.Mock;
-const mockDeactivateTalentRole = actions.deactivateTalentRole as jest.Mock;
+const mockActivate = actions.activateTalentProfile as jest.Mock;
+const mockDeactivate = actions.deactivateTalentProfile as jest.Mock;
 
 describe('TalentActivationButton', () => {
   beforeEach(() => {
-    mockActivateTalentRole.mockReset();
-    mockDeactivateTalentRole.mockReset();
+    mockActivate.mockReset();
+    mockDeactivate.mockReset();
   });
 
-  it('renders with "Activate Talent Profile" and switch off for non-talent user', () => {
-    render(<TalentActivationButton initialRoles={[Role.USER]} />);
+  it('renders "Activate Talent Profile" with the switch off when inactive', () => {
+    render(<TalentActivationButton initialIsActive={false} hasTalentProfile={false} />);
     expect(screen.getByText('Activate Talent Profile')).toBeInTheDocument();
-    const switchControl = screen.getByRole('checkbox', { name: /Activate Talent Role/i });
-    expect(switchControl).not.toBeChecked();
-    expect(switchControl).not.toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Activate Talent Profile' })).not.toBeChecked();
   });
 
-  it('renders with "Talent Role Active" and switch on and enabled for talent user (can deactivate)', () => {
-    render(<TalentActivationButton initialRoles={[Role.USER, Role.TALENT]} />);
-    expect(screen.getByText('Talent Role Active')).toBeInTheDocument();
-    const switchControl = screen.getByRole('checkbox', { name: /Deactivate Talent Role/i }); // Aria label changes
-    expect(switchControl).toBeChecked();
-    expect(switchControl).not.toBeDisabled();
+  it('renders "Talent Profile Active" with the switch on when active', () => {
+    render(<TalentActivationButton initialIsActive={true} hasTalentProfile={true} />);
+    expect(screen.getByText('Talent Profile Active')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile' })).toBeChecked();
   });
 
-  it('calls activateTalentRole and updates UI on successful activation', async () => {
-    const initialRoles = [Role.USER];
-    const finalRoles = [Role.USER, Role.TALENT];
-    mockActivateTalentRole.mockResolvedValue({
-      success: true,
-      message: 'Talent role has been activated successfully!',
-      roles: finalRoles,
-    });
+  it('activates directly (no confirmation) when toggled on', async () => {
+    mockActivate.mockResolvedValue({ success: true, isActive: true, message: 'Talent profile activated!' });
+    render(<TalentActivationButton initialIsActive={false} hasTalentProfile={true} />);
 
-    render(<TalentActivationButton initialRoles={initialRoles} />);
-    const switchControl = screen.getByRole('checkbox', { name: /Activate Talent Role/i });
-    await userEvent.click(switchControl);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Activate Talent Profile' }));
 
-    await waitFor(() => {
-      expect(mockActivateTalentRole).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Talent role has been activated successfully!')).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Talent Role Active')).toBeInTheDocument();
-    });
-    // Switch should now be checked and enabled
-    expect(screen.getByRole('checkbox', { name: /Deactivate Talent Role/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Deactivate Talent Role/i })).not.toBeDisabled();
+    await waitFor(() => expect(mockActivate).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Talent Profile Active')).toBeInTheDocument();
   });
 
-  it('calls activateTalentRole and shows error message on failed activation', async () => {
-    mockActivateTalentRole.mockResolvedValue({
-      success: false,
-      error: 'Activation failed.',
-      roles: [Role.USER], // Role remains unchanged
-    });
+  it('does NOT deactivate immediately — it opens a warning dialog first', async () => {
+    render(<TalentActivationButton initialIsActive={true} hasTalentProfile={true} />);
 
-    render(<TalentActivationButton initialRoles={[Role.USER]} />);
-    const switchControl = screen.getByRole('checkbox', { name: /Activate Talent Role/i });
-    await userEvent.click(switchControl);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile' }));
 
-    await waitFor(() => {
-      expect(mockActivateTalentRole).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Activation failed.')).toBeInTheDocument();
-    });
-    // Switch should remain unchecked and enabled
-    expect(screen.getByRole('checkbox', { name: /Activate Talent Role/i })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Activate Talent Role/i })).not.toBeDisabled();
+    // Warning shown; no server call yet; switch stays on.
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/hides your Talent profile from fans and organizers/i)).toBeInTheDocument();
+    expect(mockDeactivate).not.toHaveBeenCalled();
+    // The switch sits behind the modal (aria-hidden), so include hidden nodes.
+    expect(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile', hidden: true })).toBeChecked();
   });
 
-  it('calls deactivateTalentRole and updates UI on successful deactivation', async () => {
-    const initialRoles = [Role.USER, Role.TALENT];
-    const finalRoles = [Role.USER];
-    mockDeactivateTalentRole.mockResolvedValue({
-      success: true,
-      message: 'Talent role has been deactivated successfully.',
-      roles: finalRoles,
-    });
+  it('cancelling the dialog keeps the profile active and makes no server call', async () => {
+    render(<TalentActivationButton initialIsActive={true} hasTalentProfile={true} />);
 
-    render(<TalentActivationButton initialRoles={initialRoles} />);
-    const switchControl = screen.getByRole('checkbox', { name: /Deactivate Talent Role/i });
-    expect(switchControl).toBeChecked();
-    await userEvent.click(switchControl); // Toggle off
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Keep it visible/i }));
 
-    await waitFor(() => {
-      expect(mockDeactivateTalentRole).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Talent role has been deactivated successfully.')).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Activate Talent Profile')).toBeInTheDocument();
-    });
-    // Switch should now be unchecked and enabled
-    const finalSwitch = screen.getByRole('checkbox', { name: /Activate Talent Role/i });
-    expect(finalSwitch).not.toBeChecked();
-    expect(finalSwitch).not.toBeDisabled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockDeactivate).not.toHaveBeenCalled();
+    expect(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile' })).toBeChecked();
   });
 
-  it('shows disabled switch during activation', async () => {
-    mockActivateTalentRole.mockImplementation(() => new Promise(() => { })); // Simulate pending promise
+  it('confirming the dialog deactivates and flips the switch off', async () => {
+    mockDeactivate.mockResolvedValue({ success: true, isActive: false, message: 'Talent profile deactivated.' });
+    render(<TalentActivationButton initialIsActive={true} hasTalentProfile={true} />);
 
-    render(<TalentActivationButton initialRoles={[Role.USER]} />);
-    const switchControl = screen.getByRole('checkbox', { name: /Activate Talent Role/i });
-    await userEvent.click(switchControl);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Deactivate Talent Profile' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Hide Talent profile/i }));
 
-    await waitFor(() => {
-      expect(screen.getByRole('checkbox', { name: /Activate Talent Role/i })).toBeDisabled();
-    });
-  });
-
-  it('shows disabled switch during deactivation', async () => {
-    mockDeactivateTalentRole.mockImplementation(() => new Promise(() => { })); // Simulate pending promise
-
-    render(<TalentActivationButton initialRoles={[Role.USER, Role.TALENT]} />);
-    const switchControl = screen.getByRole('checkbox', { name: /Deactivate Talent Role/i });
-    await userEvent.click(switchControl); // Toggle off
-
-    await waitFor(() => {
-      expect(screen.getByRole('checkbox', { name: /Deactivate Talent Role/i })).toBeDisabled();
-    });
+    await waitFor(() => expect(mockDeactivate).toHaveBeenCalledTimes(1));
+    // findByRole retries while the dialog finishes closing (background un-hides).
+    const sw = await screen.findByRole('checkbox', { name: 'Activate Talent Profile' });
+    expect(sw).not.toBeChecked();
   });
 });

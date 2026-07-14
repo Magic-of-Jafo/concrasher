@@ -1,10 +1,9 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import PublicTalentProfile from './PublicTalentProfile';
-import InactiveTalentProfile from './components/InactiveTalentProfile';
 
 interface PublicTalentProfilePageProps {
     params: {
@@ -118,13 +117,17 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
         notFound();
     }
 
-    // If a claimed talent profile is inactive, show the inactive page.
+    // A deactivated (claimed) talent profile is hidden from fans and organizers:
+    // anyone landing here sees the person's regular member profile instead.
     // (Unclaimed profiles have no user and default to active.)
     if (!talentProfile.isActive && talentProfile.user) {
-        return <InactiveTalentProfile user={talentProfile.user} />;
+        redirect(`/u/${talentProfile.user.id}`);
     }
 
     return <PublicTalentProfile talentProfile={talentProfile} currentUserId={currentUserId} />;
 }
 
-export const revalidate = 3600; // Revalidate every hour 
+// Always render against live data: a talent who toggles their profile off must
+// disappear immediately (redirect to their member page), never linger in a
+// cached copy for up to an hour. The page already does a session + DB lookup.
+export const dynamic = 'force-dynamic'; 

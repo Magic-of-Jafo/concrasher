@@ -154,7 +154,13 @@ export default function ProfileTabs({
             label: 'Account Settings',
             render: () => (
                 <Paper sx={{ p: { xs: 0, md: 2 }, boxShadow: 'none', border: 'none' }}>
-                    <SettingsTab user={user} roleApplications={roleApplications} ownedBrands={ownedBrands} />
+                    <SettingsTab
+                        user={user}
+                        roleApplications={roleApplications}
+                        ownedBrands={ownedBrands}
+                        talentActive={talentProfileActive}
+                        hasTalent={hasTalentProfile}
+                    />
                 </Paper>
             ),
         });
@@ -173,7 +179,7 @@ export default function ProfileTabs({
         }
 
         return defs;
-    }, [user, currentImageUrl, onImageUpdate, isOrganizer, showTalentTab, hasBrandCreatorRole, isAdmin, roleApplications, ownedBrands, pendingApplications, onApplicationProcessed]);
+    }, [user, currentImageUrl, onImageUpdate, isOrganizer, showTalentTab, talentProfileActive, hasTalentProfile, hasBrandCreatorRole, isAdmin, roleApplications, ownedBrands, pendingApplications, onApplicationProcessed]);
 
     // Honor ?tab=<key> deep links (used by the header/account menu); fall back to first tab.
     const requestedTab = searchParams?.get('tab');

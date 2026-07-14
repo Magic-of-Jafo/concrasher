@@ -20,9 +20,13 @@ interface SettingsTabProps {
     };
     roleApplications: Pick<RoleApplication, 'requestedRole' | 'status'>[];
     ownedBrands: Pick<Brand, 'id' | 'name'>[];
+    /** Live talent state from the parent — authoritative across pane remounts,
+     *  so the activation toggle doesn't snap back to the page-load value. */
+    talentActive?: boolean;
+    hasTalent?: boolean;
 }
 
-const SettingsTab: React.FC<SettingsTabProps> = ({ user, roleApplications, ownedBrands }) => {
+const SettingsTab: React.FC<SettingsTabProps> = ({ user, roleApplications, ownedBrands, talentActive, hasTalent }) => {
     const isBrandCreator = roleApplications.some(app => app.requestedRole === RequestedRole.BRAND_CREATOR && app.status === ApplicationStatus.APPROVED);
 
     return (
@@ -31,8 +35,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user, roleApplications, owned
                 <Typography variant="h5" gutterBottom>Role Management</Typography>
                 <Box sx={{ my: 0 }}>
                     <TalentActivationButton
-                        initialIsActive={user.talentProfile?.isActive ?? false}
-                        hasTalentProfile={!!user.talentProfile}
+                        initialIsActive={talentActive ?? (user.talentProfile?.isActive ?? false)}
+                        hasTalentProfile={hasTalent ?? !!user.talentProfile}
                     />
                 </Box>
                 <Divider sx={{ my: 2 }} />

@@ -1,7 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Typography, Switch } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import {
+  Typography,
+  Switch,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  CircularProgress,
+} from '@mui/material';
 import { activateTalentProfile, deactivateTalentProfile } from '@/lib/actions';
 
 interface TalentActivationButtonProps {
@@ -12,27 +22,22 @@ interface TalentActivationButtonProps {
 export default function TalentActivationButton({ initialIsActive, hasTalentProfile }: TalentActivationButtonProps) {
   const [isPending, setIsPending] = useState(false);
   const [isActive, setIsActive] = useState(initialIsActive);
+  // The Settings pane can remount when the tab list changes (the Talent tab
+  // appears/disappears on toggle). Re-sync from the authoritative prop the
+  // parent feeds us so the switch reflects the live state after a remount,
+  // instead of snapping back to the page-load value.
+  useEffect(() => { setIsActive(initialIsActive); }, [initialIsActive]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Turning the profile OFF hides it from fans and organizers — confirm first.
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleToggleTalentProfile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    setIsPending(true);
-    setError(null);
-    setMessage(null);
-    const shouldBeActive = event.target.checked;
-
-    let result;
-    if (shouldBeActive && !isActive) {
-      result = await activateTalentProfile();
-    } else if (!shouldBeActive && isActive) {
-      result = await deactivateTalentProfile();
-    } else {
-      setIsPending(false);
-      return;
-    }
-
+  const applyResult = (
+    result: { success: boolean; message?: string; error?: string; isActive?: boolean } | undefined,
+    shouldBeActive: boolean,
+  ) => {
     if (result && result.success && result.isActive !== undefined) {
-      setMessage(result.message || (shouldBeActive ? "Talent profile activated!" : "Talent profile deactivated!"));
+      setMessage(result.message || (shouldBeActive ? "Talent profile activated!" : "Talent profile deactivated."));
       setIsActive(result.isActive);
       // Dispatch event to notify other components of the change
       window.dispatchEvent(new CustomEvent('talentProfileUpdated', {
@@ -44,6 +49,30 @@ export default function TalentActivationButton({ initialIsActive, hasTalentProfi
         setIsActive(result.isActive); // Sync state even on error if returned
       }
     }
+  };
+
+  const handleToggleTalentProfile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const shouldBeActive = event.target.checked;
+    setError(null);
+    setMessage(null);
+
+    if (shouldBeActive && !isActive) {
+      setIsPending(true);
+      const result = await activateTalentProfile();
+      applyResult(result, true);
+      setIsPending(false);
+    } else if (!shouldBeActive && isActive) {
+      // Don't deactivate yet — ask first. The switch is controlled by
+      // `isActive`, so it stays ON until the user confirms.
+      setConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmDeactivate = async () => {
+    setConfirmOpen(false);
+    setIsPending(true);
+    const result = await deactivateTalentProfile();
+    applyResult(result, false);
     setIsPending(false);
   };
 
@@ -68,6 +97,30 @@ export default function TalentActivationButton({ initialIsActive, hasTalentProfi
       {isPending && <Typography variant="caption" sx={{ ml: 1, display: 'block' }}>Processing...</Typography>}
       {message && <Typography color="primary" sx={{ mt: 1 }}>{message}</Typography>}
       {error && <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>}
+
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        aria-labelledby="deactivate-talent-title"
+      >
+        <DialogTitle id="deactivate-talent-title">Hide your Talent profile?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Turning this off hides your Talent profile from fans and organizers.
+            Anyone who clicks your name will see your regular member profile
+            instead. Your Talent details are kept, and you can turn it back on
+            anytime.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)} autoFocus>
+            Keep it visible
+          </Button>
+          <Button color="error" onClick={handleConfirmDeactivate} disabled={isPending}>
+            {isPending ? <CircularProgress size={20} /> : 'Hide Talent profile'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
