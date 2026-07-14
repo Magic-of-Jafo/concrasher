@@ -119,9 +119,6 @@ temp/
 *.sqlite
 *.sqlite3
 
-# Prisma
-prisma/migrations/
-
 # Docker
 .dockerignore
 
