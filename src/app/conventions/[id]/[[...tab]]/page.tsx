@@ -256,6 +256,8 @@ export default async function ConventionDetailPage({ params }: ConventionDetailP
     );
   } catch (error) {
     console.error('Error loading convention detail page:', error);
-    notFound();
+    // Preserve genuine notFound() exceptions, but do not disguise database or
+    // deployment failures as missing convention records.
+    throw error;
   }
-} 
+}

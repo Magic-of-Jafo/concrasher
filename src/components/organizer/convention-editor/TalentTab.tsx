@@ -68,10 +68,15 @@ export default function TalentTab({ conventionId }: { conventionId: string }) {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            const res = await getConventionTalentArrangement(conventionId);
-            if (cancelled) return;
-            if (res.success && res.rows) setRows(res.rows);
-            else setError(res.error || 'Could not load talent.');
+            try {
+                const res = await getConventionTalentArrangement(conventionId);
+                if (cancelled) return;
+                if (res.success && res.rows) setRows(res.rows);
+                else setError(res.error || 'Could not load talent.');
+            } catch (loadError) {
+                console.error('Could not load convention talent:', loadError);
+                if (!cancelled) setError('Could not load talent. Please refresh and try again.');
+            }
         })();
         return () => { cancelled = true; };
     }, [conventionId]);
@@ -104,13 +109,19 @@ export default function TalentTab({ conventionId }: { conventionId: string }) {
     const persist = useCallback(async (next: ConventionTalentRow[]) => {
         setSaving(true);
         setError(null);
-        const res = await saveConventionTalentArrangement(
-            conventionId,
-            next.map((r, i) => ({ linkId: r.linkId, order: i, isVisible: r.isVisible, isHeadliner: r.isHeadliner, imageUrl: r.imageUrl })),
-        );
-        setSaving(false);
-        if (res.success && res.rows) setRows(res.rows);
-        else setError(res.error || 'Could not save the arrangement.');
+        try {
+            const res = await saveConventionTalentArrangement(
+                conventionId,
+                next.map((r, i) => ({ linkId: r.linkId, order: i, isVisible: r.isVisible, isHeadliner: r.isHeadliner, imageUrl: r.imageUrl })),
+            );
+            if (res.success && res.rows) setRows(res.rows);
+            else setError(res.error || 'Could not save the arrangement.');
+        } catch (saveError) {
+            console.error('Could not save convention talent:', saveError);
+            setError('Could not save the arrangement. Please try again.');
+        } finally {
+            setSaving(false);
+        }
     }, [conventionId]);
 
     const commit = (nextHeadliners: ConventionTalentRow[], nextSupporting: ConventionTalentRow[]) => {

@@ -2939,7 +2939,12 @@ export async function getConventionTalentArrangement(conventionId: string): Prom
   if (!(await canEditConventionTalent(conventionId, session.user.id))) {
     return { success: false, error: 'Permission denied.' };
   }
-  return { success: true, rows: await loadConventionTalentRows(conventionId) };
+  try {
+    return { success: true, rows: await loadConventionTalentRows(conventionId) };
+  } catch (error) {
+    console.error('Could not load convention talent arrangement:', error);
+    return { success: false, error: 'Could not load talent. Please try again.' };
+  }
 }
 
 /**
