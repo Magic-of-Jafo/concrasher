@@ -138,31 +138,72 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
           }
         },
 
-        // Talent information — with each talent's promo photos so the listing
-        // can resolve card images, in the organizer's billing order (unarranged
-        // rows fall to the end in assignment order).
-        talent: {
-          include: {
-            talentProfile: {
-              include: {
-                media: {
-                  where: { type: 'PROMO_IMAGE' },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: [
-            { order: { sort: 'asc', nulls: 'last' } },
-            { assignedAt: 'asc' },
-          ],
-        }
       }
     });
 
-    return convention;
+    if (!convention) return null;
+
+    // Load talent separately so convention pages remain available while a
+    // deployment's database is catching up with the talent-card schema. The
+    // legacy query deliberately selects only columns that existed before the
+    // talent-tab work; Prisma otherwise selects every scalar field and a
+    // missing new column turns the entire convention page into a 404.
+    let talent;
+    try {
+      talent = await db.conventionTalent.findMany({
+        where: { conventionId: convention.id },
+        include: {
+          talentProfile: {
+            include: {
+              media: {
+                where: { type: 'PROMO_IMAGE' },
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+        },
+        orderBy: [
+          { order: { sort: 'asc', nulls: 'last' } },
+          { assignedAt: 'asc' },
+        ],
+      });
+    } catch (talentError) {
+      const code = (talentError as { code?: string })?.code;
+      const message = talentError instanceof Error ? talentError.message : String(talentError);
+      const isSchemaMismatch = code === 'P2022'
+        || /PROMO_IMAGE|invalid input value for enum|column .* does not exist/i.test(message);
+
+      if (!isSchemaMismatch) throw talentError;
+
+      console.warn('Convention talent-card schema is not deployed yet; using legacy talent data.');
+      const legacyTalent = await db.conventionTalent.findMany({
+        where: { conventionId: convention.id },
+        select: {
+          id: true,
+          conventionId: true,
+          talentProfileId: true,
+          overrideDisplayName: true,
+          overrideBio: true,
+          assignedAt: true,
+          talentProfile: {
+            include: { media: { orderBy: { order: 'asc' } } },
+          },
+        },
+        orderBy: { assignedAt: 'asc' },
+      });
+
+      talent = legacyTalent.map((row) => ({
+        ...row,
+        order: null,
+        isVisible: true,
+        isHeadliner: false,
+        imageUrl: null,
+      }));
+    }
+
+    return { ...convention, talent };
   } catch (error) {
     console.error('Error loading convention details:', error);
     throw error;
   }
-} 
+}
