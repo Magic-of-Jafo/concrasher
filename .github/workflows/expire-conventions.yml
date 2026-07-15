@@ -1,0 +1,28 @@
+name: Expire past conventions
+
+# Daily sweep that flips finished PUBLISHED conventions to PAST on the live
+# site. GitHub's scheduler just curls the production cron endpoint; the
+# endpoint itself (src/app/api/cron/expire-conventions) does the work and is
+# gated by the CRON_SECRET repo secret, which must match the Render env var.
+#
+# Local dev is NOT covered by this workflow (it only targets production).
+# To sweep a local database while testing, run: npm run expire:local
+
+on:
+  schedule:
+    # 09:17 UTC daily (~4-5am US Eastern). Odd minute on purpose: GitHub
+    # delays on-the-hour schedules when runners are busy.
+    - cron: '17 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  expire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call expire endpoint
+        run: |
+          curl --fail-with-body -sS --max-time 120 --retry 3 --retry-delay 30 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://convention-crasher.onrender.com/api/cron/expire-conventions"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

@@ -23,6 +23,7 @@
     "prisma:generate": "prisma generate",
     "db:seed-lookups": "dotenv -e .env.local -- tsx prisma/seed-lookups.ts",
     "db:seed-timezones": "dotenv -e .env.local -- tsx prisma/seed-timezones.ts",
+    "expire:local": "dotenv -e .env.local -- node -e \"fetch(`http://localhost:3000/api/cron/expire-conventions?secret=${process.env.CRON_SECRET}`).then(r=>r.json()).then(j=>console.log(j)).catch(e=>{console.error('Is the dev server running?',e.message);process.exit(1)})\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
