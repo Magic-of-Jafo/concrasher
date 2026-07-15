@@ -151,5 +151,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         sameLocation: result!.sameLocation,
         venue: result!.venue,
         hotels: result!.hotels,
+        // Locale inferred from the venue's address; the client applies these to
+        // the convention's Settings fill-only (never overwriting a choice).
+        timezone: result!.timezone,
+        currency: result!.currency,
     });
 }

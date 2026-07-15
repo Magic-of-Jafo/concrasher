@@ -242,6 +242,9 @@ export default function ConventionActions({ convention, onConventionUpdated = ()
         size="small"
         onClick={handleMenuOpen}
         aria-label="convention actions"
+        // MUI's default action.active is near-invisible on the slate panel;
+        // use the theme ink ramp like the grid's own header icons.
+        sx={{ color: 'var(--cc-muted)', '&:hover': { color: 'var(--cc-ink)' } }}
       >
         <MoreIcon />
       </IconButton>

@@ -449,6 +449,17 @@ const ConventionEditorTabs: React.FC<ConventionEditorTabsProps> = ({
           onChange={handleVenueHotelDataChange}
           onValidationChange={handleVenueHotelValidationChange}
           disabled={isSaveDisabled}
+          settingsFilled={{ timezone: !!settingsData.timezone, currency: !!settingsData.currency }}
+          onLocaleApplied={({ timezoneSetId, currencySet }) => {
+            // The helper reports only fields it actually persisted (blank ones,
+            // or ones the organizer opted to replace); mirror them into the
+            // Settings tab state so it shows current values without a reload.
+            setSettingsData((prev) => ({
+              ...prev,
+              ...(timezoneSetId ? { timezone: timezoneSetId } : {}),
+              ...(currencySet ? { currency: currencySet } : {}),
+            }));
+          }}
         />
       </TabPanel>
 

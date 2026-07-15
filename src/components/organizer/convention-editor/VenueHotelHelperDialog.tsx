@@ -4,15 +4,20 @@ import React, { useState, useRef } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography,
     CircularProgress, Alert, ToggleButtonGroup, ToggleButton, Paper, Divider, Chip, Link,
-    Select, MenuItem, FormControl, InputLabel,
+    Select, MenuItem, FormControl, InputLabel, FormControlLabel, Checkbox,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LinkIcon from '@mui/icons-material/Link';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ImageIcon from '@mui/icons-material/Image';
 import { usePasteImage } from '@/hooks/usePasteImage';
+import { applyDetectedConventionLocale } from '@/lib/actions';
 
 type SourceType = 'url' | 'pdf' | 'image';
+
+// Timezone + currency the helper inferred from the venue's address. Applied
+// fill-only to the convention's Settings when the organizer clicks Use.
+export interface DetectedLocale { timezone: string | null; currency: string | null; }
 
 export interface ScrapedPlaceResult {
     name: string | null;
@@ -115,18 +120,27 @@ function buildAssignments(
 }
 
 export default function VenueHotelHelperDialog({
-    open, onClose, conventionId, onApplied, initialUrl, hasPrimaryVenue = false, hasPrimaryHotel = false,
+    open, onClose, conventionId, onApplied, onLocaleApplied, initialUrl, hasPrimaryVenue = false, hasPrimaryHotel = false, settingsFilled,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
     onApplied: (assignment: VenueHotelAssignment) => void;
+    /** Called after the detected timezone/currency were filled into Settings,
+     *  so the host can refresh any in-memory settings state. timezoneSet is the
+     *  IANA id (for display); timezoneSetId is the Timezone row id the Settings
+     *  tab state stores. */
+    onLocaleApplied?: (applied: { timezoneSet?: string; timezoneSetId?: string; currencySet?: string }) => void;
     /** Pre-fill the URL field (e.g. a page the wizard discovered). */
     initialUrl?: string;
     /** Whether the tab already has a primary venue / primary hotel — drives the
      *  conservative default role for scraped places. */
     hasPrimaryVenue?: boolean;
     hasPrimaryHotel?: boolean;
+    /** Whether the convention's Settings already hold a timezone / currency.
+     *  Blank fields fill automatically; filled ones only change if the
+     *  organizer ticks the replace checkbox in the preview. */
+    settingsFilled?: { timezone: boolean; currency: boolean };
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
     const [url, setUrl] = useState(initialUrl || '');
@@ -135,6 +149,8 @@ export default function VenueHotelHelperDialog({
     const [error, setError] = useState<string | null>(null);
     const [source, setSource] = useState<string | null>(null);
     const [assignments, setAssignments] = useState<AssignedPlace[] | null>(null);
+    const [locale, setLocale] = useState<DetectedLocale | null>(null);
+    const [replaceLocale, setReplaceLocale] = useState(false);
     const [stageIdx, setStageIdx] = useState(0);
     const abortRef = useRef<AbortController | null>(null);
     const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -142,7 +158,7 @@ export default function VenueHotelHelperDialog({
     usePasteImage(setFile, { enabled: open && sourceType === 'image' });
 
     const stopStages = () => { if (stageTimerRef.current) { clearInterval(stageTimerRef.current); stageTimerRef.current = null; } };
-    const reset = () => { setAssignments(null); setSource(null); setError(null); setFile(null); };
+    const reset = () => { setAssignments(null); setSource(null); setError(null); setFile(null); setLocale(null); setReplaceLocale(false); };
     const close = () => {
         abortRef.current?.abort();
         abortRef.current = null;
@@ -188,6 +204,7 @@ export default function VenueHotelHelperDialog({
             else if (!data.venue && !hotels.length) setError('No venue or hotel details were found. Try the venue/travel page, a PDF, or an image.');
             else {
                 setSource(data.source);
+                setLocale({ timezone: data.timezone || null, currency: data.currency || null });
                 setAssignments(buildAssignments(
                     { sameLocation: data.sameLocation, venue: data.venue, hotels },
                     hasPrimaryVenue,
@@ -204,6 +221,12 @@ export default function VenueHotelHelperDialog({
     };
 
     const usableCount = (assignments ?? []).filter((a) => a.role !== 'skip').length;
+    // The locale (timezone/currency) is applyable on its own: automatically
+    // when the matching Settings field is blank, or via the replace checkbox.
+    const localeActionable = !!(locale && (
+        (locale.timezone && (!settingsFilled?.timezone || replaceLocale)) ||
+        (locale.currency && (!settingsFilled?.currency || replaceLocale))
+    ));
 
     return (
         <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
@@ -293,6 +316,28 @@ export default function VenueHotelHelperDialog({
                             </Paper>
                         ))}
 
+                        {(locale?.timezone || locale?.currency) && (() => {
+                            const anyFilled = !!((settingsFilled?.timezone && locale.timezone) || (settingsFilled?.currency && locale.currency));
+                            return (
+                                <Box sx={{ mb: 0.5 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        From the venue&apos;s address: {[locale.timezone, locale.currency].filter(Boolean).join(' · ')}.
+                                        {anyFilled ? '' : ' Blank Settings fields fill in automatically.'}
+                                    </Typography>
+                                    {anyFilled && (
+                                        <FormControlLabel
+                                            sx={{ mt: 0.5 }}
+                                            control={<Checkbox size="small" checked={replaceLocale} onChange={(e) => setReplaceLocale(e.target.checked)} />}
+                                            label={
+                                                <Typography variant="body2">
+                                                    Update the Settings tab&apos;s timezone/currency to match the venue
+                                                </Typography>
+                                            }
+                                        />
+                                    )}
+                                </Box>
+                            );
+                        })()}
                         {source && <Typography variant="caption" color="text.secondary">Source: {source}</Typography>}
 
                         <Divider sx={{ my: 1 }} />
@@ -310,11 +355,31 @@ export default function VenueHotelHelperDialog({
                     </Button>
                 ) : (
                     <Button
-                        onClick={() => { onApplied({ places: assignments }); close(); }}
+                        onClick={() => {
+                            if (usableCount > 0) onApplied({ places: assignments });
+                            // Fill Settings (timezone/currency) from the detected
+                            // locale, fill-only server-side. Fire-and-forget: a
+                            // failure here must not block applying the places.
+                            const loc = locale;
+                            if (loc && (loc.timezone || loc.currency)) {
+                                applyDetectedConventionLocale(conventionId, loc, replaceLocale ? { timezone: true, currency: true } : undefined)
+                                    .then((r) => {
+                                        if (r.success && (r.timezoneSet || r.currencySet)) {
+                                            onLocaleApplied?.({ timezoneSet: r.timezoneSet, timezoneSetId: r.timezoneSetId, currencySet: r.currencySet });
+                                        }
+                                    })
+                                    .catch(() => { /* fill-only nicety; ignore */ });
+                            }
+                            close();
+                        }}
                         variant="contained"
-                        disabled={usableCount === 0}
+                        disabled={usableCount === 0 && !localeActionable}
                     >
-                        {usableCount === 0 ? 'Nothing selected' : `Use ${usableCount} ${usableCount === 1 ? 'place' : 'places'}`}
+                        {usableCount > 0
+                            ? `Use ${usableCount} ${usableCount === 1 ? 'place' : 'places'}`
+                            : localeActionable
+                                ? 'Update timezone & currency'
+                                : 'Nothing selected'}
                     </Button>
                 )}
             </DialogActions>

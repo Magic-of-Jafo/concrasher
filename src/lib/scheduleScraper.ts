@@ -908,6 +908,10 @@ export interface ScrapedVenueHotel {
     sameLocation: boolean | null; // do attendees stay where the events happen?
     venue: ScrapedPlace | null;
     hotels: ScrapedPlace[];       // lodging hotels separate from the venue — host/primary first, then overflow
+    // Locale inferred from the venue's address, used to pre-fill the
+    // convention's Settings (fill-only; never overwrites organizer choices).
+    timezone: string | null;      // IANA id, e.g. "America/New_York"
+    currency: string | null;      // ISO 4217 code, e.g. "USD"
 }
 
 /** Build a universal, always-clickable Google Maps search link from a place's
@@ -926,7 +930,7 @@ function venueHotelSystemPrompt(): string {
 A convention has a VENUE where events take place, and lodging where attendees stay. VERY OFTEN the convention is held AT a hotel and attendees stay in that same hotel (sameLocation true). Sometimes events are at a separate venue and attendees stay at a different host hotel (sameLocation false).
 
 Respond ONLY as JSON with exactly these keys:
-{"sameLocation":true,"venue":{place},"hotels":[]}
+{"sameLocation":true,"venue":{place},"hotels":[],"timezone":"America/New_York","currency":"USD"}
 
 A {place} object has exactly these keys:
 {"name":"...","websiteUrl":"...","googleMapsUrl":"...","streetAddress":"...","city":"...","stateRegion":"...","postalCode":"...","country":"...","contactEmail":"...","contactPhone":"...","description":"...","amenities":["..."],"parkingInfo":"...","publicTransportInfo":"...","groupPrice":"...","groupRateOrBookingCode":"...","bookingLink":"...","bookingCutoffDate":"YYYY-MM-DD"}
@@ -939,6 +943,8 @@ Rules:
 - Booking fields (on whichever place is the lodging): "groupPrice" = nightly rate as written (e.g. "$129/night"); "groupRateOrBookingCode" = the code/phrase to mention for the convention rate (e.g. "MAGIC26"); "bookingLink" = the direct booking URL; "bookingCutoffDate" = last day to book at that rate (YYYY-MM-DD).
 - "googleMapsUrl": only if an explicit Google Maps link is present in the source; otherwise null (we build one from the address).
 - "amenities": a short list if stated, else [].
+- "timezone": the IANA timezone id for the venue's location, inferred from its city/state/country. Use the region's MAJOR id ("America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London"), not a niche one like "America/Indiana/Indianapolis". null only if the location is genuinely unknown.
+- "currency": the ISO 4217 code of the local currency at the venue's location, inferred from its country (e.g. "USD", "GBP", "EUR", "CAD", "AUD"). null only if the location is genuinely unknown.
 - If the source is in another language, translate descriptions/amenities into natural English; keep proper names, addresses, and codes. Use null or "" for anything not present. Do not invent details.`;
 }
 
@@ -980,9 +986,22 @@ function shapePlace(p: any): ScrapedPlace | null {
     return place;
 }
 
+/** Keep the model's timezone only if the JS runtime recognizes it as a real
+ *  IANA id — a hallucinated id would otherwise break date math downstream. */
+function shapeTimezone(v: any): string | null {
+    const s = v && String(v).trim();
+    if (!s || !/^[A-Za-z_]+\/[A-Za-z0-9_+\-/]+$/.test(s)) return null;
+    try { new Intl.DateTimeFormat('en-US', { timeZone: s }); return s; } catch { return null; }
+}
+
+function shapeCurrency(v: any): string | null {
+    const s = v && String(v).trim().toUpperCase();
+    return s && /^[A-Z]{3}$/.test(s) ? s : null;
+}
+
 function shapeVenueHotel(content: string): ScrapedVenueHotel {
     let p: any = {};
-    try { p = JSON.parse(content); } catch { return { sameLocation: null, venue: null, hotels: [] }; }
+    try { p = JSON.parse(content); } catch { return { sameLocation: null, venue: null, hotels: [], timezone: null, currency: null }; }
     const venue = shapePlace(p.venue);
     // Accept "hotels" (array) or a legacy single "hotel".
     const rawHotels = Array.isArray(p.hotels) ? p.hotels : (p.hotel ? [p.hotel] : []);
@@ -991,7 +1010,7 @@ function shapeVenueHotel(content: string): ScrapedVenueHotel {
         p.sameLocation === true ? true : p.sameLocation === false ? false : null;
     // If the model said "separate hotel" but listed none, treat as same-location.
     if (sameLocation === false && hotels.length === 0) sameLocation = true;
-    return { sameLocation, venue, hotels };
+    return { sameLocation, venue, hotels, timezone: shapeTimezone(p.timezone), currency: shapeCurrency(p.currency) };
 }
 
 export async function extractVenueHotelFromText(
@@ -999,7 +1018,7 @@ export async function extractVenueHotelFromText(
     ctx: { apiKey: string; model: string },
 ): Promise<ScrapedVenueHotel> {
     const trimmed = (text || '').slice(0, MAX_TEXT_CHARS).trim();
-    if (!trimmed) return { sameLocation: null, venue: null, hotels: [] };
+    if (!trimmed) return { sameLocation: null, venue: null, hotels: [], timezone: null, currency: null };
     const content = await callOpenAI(ctx.apiKey, ctx.model, [
         { role: 'system', content: venueHotelSystemPrompt() },
         { role: 'user', content: `Source text:\n${trimmed}` },
@@ -1011,7 +1030,7 @@ export async function extractVenueHotelFromImages(
     images: string[],
     ctx: { apiKey: string; model: string },
 ): Promise<ScrapedVenueHotel> {
-    if (!images.length) return { sameLocation: null, venue: null, hotels: [] };
+    if (!images.length) return { sameLocation: null, venue: null, hotels: [], timezone: null, currency: null };
     const userParts: any[] = [
         { type: 'text', text: 'The venue / hotel details are in the following image(s). Read them and return the JSON.' },
         ...images.map((url) => ({ type: 'image_url', image_url: { url } })),

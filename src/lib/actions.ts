@@ -2201,6 +2201,95 @@ export async function updateConventionSettings(
   }
 }
 
+/**
+ * Fill the convention's timezone and currency Settings from a locale the
+ * venue helper inferred from the venue's address. Strictly fill-only: a value
+ * the organizer (or a previous run) already set is never overwritten, so this
+ * is safe to call on every helper apply.
+ *
+ * Returns what was actually set so the UI can tell the organizer.
+ */
+export async function applyDetectedConventionLocale(
+  conventionId: string,
+  locale: { timezone?: string | null; currency?: string | null },
+  // Per-field organizer opt-in to replace a value that is already set (the
+  // helper dialog shows a checkbox when Settings aren't blank). Without it,
+  // existing values are never touched.
+  overwrite?: { timezone?: boolean; currency?: boolean }
+): Promise<{ success: boolean; error?: string; timezoneSet?: string; timezoneSetId?: string; currencySet?: string }> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  try {
+    const convention = await db.convention.findUnique({
+      where: { id: conventionId },
+      select: { id: true, timezoneId: true, series: { select: { organizerUserId: true } } },
+    });
+    if (!convention) return { success: false, error: "Convention not found." };
+
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
+    const isOrganizer = convention.series?.organizerUserId === session.user.id;
+    const isAdmin = user?.roles.includes(Role.ADMIN) ?? false;
+    if (!isOrganizer && !isAdmin) {
+      return { success: false, error: "You are not authorized to update this convention." };
+    }
+
+    const result: { success: boolean; timezoneSet?: string; timezoneSetId?: string; currencySet?: string } = { success: true };
+
+    // Timezone: resolve the IANA id against the seeded Timezone table (same
+    // matching the enrichment agent uses). Set when currently unset, or when
+    // the organizer explicitly opted to replace the existing value.
+    const iana = (locale.timezone || "").trim();
+    if (iana && (!convention.timezoneId || overwrite?.timezone)) {
+      const tz = await db.timezone.findFirst({
+        where: { OR: [{ ianaId: iana }, { utcAliases: { has: iana } }] },
+        select: { id: true, ianaId: true },
+      });
+      if (tz && tz.id !== convention.timezoneId) {
+        await db.convention.update({
+          where: { id: conventionId },
+          data: { timezoneId: tz.id, updatedAt: new Date() },
+        });
+        result.timezoneSet = tz.ianaId;
+        result.timezoneSetId = tz.id;
+      }
+    }
+
+    // Currency: validate against the Currency table. Set when the convention
+    // has no currency setting yet, or when the organizer opted to replace it.
+    const code = (locale.currency || "").trim().toUpperCase();
+    if (code) {
+      const existing = await db.conventionSetting.findUnique({
+        where: { conventionId_key: { conventionId, key: "currency" } },
+        select: { value: true },
+      });
+      if ((!existing?.value || overwrite?.currency) && existing?.value !== code) {
+        const currencyRecord = await db.currency.findUnique({ where: { code } });
+        if (currencyRecord) {
+          await db.conventionSetting.upsert({
+            where: { conventionId_key: { conventionId, key: "currency" } },
+            update: { value: code, currencyId: currencyRecord.id, updatedAt: new Date() },
+            create: { conventionId, key: "currency", value: code, currencyId: currencyRecord.id },
+          });
+          result.currencySet = code;
+        }
+      }
+    }
+
+    if (result.timezoneSet || result.currencySet) {
+      revalidatePath(`/organizer/conventions/${conventionId}/edit`);
+    }
+    return result;
+  } catch (error) {
+    console.error("[applyDetectedConventionLocale] Error:", error);
+    return { success: false, error: "Could not apply the detected locale." };
+  }
+}
+
 export async function getConventionSettings(
   conventionId: string
 ): Promise<ConventionSettingData | null> {

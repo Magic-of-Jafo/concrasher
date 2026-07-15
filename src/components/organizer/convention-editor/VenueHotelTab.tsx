@@ -28,9 +28,14 @@ interface VenueHotelTabProps {
   onValidationChange: (isValid: boolean) => void;
   disabled?: boolean;
   schema?: typeof VenueHotelTabSchema;
+  /** Forwarded to the helper dialog: fires when the detected timezone/currency
+   *  were filled into the convention's Settings. */
+  onLocaleApplied?: (applied: { timezoneSet?: string; timezoneSetId?: string; currencySet?: string }) => void;
+  /** Forwarded to the helper dialog: whether Settings already hold values. */
+  settingsFilled?: { timezone: boolean; currency: boolean };
 }
 
-const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema }) => {
+const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onChange, onValidationChange, disabled, schema = VenueHotelTabSchema, onLocaleApplied, settingsFilled }) => {
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>(false);
   const [zodErrors, setZodErrors] = useState<z.ZodIssue[] | null>(null);
   const [venueToDelete, setVenueToDelete] = useState<{ originalIndex: number, displayIndex: number } | null>(null);
@@ -488,6 +493,8 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
           onClose={() => setHelperOpen(false)}
           conventionId={conventionId}
           onApplied={applyVenueHotel}
+          onLocaleApplied={onLocaleApplied}
+          settingsFilled={settingsFilled}
           hasPrimaryVenue={!!(primaryVenue?.venueName || '').trim()}
           hasPrimaryHotel={(value.hotels || []).some(h => h.isPrimaryHotel && (h.hotelName || '').trim())}
         />
