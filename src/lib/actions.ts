@@ -2968,7 +2968,12 @@ export async function saveConventionTalentArrangement(
     select: {
       id: true,
       talentProfile: {
-        select: { media: { where: { type: 'PROMO_IMAGE' }, select: { url: true } } },
+        select: {
+          id: true,
+          userId: true,
+          profilePictureUrl: true,
+          media: { where: { type: 'PROMO_IMAGE' }, select: { url: true } },
+        },
       },
     },
   });
@@ -2987,6 +2992,25 @@ export async function saveConventionTalentArrangement(
       where: { id: item.linkId },
       data: { order: item.order, isVisible: item.isVisible, isHeadliner: item.isHeadliner, imageUrl },
     });
+
+    // Streamlining rule (2026-07-14): the FIRST organizer to upload an image
+    // for an UNCLAIMED, picture-less talent also seeds it as that profile's
+    // picture, so the next organizer (and the public profile page) get an
+    // image for free. Strictly first-wins and unclaimed-only: never touches a
+    // claimed profile, and never overwrites an existing picture — once the
+    // person claims the profile, the photo is entirely theirs to change.
+    if (
+      imageUrl &&
+      promoUrls.length === 0 &&
+      link.talentProfile.userId === null &&
+      !link.talentProfile.profilePictureUrl
+    ) {
+      await db.talentProfile.update({
+        where: { id: link.talentProfile.id },
+        data: { profilePictureUrl: imageUrl },
+      });
+      revalidatePath(`/t/${link.talentProfile.id}`);
+    }
   }
 
   revalidatePath(`/conventions/${conventionId}`);

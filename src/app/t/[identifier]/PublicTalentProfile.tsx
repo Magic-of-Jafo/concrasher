@@ -61,6 +61,7 @@ interface TalentProfileData {
         convention: {
             id: string;
             name: string;
+            slug?: string | null;
             startDate: Date | null;
             endDate: Date | null;
             city: string | null;
@@ -69,6 +70,8 @@ interface TalentProfileData {
         };
     }>;
 }
+
+type AppearanceRow = TalentProfileData['conventions'][number];
 
 interface PublicTalentProfileProps {
     talentProfile: TalentProfileData;
@@ -129,6 +132,23 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
     const bookingRef = React.useRef<HTMLDivElement>(null);
     // Promo photos serve convention talent cards, not the profile gallery.
     const galleryMedia = talentProfile.media.filter((m) => m.type !== 'PROMO_IMAGE');
+
+    // The ConventionTalent links are this person's permanent appearance record.
+    // Split into upcoming (still selling) and past (the credits list). A
+    // convention counts as upcoming until its last day has ended.
+    const todayUtc = (() => { const n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()); })();
+    const lastDayUtc = (a: AppearanceRow) => {
+        const end = a.convention.endDate ?? a.convention.startDate;
+        if (!end) return Number.MAX_SAFE_INTEGER; // dateless = treat as upcoming
+        const d = new Date(end);
+        return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    };
+    const upcomingAppearances = talentProfile.conventions.filter((a) => lastDayUtc(a) >= todayUtc);
+    const pastAppearances = talentProfile.conventions
+        .filter((a) => lastDayUtc(a) < todayUtc)
+        .sort((a, b) => lastDayUtc(b) - lastDayUtc(a)); // most recent first
+    const appearanceYear = (a: AppearanceRow) =>
+        a.convention.startDate ? new Date(a.convention.startDate).getUTCFullYear() : null;
 
     const scrollToBooking = () => {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -336,9 +356,9 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                         {/* Upcoming appearances — the proof they work. */}
                         <Box sx={cardSx}>
                             <Typography component="h2" sx={cardTitleSx}>Upcoming Appearances</Typography>
-                            {talentProfile.conventions.length > 0 ? (
+                            {upcomingAppearances.length > 0 ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                    {talentProfile.conventions.map((booking, i) => (
+                                    {upcomingAppearances.map((booking, i) => (
                                         <Box
                                             key={booking.id}
                                             sx={{
@@ -367,7 +387,7 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                                                 </Box>
                                             </Box>
                                             <Link
-                                                href={`/conventions/${booking.convention.id}`}
+                                                href={`/conventions/${booking.convention.slug || booking.convention.id}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 sx={{ color: 'var(--cc-cyan)', textDecoration: 'none', fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
@@ -399,6 +419,62 @@ const PublicTalentProfile: React.FC<PublicTalentProfileProps> = ({ talentProfile
                                 </Typography>
                             )}
                         </Box>
+
+                        {/* Past appearances — the permanent credits list. Every
+                            convention this person was featured at stays on the
+                            record; grouped by year, most recent first. Hidden
+                            until there's history to show. */}
+                        {pastAppearances.length > 0 && (
+                            <Box sx={cardSx}>
+                                <Typography component="h2" sx={cardTitleSx}>Past Appearances</Typography>
+                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                    {pastAppearances.map((booking, i) => {
+                                        const year = appearanceYear(booking);
+                                        const prevYear = i > 0 ? appearanceYear(pastAppearances[i - 1]) : null;
+                                        const showYear = year !== null && year !== prevYear;
+                                        return (
+                                            <React.Fragment key={booking.id}>
+                                                {showYear && (
+                                                    <Typography
+                                                        component="h3"
+                                                        sx={{
+                                                            fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.78rem',
+                                                            letterSpacing: '0.12em', color: 'var(--cc-soft)',
+                                                            mt: i === 0 ? 0 : 1.5, mb: 0.25,
+                                                        }}
+                                                    >
+                                                        {year}
+                                                    </Typography>
+                                                )}
+                                                <Box
+                                                    sx={{
+                                                        py: 1.25,
+                                                        borderTop: showYear ? 'none' : '1px solid var(--cc-hairline)',
+                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+                                                    }}
+                                                >
+                                                    <Box sx={{ minWidth: 0 }}>
+                                                        <Link
+                                                            href={`/conventions/${booking.convention.slug || booking.convention.id}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            sx={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.92rem', color: 'var(--cc-ink)', textDecoration: 'none', '&:hover': { color: 'var(--cc-cyan)', textDecoration: 'underline' } }}
+                                                        >
+                                                            {booking.convention.name}
+                                                        </Link>
+                                                        <Typography suppressHydrationWarning sx={{ fontFamily: BODY, fontSize: '0.78rem', color: 'var(--cc-muted)', mt: 0.25 }}>
+                                                            {formatDateRange(booking.convention.startDate, booking.convention.endDate)}
+                                                            {' · '}
+                                                            {formatLocation(booking.convention.city, booking.convention.country)}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </Box>
+                            </Box>
+                        )}
                     </Box>
 
                     {/* -------- Rail -------- */}

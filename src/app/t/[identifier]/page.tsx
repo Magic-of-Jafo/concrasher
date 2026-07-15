@@ -82,12 +82,18 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
                     order: 'asc',
                 },
             },
+            // ALL published appearances — the ConventionTalent link is the
+            // permanent record of where this person has performed. The
+            // component splits them into upcoming vs. past for display.
+            // isVisible mirrors the convention's own talent tab: a card the
+            // organizer hid doesn't count as a public appearance.
             conventions: {
                 include: {
                     convention: {
                         select: {
                             id: true,
                             name: true,
+                            slug: true,
                             startDate: true,
                             endDate: true,
                             city: true,
@@ -97,11 +103,13 @@ export default async function PublicTalentProfilePage({ params }: PublicTalentPr
                     },
                 },
                 where: {
+                    isVisible: true,
                     convention: {
-                        status: 'PUBLISHED',
-                        startDate: {
-                            gte: new Date(), // Only future conventions
-                        },
+                        // PUBLISHED covers live listings; PAST is what organizers
+                        // flip wrapped conventions to — both are real appearances.
+                        status: { in: ['PUBLISHED', 'PAST'] },
+                        deletedAt: null,
+                        startDate: { not: null },
                     },
                 },
                 orderBy: {
