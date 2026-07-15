@@ -19,7 +19,7 @@ import PrimaryVenueForm from './PrimaryVenueForm';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import VenueHotelHelperDialog, { type VenueHotelResult, type ScrapedPlaceResult } from './VenueHotelHelperDialog';
+import VenueHotelHelperDialog, { type VenueHotelAssignment, type ScrapedPlaceResult } from './VenueHotelHelperDialog';
 
 interface VenueHotelTabProps {
   conventionId: string | null;
@@ -212,12 +212,13 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue, hotels });
   };
 
-  // Apply a scraped venue/hotel result from the helper. ADDITIVE: it only fills
-  // fields that are currently empty, so the organizer can run it once from a link
-  // and again from a screenshot (e.g. for the nightly rate) without losing what
-  // an earlier pass already captured. The stay-at-venue toggle only changes on a
-  // definitive read; an ambiguous result leaves the existing setting alone.
-  const applyVenueHotel = useCallback((r: VenueHotelResult) => {
+  // Apply the helper's assignments. STRICTLY ADDITIVE: each scraped place goes
+  // into the role the organizer picked, filling only empty fields; nothing that
+  // already exists on the tab is removed, replaced, or reordered, and the
+  // stay-at-venue toggle is never auto-changed. This is what lets an organizer
+  // scrape a second page of hotels and just tag them "secondary hotel" without
+  // disturbing the good data already in place.
+  const applyVenueHotel = useCallback((a: VenueHotelAssignment) => {
     const fill = (cur: any, val: any) => (cur != null && cur !== '' ? cur : val); // keep existing
     const mergeInto = (base: any, p: ScrapedPlaceResult, nameKey: 'venueName' | 'hotelName') => {
       const out: any = { ...base };
@@ -232,47 +233,38 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
       if (!base.bookingCutoffDate && p.bookingCutoffDate) out.bookingCutoffDate = new Date(p.bookingCutoffDate);
       return out;
     };
+    const mergeVenueInto = (base: VenueData, p: ScrapedPlaceResult, isPrimary: boolean) =>
+      ({ ...mergeInto(base, p, 'venueName'), isPrimaryVenue: isPrimary } as VenueData);
     const mergeHotelInto = (base: HotelData, p: ScrapedPlaceResult, isPrimary: boolean) =>
       ({ ...mergeInto(base, p, 'hotelName'), isPrimaryHotel: isPrimary } as HotelData);
+    const nameKey = (s: string | null | undefined) => (s || '').trim().toLowerCase();
 
-    const newPrimaryVenue = r.venue ? mergeInto(primaryVenue, r.venue, 'venueName') : primaryVenue;
+    let newPrimaryVenue = primaryVenue;
+    const newSecondaryVenues = [...secondaryVenues];
+    const hotels = [...(value.hotels || [])];
 
-    const scraped = r.hotels || [];
-    let guests = value.guestsStayAtPrimaryVenue;
-    let hotels = [...(value.hotels || [])];
-
-    // Split scraped hotels into the primary host hotel vs additional/overflow.
-    let primaryScraped: ScrapedPlaceResult | null = null;
-    let additional: ScrapedPlaceResult[] = scraped;
-    if (r.sameLocation === true) {
-      guests = true;
-      hotels = hotels.filter(h => !h.isPrimaryHotel); // venue is the lodging; scraped hotels are overflow
-    } else if (r.sameLocation === false) {
-      guests = false;
-      primaryScraped = scraped[0] || null;
-      additional = scraped.slice(1);
-    } else if (scraped.length && !hotels.some(h => h.isPrimaryHotel)) {
-      // Ambiguous read, no primary set yet — make the first scraped hotel primary.
-      primaryScraped = scraped[0];
-      additional = scraped.slice(1);
+    for (const { place, role } of a.places) {
+      if (role === 'skip') continue;
+      if (role === 'primaryVenue') {
+        newPrimaryVenue = mergeVenueInto(newPrimaryVenue, place, true);
+      } else if (role === 'secondaryVenue') {
+        const n = nameKey(place.name);
+        const idx = n ? newSecondaryVenues.findIndex(v => nameKey(v.venueName) === n) : -1;
+        if (idx >= 0) newSecondaryVenues[idx] = mergeVenueInto(newSecondaryVenues[idx], place, false);
+        else newSecondaryVenues.push(mergeVenueInto(createDefaultVenue(false), place, false));
+      } else if (role === 'primaryHotel') {
+        const idx = hotels.findIndex(h => h.isPrimaryHotel);
+        if (idx >= 0) hotels[idx] = mergeHotelInto(hotels[idx], place, true);
+        else hotels.unshift(mergeHotelInto(createDefaultHotel(true), place, true));
+      } else if (role === 'secondaryHotel') {
+        const n = nameKey(place.name);
+        const idx = n ? hotels.findIndex(h => !h.isPrimaryHotel && nameKey(h.hotelName) === n) : -1;
+        if (idx >= 0) hotels[idx] = mergeHotelInto(hotels[idx], place, false);
+        else hotels.push(mergeHotelInto(createDefaultHotel(false), place, false));
+      }
     }
 
-    if (primaryScraped) {
-      const idx = hotels.findIndex(h => h.isPrimaryHotel);
-      const base = idx >= 0 ? hotels[idx] : createDefaultHotel(true);
-      const merged = mergeHotelInto(base, primaryScraped, true);
-      if (idx >= 0) hotels[idx] = merged; else hotels.unshift(merged);
-    }
-
-    // Add/merge additional hotels, deduped by name so re-runs don't duplicate them.
-    for (const p of additional) {
-      const name = (p.name || '').trim().toLowerCase();
-      const exIdx = name ? hotels.findIndex(h => !h.isPrimaryHotel && (h.hotelName || '').trim().toLowerCase() === name) : -1;
-      if (exIdx >= 0) hotels[exIdx] = mergeHotelInto(hotels[exIdx], p, false);
-      else hotels.push(mergeHotelInto(createDefaultHotel(false), p, false));
-    }
-
-    validateAndNotify({ ...value, primaryVenue: newPrimaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: guests, hotels });
+    validateAndNotify({ ...value, primaryVenue: newPrimaryVenue, secondaryVenues: newSecondaryVenues, hotels });
     setExpandedAccordion('primaryVenue');
   }, [value, primaryVenue, secondaryVenues, validateAndNotify]);
 
@@ -409,13 +401,21 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
             {/* Additional Hotels Section */}
             {additionalHotels.map((hotel, index) => {
-              const actualIndex = hotels.findIndex(h => h.id === hotel.id);
+              // Identify the row by object reference, not id: freshly-scraped
+              // (unsaved) hotels all share id === undefined, so an id-based
+              // findIndex collides them onto one slot and photo/field edits
+              // land on the wrong hotel. filter() preserves references, so
+              // indexOf is exact for saved and unsaved hotels alike.
+              const actualIndex = hotels.indexOf(hotel);
               return (
-                <Accordion key={hotel.id || `hotel-${index}`} defaultExpanded={false}>
+                <Accordion key={hotel.id || hotel.tempId || `hotel-${index}`} defaultExpanded={false}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                      <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
-                        Additional Hotel {index + 1}
+                      {/* Show the hotel's actual name so the organizer always
+                          knows which hotel this row edits; a bare positional
+                          label invites typing one hotel's info into another. */}
+                      <Typography sx={{ fontWeight: 'medium', mr: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {(hotel.hotelName || '').trim() || `Additional Hotel ${index + 1}`}
                       </Typography>
                       <FormControlLabel
                         control={
@@ -488,6 +488,8 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
           onClose={() => setHelperOpen(false)}
           conventionId={conventionId}
           onApplied={applyVenueHotel}
+          hasPrimaryVenue={!!(primaryVenue?.venueName || '').trim()}
+          hasPrimaryHotel={(value.hotels || []).some(h => h.isPrimaryHotel && (h.hotelName || '').trim())}
         />
       )}
 

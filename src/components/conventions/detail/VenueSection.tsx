@@ -5,6 +5,7 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import MapIcon from '@mui/icons-material/Map';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { toAbsoluteUrl } from '@/lib/url';
 import { DISPLAY, BODY } from '@/lib/fonts';
 
 // House Lights reskin (2026-07-10): panel cards on the theme surface, one
@@ -121,7 +122,7 @@ const VenueCard = ({ venue, isCompact = false }: { venue: any; isCompact?: boole
                     <Button
                         startIcon={<MapIcon />}
                         disabled={!venue.googleMapsUrl}
-                        href={venue.googleMapsUrl}
+                        href={toAbsoluteUrl(venue.googleMapsUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         size={isCompact ? 'small' : 'medium'}
@@ -144,7 +145,7 @@ export default function VenueSection({ convention }: { convention: any }) {
             <SectionKicker>Venue</SectionKicker>
             {(primaryVenue?.bookingLink || primaryVenue?.websiteUrl) && (
                 <Button
-                    href={primaryVenue.bookingLink || primaryVenue.websiteUrl}
+                    href={toAbsoluteUrl(primaryVenue.bookingLink || primaryVenue.websiteUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     sx={{ ...outlineButtonSx, mb: 2 }}

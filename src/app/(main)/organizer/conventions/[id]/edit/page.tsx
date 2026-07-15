@@ -555,13 +555,28 @@ function ConventionEditPage() { // Remove params from props
 
       const savedConvention = await response.json();
 
-      // Update local state with any new data from the server (like new IDs)
+      // Adopt the persisted venues/hotels the server just returned — they
+      // carry the real DB ids. This closes the identity loop: without it the
+      // editor keeps its initial-load snapshot (edits live only in the tab's
+      // state), a sync effect rolls the tab back to that stale snapshot after
+      // every save, and the next save re-sends id-less hotels, forcing a
+      // delete+recreate that shuffles row order and crosses edits between
+      // hotels. With real ids adopted here, later saves update in place.
+      const savedHotels = savedConvention.hotels;
+      const savedVenues = savedConvention.venues;
       setConventionPageData(prev => ({
         ...prev,
         ...savedConvention,
         venueHotel: {
           ...prev.venueHotel,
           ...savedConvention.venueHotel,
+          ...(Array.isArray(savedHotels) ? { hotels: savedHotels } : {}),
+          ...(Array.isArray(savedVenues)
+            ? {
+                primaryVenue: savedVenues.find((v: any) => v.isPrimaryVenue) ?? null,
+                secondaryVenues: savedVenues.filter((v: any) => !v.isPrimaryVenue),
+              }
+            : {}),
         }
       }));
 

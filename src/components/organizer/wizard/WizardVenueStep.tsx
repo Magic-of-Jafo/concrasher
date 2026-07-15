@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Alert, CircularProgress, Chip, Typography } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import VenueHotelHelperDialog, { type VenueHotelResult, type ScrapedPlaceResult } from '../convention-editor/VenueHotelHelperDialog';
+import VenueHotelHelperDialog, { type VenueHotelAssignment, type ScrapedPlaceResult } from '../convention-editor/VenueHotelHelperDialog';
 import type { WizardStepContext } from './ConventionWizard';
 
 // Wizard step: import the venue + hotel(s) from the discovered hotel/venue page
@@ -34,23 +34,23 @@ export default function WizardVenueStep({ ctx }: { ctx: WizardStepContext }) {
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const apply = async (r: VenueHotelResult) => {
+    const apply = async (a: VenueHotelAssignment) => {
         setSaving(true);
         setError(null);
         try {
-            const sameLoc = r.sameLocation !== false;
-            const venues = r.venue
-                ? [{ isPrimaryVenue: true, venueName: r.venue.name || 'Venue', ...placeCommon(r.venue) }]
-                : [];
-            const hotels = (r.hotels || []).map((h, i) => ({
-                isPrimaryHotel: !sameLoc && i === 0,
-                hotelName: h.name || 'Hotel',
-                ...placeCommon(h),
-            }));
+            // Honor the roles the organizer chose in the preview.
+            const venues = a.places
+                .filter(x => x.role === 'primaryVenue' || x.role === 'secondaryVenue')
+                .map(x => ({ isPrimaryVenue: x.role === 'primaryVenue', venueName: x.place.name || 'Venue', ...placeCommon(x.place) }));
+            const hotels = a.places
+                .filter(x => x.role === 'primaryHotel' || x.role === 'secondaryHotel')
+                .map(x => ({ isPrimaryHotel: x.role === 'primaryHotel', hotelName: x.place.name || 'Hotel', ...placeCommon(x.place) }));
             const res = await fetch(`/api/organizer/conventions/${convention.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ venues, hotels, guestsStayAtPrimaryVenue: sameLoc }),
+                // The stay-at-venue toggle is set explicitly on the venue tab,
+                // not inferred from the scrape.
+                body: JSON.stringify({ venues, hotels }),
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));

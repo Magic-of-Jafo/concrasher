@@ -5,7 +5,7 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import { DISPLAY, BODY } from '@/lib/fonts';
 import { getS3ImageUrl } from '@/lib/defaults';
-import { SectionKicker } from './VenueSection';
+import { toAbsoluteUrl } from '@/lib/url';
 
 // House Lights reskin (2026-07-10): panel cards on the theme surface. All
 // booking/website/map links leave the site, so they open in a new tab.
@@ -27,6 +27,13 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
     if (!hotel) return null;
     const photo = hotel.photos?.[0];
 
+    // Non-compact (primary) always gets an image column, with a text fallback.
+    // Compact (additional-hotel) cards only get one when a photo exists —
+    // otherwise they stay text-only. The image sits beside the content at `lg`
+    // for the primary card, at `sm` for the tighter compact cards.
+    const showImage = photo || !isCompact;
+    const imgSide = isCompact ? 'sm' : 'lg';
+
     return (
         <Box
             sx={{
@@ -36,20 +43,26 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
                 mb: 2,
                 height: '100%',
                 overflow: 'hidden',
-                display: isCompact ? 'block' : { xs: 'block', lg: 'grid' },
-                gridTemplateColumns: isCompact ? undefined : { lg: 'minmax(320px, 42%) minmax(0, 1fr)' },
+                display: showImage
+                    ? (isCompact ? { xs: 'block', sm: 'grid' } : { xs: 'block', lg: 'grid' })
+                    : 'block',
+                gridTemplateColumns: showImage
+                    ? (isCompact
+                        ? { sm: 'minmax(150px, 32%) minmax(0, 1fr)' }
+                        : { lg: 'minmax(320px, 42%) minmax(0, 1fr)' })
+                    : undefined,
             }}
         >
-            {!isCompact && (
+            {showImage && (
                 <Box
                     sx={{
-                        height: { xs: 150, sm: 'auto', lg: '100%' },
-                        minHeight: { lg: 320 },
-                        aspectRatio: { xs: 'auto', sm: '16 / 9', lg: 'auto' },
+                        height: isCompact ? { xs: 140, sm: '100%' } : { xs: 150, sm: 'auto', lg: '100%' },
+                        minHeight: isCompact ? { sm: 140 } : { lg: 320 },
+                        aspectRatio: isCompact ? { xs: '16 / 9', sm: 'auto' } : { xs: 'auto', sm: '16 / 9', lg: 'auto' },
                         background: 'var(--cc-hero-scene)',
                         backgroundSize: 'var(--cc-hero-bokeh-size)',
-                        borderBottom: { xs: '1px solid var(--cc-hairline)', lg: 'none' },
-                        borderRight: { xs: 'none', lg: '1px solid var(--cc-hairline)' },
+                        borderBottom: { xs: '1px solid var(--cc-hairline)', [imgSide]: 'none' },
+                        borderRight: { xs: 'none', [imgSide]: '1px solid var(--cc-hairline)' },
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -125,22 +138,22 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
             )}
             <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
                 {hotel.bookingLink && (
-                    <Button href={hotel.bookingLink} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
+                    <Button href={toAbsoluteUrl(hotel.bookingLink)} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
                         Book Room ↗
                     </Button>
                 )}
                 {hotel.websiteUrl && !hotel.bookingLink && (
-                    <Button href={hotel.websiteUrl} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
+                    <Button href={toAbsoluteUrl(hotel.websiteUrl)} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
                         Hotel Website ↗
                     </Button>
                 )}
                 {hotel.websiteUrl && hotel.bookingLink && hotel.websiteUrl !== hotel.bookingLink && (
-                    <Button href={hotel.websiteUrl} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
+                    <Button href={toAbsoluteUrl(hotel.websiteUrl)} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
                         Website ↗
                     </Button>
                 )}
                 {hotel.googleMapsUrl && (
-                    <Button startIcon={<MapIcon />} href={hotel.googleMapsUrl} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
+                    <Button startIcon={<MapIcon />} href={toAbsoluteUrl(hotel.googleMapsUrl)} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
                         Map
                     </Button>
                 )}
@@ -164,10 +177,14 @@ export default function HotelSection({ convention }: { convention: any }) {
 
     const otherHotels = convention.hotels?.filter((h: any) => h !== hotelRecordPrimary) || [];
 
+    // Same weight/size as the Additional Hotel(s) heading below so the two
+    // section titles read as siblings.
+    const headingSx = { fontFamily: DISPLAY, fontWeight: 800, fontSize: '1.05rem', color: 'var(--cc-ink)', mb: 1.5 } as const;
+
     if (!primaryHotel) {
         return (
             <Box sx={{ py: 1 }}>
-                <SectionKicker>Hotel</SectionKicker>
+                <Typography component="h2" sx={headingSx}>Primary Hotel</Typography>
                 <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
                     Hotel information is not yet available.
                 </Typography>
@@ -177,12 +194,12 @@ export default function HotelSection({ convention }: { convention: any }) {
 
     return (
         <Box sx={{ py: 1 }}>
-            <SectionKicker>Hotel</SectionKicker>
+            <Typography component="h2" sx={headingSx}>Primary Hotel</Typography>
             {primaryHotel && <HotelCard hotel={primaryHotel} isCompact={false} />}
             {otherHotels.length > 0 && (
                 <Box sx={{ mt: 4 }}>
-                    <Typography component="h3" sx={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: '1.05rem', color: 'var(--cc-ink)', mb: 1.5 }}>
-                        Additional Hotels &amp; Accommodations
+                    <Typography component="h3" sx={headingSx}>
+                        {otherHotels.length > 1 ? 'Additional Hotels' : 'Additional Hotel'}
                     </Typography>
                     <Stack spacing={2}>
                         {otherHotels.map((hotel: any) => (

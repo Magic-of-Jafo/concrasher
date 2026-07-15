@@ -108,8 +108,11 @@ export async function GET(
         priceDiscounts: true, // Include PriceDiscounts (though these are more complex to load directly)
         // Consider if PriceDiscounts should be a separate fetch or structured differently
         // For now, including them to see if it works for the page load.
-        venues: { include: { photos: true } }, // Include venues + their photos so the editor shows uploaded images
-        hotels: { include: { photos: true } }, // Include hotels + their photos
+        // Deterministic order (primary first, then creation order) — must match
+        // the public page (src/lib/db.ts) so "Additional Hotel 1" is the same
+        // hotel everywhere.
+        venues: { include: { photos: true }, orderBy: [{ isPrimaryVenue: 'desc' as const }, { createdAt: 'asc' as const }] },
+        hotels: { include: { photos: true }, orderBy: [{ isPrimaryHotel: 'desc' as const }, { createdAt: 'asc' as const }] },
         media: true, // Include media
         tags: true, // Include tags
       }
@@ -399,7 +402,24 @@ export async function PUT(
         }
       }
 
-      return convention;
+      // Return the persisted venues/hotels (with their real DB ids) so the
+      // client can adopt them. Without this the editor never learns the ids
+      // of newly created rows, keeps sending id-less hotels, and every save
+      // becomes a delete+recreate — new ids, identical createdAt within the
+      // transaction, arbitrary re-ordering, and edits crossing between rows.
+      // Same ordering as the GET above and the public page (src/lib/db.ts).
+      const savedVenues = await tx.venue.findMany({
+        where: { conventionId },
+        include: { photos: true },
+        orderBy: [{ isPrimaryVenue: 'desc' }, { createdAt: 'asc' }],
+      });
+      const savedHotels = await tx.hotel.findMany({
+        where: { conventionId },
+        include: { photos: true },
+        orderBy: [{ isPrimaryHotel: 'desc' }, { createdAt: 'asc' }],
+      });
+
+      return { ...convention, venues: savedVenues, hotels: savedHotels };
     });
 
 

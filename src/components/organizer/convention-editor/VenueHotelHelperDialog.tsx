@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography,
     CircularProgress, Alert, ToggleButtonGroup, ToggleButton, Paper, Divider, Chip, Link,
+    Select, MenuItem, FormControl, InputLabel,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LinkIcon from '@mui/icons-material/Link';
@@ -39,6 +40,20 @@ export interface VenueHotelResult {
     hotels: ScrapedPlaceResult[];
 }
 
+// The organizer assigns each scraped place a role in the preview; apply is
+// purely additive per role and never removes existing data.
+export type PlaceRole = 'primaryVenue' | 'secondaryVenue' | 'primaryHotel' | 'secondaryHotel' | 'skip';
+export interface AssignedPlace { place: ScrapedPlaceResult; role: PlaceRole; }
+export interface VenueHotelAssignment { places: AssignedPlace[]; }
+
+const ROLE_OPTIONS: { value: PlaceRole; label: string }[] = [
+    { value: 'primaryVenue', label: 'Primary venue' },
+    { value: 'secondaryVenue', label: 'Secondary venue' },
+    { value: 'primaryHotel', label: 'Primary hotel' },
+    { value: 'secondaryHotel', label: 'Secondary hotel' },
+    { value: 'skip', label: "Don't use" },
+];
+
 const GEN_STAGES = [
     'Gathering the page…',
     'Reading the venue details…',
@@ -46,11 +61,10 @@ const GEN_STAGES = [
     'Almost there…',
 ];
 
-function PlacePreview({ title, place }: { title: string; place: ScrapedPlaceResult }) {
+function PlacePreview({ place }: { place: ScrapedPlaceResult }) {
     const addr = [place.streetAddress, place.city, place.stateRegion, place.postalCode, place.country].filter(Boolean).join(', ');
     return (
-        <Paper variant="outlined" sx={{ mb: 1.5, p: 1.5 }}>
-            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{title}</Typography>
+        <>
             {place.name && <Typography variant="body2" sx={{ fontWeight: 600 }}>{place.name}</Typography>}
             {addr && <Typography variant="body2" color="text.secondary">{addr}</Typography>}
             {(place.contactPhone || place.contactEmail) && (
@@ -71,26 +85,56 @@ function PlacePreview({ title, place }: { title: string; place: ScrapedPlaceResu
                 {place.bookingLink && <Chip size="small" color="primary" label="Booking link" component={Link} href={place.bookingLink} target="_blank" clickable />}
                 {place.googleMapsUrl && <Chip size="small" label="Map" component={Link} href={place.googleMapsUrl} target="_blank" clickable />}
             </Box>
-        </Paper>
+        </>
     );
 }
 
+/** Conservative default role per scraped place: only claim the primary slots
+ *  when the tab doesn't already have them, so scraping extra pages appends. */
+function buildAssignments(
+    r: VenueHotelResult,
+    hasPrimaryVenue: boolean,
+    hasPrimaryHotel: boolean,
+): AssignedPlace[] {
+    const out: AssignedPlace[] = [];
+    if (r.venue) out.push({ place: r.venue, role: hasPrimaryVenue ? 'secondaryVenue' : 'primaryVenue' });
+    let primaryHotelTaken = hasPrimaryHotel;
+    for (const h of r.hotels) {
+        let role: PlaceRole;
+        if (r.sameLocation === true) {
+            role = 'secondaryHotel'; // venue is the lodging; scraped hotels are extras
+        } else if (!primaryHotelTaken) {
+            role = 'primaryHotel';
+            primaryHotelTaken = true;
+        } else {
+            role = 'secondaryHotel';
+        }
+        out.push({ place: h, role });
+    }
+    return out;
+}
+
 export default function VenueHotelHelperDialog({
-    open, onClose, conventionId, onApplied, initialUrl,
+    open, onClose, conventionId, onApplied, initialUrl, hasPrimaryVenue = false, hasPrimaryHotel = false,
 }: {
     open: boolean;
     onClose: () => void;
     conventionId: string;
-    onApplied: (result: VenueHotelResult) => void;
+    onApplied: (assignment: VenueHotelAssignment) => void;
     /** Pre-fill the URL field (e.g. a page the wizard discovered). */
     initialUrl?: string;
+    /** Whether the tab already has a primary venue / primary hotel — drives the
+     *  conservative default role for scraped places. */
+    hasPrimaryVenue?: boolean;
+    hasPrimaryHotel?: boolean;
 }) {
     const [sourceType, setSourceType] = useState<SourceType>('url');
     const [url, setUrl] = useState(initialUrl || '');
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [preview, setPreview] = useState<{ source: string } & VenueHotelResult | null>(null);
+    const [source, setSource] = useState<string | null>(null);
+    const [assignments, setAssignments] = useState<AssignedPlace[] | null>(null);
     const [stageIdx, setStageIdx] = useState(0);
     const abortRef = useRef<AbortController | null>(null);
     const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -98,7 +142,7 @@ export default function VenueHotelHelperDialog({
     usePasteImage(setFile, { enabled: open && sourceType === 'image' });
 
     const stopStages = () => { if (stageTimerRef.current) { clearInterval(stageTimerRef.current); stageTimerRef.current = null; } };
-    const reset = () => { setPreview(null); setError(null); setFile(null); };
+    const reset = () => { setAssignments(null); setSource(null); setError(null); setFile(null); };
     const close = () => {
         abortRef.current?.abort();
         abortRef.current = null;
@@ -107,6 +151,10 @@ export default function VenueHotelHelperDialog({
         reset();
         setUrl('');
         onClose();
+    };
+
+    const setRole = (index: number, role: PlaceRole) => {
+        setAssignments((prev) => (prev ? prev.map((a, i) => (i === index ? { ...a, role } : a)) : prev));
     };
 
     const generate = async () => {
@@ -138,7 +186,14 @@ export default function VenueHotelHelperDialog({
             const hotels = Array.isArray(data.hotels) ? data.hotels : (data.hotel ? [data.hotel] : []);
             if (!res.ok) setError(data.error || 'Could not read that source.');
             else if (!data.venue && !hotels.length) setError('No venue or hotel details were found. Try the venue/travel page, a PDF, or an image.');
-            else setPreview({ source: data.source, sameLocation: data.sameLocation, venue: data.venue, hotels });
+            else {
+                setSource(data.source);
+                setAssignments(buildAssignments(
+                    { sameLocation: data.sameLocation, venue: data.venue, hotels },
+                    hasPrimaryVenue,
+                    hasPrimaryHotel,
+                ));
+            }
         } catch (e: any) {
             if (e?.name !== 'AbortError') setError(e?.message || 'Request failed.');
         } finally {
@@ -148,7 +203,7 @@ export default function VenueHotelHelperDialog({
         }
     };
 
-    const sameLoc = preview?.sameLocation !== false; // default true when null
+    const usableCount = (assignments ?? []).filter((a) => a.role !== 'skip').length;
 
     return (
         <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
@@ -156,10 +211,10 @@ export default function VenueHotelHelperDialog({
                 <AutoAwesomeIcon color="primary" /> Venue &amp; Hotel Helper
             </DialogTitle>
             <DialogContent dividers>
-                {!preview ? (
+                {!assignments ? (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Point the helper at the event&apos;s venue / travel / hotel page — paste a link, or upload a PDF or a screenshot — and it&apos;ll pull out the venue, address, map link, and room-block details. You&apos;ll review it before it fills the tab.
+                            Point the helper at the event&apos;s venue / travel / hotel page — paste a link, or upload a PDF or a screenshot — and it&apos;ll pull out each place it finds. In the preview you decide what each one is, and nothing you&apos;ve already entered gets overwritten.
                         </Typography>
 
                         <ToggleButtonGroup exclusive fullWidth size="small" value={sourceType} onChange={(_, v) => v && setSourceType(v)} sx={{ mb: 2 }}>
@@ -212,42 +267,54 @@ export default function VenueHotelHelperDialog({
                 ) : (
                     <>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                            <Chip
-                                size="small"
-                                color={sameLoc ? 'success' : 'default'}
-                                label={sameLoc ? 'Attendees stay at the venue' : 'Separate host hotel'}
-                            />
+                            <Typography variant="subtitle2">Assign each place</Typography>
                             <Button size="small" onClick={reset}>Start over</Button>
                         </Box>
-                        <Typography variant="caption" color="text.secondary">Source: {preview.source}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                            Tell the helper what each place is. Applying only adds or fills the roles you choose — it never removes or replaces what&apos;s already on the tab, so you can scrape more pages and top up.
+                        </Typography>
 
-                        <Box sx={{ mt: 1.5 }}>
-                            {preview.venue && <PlacePreview title="Venue" place={preview.venue} />}
-                            {preview.hotels.map((h, i) => (
-                                <PlacePreview
-                                    key={i}
-                                    title={preview.hotels.length === 1 ? 'Host hotel' : (i === 0 ? 'Primary hotel' : `Hotel ${i + 1}`)}
-                                    place={h}
-                                />
-                            ))}
-                        </Box>
+                        {assignments.map((a, i) => (
+                            <Paper key={i} variant="outlined" sx={{ mb: 1.5, p: 1.5, opacity: a.role === 'skip' ? 0.6 : 1 }}>
+                                <FormControl size="small" sx={{ minWidth: 180, mb: 1 }}>
+                                    <InputLabel id={`role-${i}`}>Use as</InputLabel>
+                                    <Select
+                                        labelId={`role-${i}`}
+                                        label="Use as"
+                                        value={a.role}
+                                        onChange={(e) => setRole(i, e.target.value as PlaceRole)}
+                                    >
+                                        {ROLE_OPTIONS.map((opt) => (
+                                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <PlacePreview place={a.place} />
+                            </Paper>
+                        ))}
+
+                        {source && <Typography variant="caption" color="text.secondary">Source: {source}</Typography>}
 
                         <Divider sx={{ my: 1 }} />
                         <Alert severity="info">
-                            This fills any <strong>empty</strong> fields on the Venue/Hotel tab — it won&apos;t overwrite what you&apos;ve already entered{preview.sameLocation === true ? ', and sets “attendees stay at the venue”' : ''}. Review and save. You can run it again — e.g. from a screenshot — to top up missing details like the nightly rate.
+                            Only the roles you pick above are applied, and only to <strong>empty</strong> fields — nothing already on the tab is removed or overwritten. Set “Don&apos;t use” to ignore a place. The stay-at-venue toggle is yours to set on the tab.
                         </Alert>
                     </>
                 )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={close} color={loading ? 'error' : 'inherit'}>Cancel</Button>
-                {!preview ? (
+                {!assignments ? (
                     <Button onClick={generate} variant="contained" disabled={loading} startIcon={loading ? <CircularProgress size={16} /> : <AutoAwesomeIcon />}>
                         {loading ? 'Reading…' : 'Generate preview'}
                     </Button>
                 ) : (
-                    <Button onClick={() => { onApplied({ sameLocation: preview.sameLocation, venue: preview.venue, hotels: preview.hotels }); close(); }} variant="contained">
-                        Use these details
+                    <Button
+                        onClick={() => { onApplied({ places: assignments }); close(); }}
+                        variant="contained"
+                        disabled={usableCount === 0}
+                    >
+                        {usableCount === 0 ? 'Nothing selected' : `Use ${usableCount} ${usableCount === 1 ? 'place' : 'places'}`}
                     </Button>
                 )}
             </DialogActions>

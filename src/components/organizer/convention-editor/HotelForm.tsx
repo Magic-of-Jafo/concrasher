@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Button, Paper, Switch } from '@mui/material';
+import { Box, TextField, Typography, FormGroup, FormControlLabel, Checkbox, Paper, Switch } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { HotelData, HotelPhotoData } from '@/lib/validators';
 import ProseMirrorEditor from '@/components/ui/ProseMirrorEditor';
@@ -397,12 +397,6 @@ const HotelForm: React.FC<HotelFormProps> = ({
           />
         )}
       </Paper>
-
-      {!isPrimaryHotel && (
-        <Button variant="outlined" color="error" onClick={() => onFormDataChange({ _delete: true } as any)} sx={{ mt: 1 }}>
-          Remove Hotel
-        </Button>
-      )}
     </Box>
   );
 };
