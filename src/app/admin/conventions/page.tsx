@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { Metadata } from 'next';
 import AdminConventionsTable, { AdminConventionRow } from '@/components/admin/AdminConventionsTable';
+import AdminMajorsEditor, { MajorsSlotDraft } from '@/components/admin/AdminMajorsEditor';
+import { readMajorsSlots } from '@/lib/majors';
+import { MAJORS } from '@/components/frontpage/majors-config';
 
 // The admin's convention manager: every convention on the site in one table —
 // sortable, filterable, with View/Edit/Delete per row and the exclusive
@@ -21,7 +24,7 @@ export default async function AdminConventionsPage() {
         redirect('/');
     }
 
-    const [rows, featuredSetting] = await Promise.all([
+    const [rows, featuredSetting, seriesList, savedSlots] = await Promise.all([
         db.convention.findMany({
             where: { deletedAt: null },
             orderBy: { startDate: 'asc' },
@@ -41,7 +44,19 @@ export default async function AdminConventionsPage() {
             },
         }),
         db.siteSetting.findUnique({ where: { key: 'featured_convention_id' } }),
+        db.conventionSeries.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+        readMajorsSlots(),
     ]);
+
+    // Seed the majors editor: the saved configuration, or (first visit) the
+    // built-in default slots resolved against real series so the admin starts
+    // from what the front page is actually showing today.
+    const initialSlots: MajorsSlotDraft[] = savedSlots
+        ?? MAJORS.map((slot) => ({
+            id: slot.key,
+            label: slot.short,
+            seriesId: seriesList.find((s) => slot.match(s.name))?.id ?? '',
+        }));
 
     const serialized: AdminConventionRow[] = rows.map((r) => ({
         id: r.id,
@@ -59,9 +74,12 @@ export default async function AdminConventionsPage() {
     }));
 
     return (
-        <AdminConventionsTable
-            rows={serialized}
-            initialFeaturedIds={(featuredSetting?.value || '').split(',').map((s) => s.trim()).filter(Boolean)}
-        />
+        <>
+            <AdminMajorsEditor series={seriesList} initialSlots={initialSlots} />
+            <AdminConventionsTable
+                rows={serialized}
+                initialFeaturedIds={(featuredSetting?.value || '').split(',').map((s) => s.trim()).filter(Boolean)}
+            />
+        </>
     );
 }

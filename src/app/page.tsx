@@ -5,6 +5,7 @@ import { ConventionStatus } from "@prisma/client";
 import { Metadata } from 'next';
 import FrontPage from "@/components/frontpage/FrontPage";
 import { MAJORS } from "@/components/frontpage/majors-config";
+import { readMajorsSlots } from "@/lib/majors";
 import type { MajorData } from "@/components/frontpage/FrontMajors";
 import { HomeConvention, countryToRegion } from "@/components/home/home-types";
 import { pickHeroMessage } from "@/components/home/headlines";
@@ -150,11 +151,89 @@ function toHomeConvention(row: EditionRow): HomeConvention {
   };
 }
 
-// The majors cards resolve through the convention SERIES: each slot finds its
-// series (interim: name match; admin-assigned seriesId later) and shows that
+// The majors cards resolve through the convention SERIES: each slot shows its
 // series' most recent edition, past or future. Upcoming = countdown, dateless
-// TBD edition = "TBD", already passed = the cadence line ("Every summer") but
-// still with the passed edition's artwork, so the card is never a blank tile.
+// TBD edition = "TBD", already passed = "Back next year" but still with the
+// passed edition's artwork, so the card is never a blank tile. Slots come from
+// the admin's saved list (label + series, any order/count) when one exists;
+// otherwise the hardcoded name-matching defaults in majors-config.ts.
+async function resolveMajorSlot(
+  base: { key: string; short: string; descriptor: string; cadence: string },
+  seriesId: string | null,
+  nameMatch?: (name: string) => boolean,
+): Promise<MajorData> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  try {
+    const isPast = (r: EditionRow) => {
+      const end = new Date(r.endDate ?? r.startDate!);
+      end.setHours(0, 0, 0, 0);
+      return end.getTime() < today.getTime();
+    };
+
+    // PAST counts: since the auto-expire sweep started flipping finished
+    // editions to PAST, a PUBLISHED-only filter would blank the card the
+    // day after the convention ends (artwork and all).
+    const editionStatuses = [ConventionStatus.PUBLISHED, ConventionStatus.PAST];
+    let editions: EditionRow[] = [];
+    if (seriesId) {
+      editions = await db.convention.findMany({
+        where: { seriesId, status: { in: editionStatuses }, deletedAt: null, startDate: { not: null } },
+        orderBy: { startDate: "asc" },
+        select: editionSelect,
+      });
+    } else if (nameMatch) {
+      const rows = await db.convention.findMany({
+        where: { status: { in: editionStatuses }, deletedAt: null, startDate: { not: null } },
+        orderBy: { startDate: "asc" },
+        select: editionSelect,
+      });
+      editions = rows.filter((r) => nameMatch(r.name));
+    }
+
+    // The chosen edition may not have artwork yet (imported future years
+    // usually don't, and a just-finished year sometimes never got one).
+    // Borrow from the nearest earlier edition that has art, so the slot
+    // shows the series' identity instead of a blank monogram tile.
+    const withArtFallback = (edition: ReturnType<typeof toHomeConvention>) => {
+      if (edition.imageUrl) return edition;
+      for (let i = editions.length - 1; i >= 0; i--) {
+        const img = toHomeConvention(editions[i]).imageUrl;
+        if (img) return { ...edition, imageUrl: img };
+      }
+      return edition;
+    };
+
+    // A series can hold several announced future years (the importer
+    // grabs them); the card wants the SOONEST upcoming edition, not the
+    // farthest-out one.
+    const upcoming = editions.find((r) => !isPast(r));
+    if (upcoming) {
+      return { ...base, status: "upcoming", convention: withArtFallback(toHomeConvention(upcoming)) };
+    }
+
+    const latestPast = editions.length ? editions[editions.length - 1] : null;
+
+    const tbd = seriesId
+      ? await db.convention.findFirst({
+          where: { seriesId, status: ConventionStatus.PUBLISHED, deletedAt: null, isTBD: true, startDate: null },
+          orderBy: { createdAt: "desc" },
+          select: editionSelect,
+        })
+      : null;
+    if (tbd) {
+      return { ...base, status: "tbd", convention: withArtFallback(toHomeConvention(tbd)) };
+    }
+    if (latestPast) {
+      return { ...base, status: "past", convention: withArtFallback(toHomeConvention(latestPast)) };
+    }
+    return { ...base, status: "none", convention: null };
+  } catch (error) {
+    console.error(`Failed to resolve major slot ${base.key}:`, error);
+    return { ...base, status: "none", convention: null };
+  }
+}
+
 async function getMajors(): Promise<MajorData[]> {
   let seriesList: { id: string; name: string }[] = [];
   try {
@@ -163,71 +242,34 @@ async function getMajors(): Promise<MajorData[]> {
     console.error("Failed to fetch series for majors:", error);
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Admin-curated slots win; the hardcoded defaults only serve databases
+  // where the admin never saved a configuration.
+  const configured = await readMajorsSlots();
+  if (configured) {
+    const seriesNameById = new Map(seriesList.map((s) => [s.id, s.name]));
+    return Promise.all(
+      configured.map((slot) =>
+        resolveMajorSlot(
+          {
+            key: slot.id,
+            short: slot.label,
+            descriptor: seriesNameById.get(slot.seriesId) || slot.label,
+            cadence: "TBD",
+          },
+          slot.seriesId,
+        ),
+      ),
+    );
+  }
 
   return Promise.all(
-    MAJORS.map(async (slot): Promise<MajorData> => {
-      const base = { key: slot.key, short: slot.short, descriptor: slot.descriptor, cadence: slot.cadence };
-      try {
-        const series = seriesList.find((s) => slot.match(s.name));
-
-        const isPast = (r: EditionRow) => {
-          const end = new Date(r.endDate ?? r.startDate!);
-          end.setHours(0, 0, 0, 0);
-          return end.getTime() < today.getTime();
-        };
-
-        // Editions for this slot: by series when one matched, otherwise by
-        // convention-name match (interim until admin series assignment).
-        let editions: EditionRow[] = [];
-        if (series) {
-          editions = await db.convention.findMany({
-            where: { seriesId: series.id, status: ConventionStatus.PUBLISHED, deletedAt: null, startDate: { not: null } },
-            orderBy: { startDate: "asc" },
-            select: editionSelect,
-          });
-        } else {
-          const rows = await db.convention.findMany({
-            where: { status: ConventionStatus.PUBLISHED, deletedAt: null, startDate: { not: null } },
-            orderBy: { startDate: "asc" },
-            select: editionSelect,
-          });
-          editions = rows.filter((r) => slot.match(r.name));
-        }
-
-        // A series can hold several announced future years (the importer
-        // grabs them); the card wants the SOONEST upcoming edition, not the
-        // farthest-out one.
-        const upcoming = editions.find((r) => !isPast(r));
-        if (upcoming) {
-          return { ...base, status: "upcoming", convention: toHomeConvention(upcoming) };
-        }
-
-        const latestPast = editions.length ? editions[editions.length - 1] : null;
-
-        const tbd = series
-          ? await db.convention.findFirst({
-              where: { seriesId: series.id, status: ConventionStatus.PUBLISHED, deletedAt: null, isTBD: true, startDate: null },
-              orderBy: { createdAt: "desc" },
-              select: editionSelect,
-            })
-          : null;
-        if (tbd) {
-          const edition = toHomeConvention(tbd);
-          // A TBD edition often has no artwork yet; borrow the last edition's.
-          if (!edition.imageUrl && latestPast) edition.imageUrl = toHomeConvention(latestPast).imageUrl;
-          return { ...base, status: "tbd", convention: edition };
-        }
-        if (latestPast) {
-          return { ...base, status: "past", convention: toHomeConvention(latestPast) };
-        }
-        return { ...base, status: "none", convention: null };
-      } catch (error) {
-        console.error(`Failed to resolve major slot ${slot.key}:`, error);
-        return { ...base, status: "none", convention: null };
-      }
-    }),
+    MAJORS.map((slot) =>
+      resolveMajorSlot(
+        { key: slot.key, short: slot.short, descriptor: slot.descriptor, cadence: slot.cadence },
+        seriesList.find((s) => slot.match(s.name))?.id ?? null,
+        slot.match,
+      ),
+    ),
   );
 }
 

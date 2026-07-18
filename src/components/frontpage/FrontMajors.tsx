@@ -13,8 +13,8 @@ import { FlagCorner } from './FrontThumb';
 // edition (see getMajors in page.tsx); this component just presents:
 //   upcoming edition  -> countdown kicker
 //   dateless TBD next -> "TBD"
-//   edition passed    -> the cadence line ("Every summer"), artwork retained
-//   nothing known     -> descriptor + monogram tile
+//   edition passed    -> "Back next year" (forward-looking), artwork retained
+//   nothing known     -> cadence + descriptor + monogram tile
 
 export interface MajorData {
     key: string;
@@ -28,6 +28,9 @@ export interface MajorData {
 function kickerFor(m: MajorData): string {
     if (m.status === 'upcoming' && m.convention) return getCountdown(m.convention.startDate, m.convention.endDate).text;
     if (m.status === 'tbd') return 'TBD';
+    // This year's edition wrapped and no next date is announced yet. Sell the
+    // return, not the miss; the cadence line only remains for empty slots.
+    if (m.status === 'past') return 'Back next year';
     return m.cadence;
 }
 
@@ -38,7 +41,9 @@ export default function FrontMajors({ majors }: { majors: MajorData[] }) {
             aria-label="The majors"
             sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+                // One row on desktop however many slots the admin configured;
+                // two-up on phones regardless.
+                gridTemplateColumns: { xs: '1fr 1fr', md: `repeat(${Math.max(majors.length, 1)}, 1fr)` },
                 gap: 1.5,
                 mb: 4,
             }}

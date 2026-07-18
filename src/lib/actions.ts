@@ -2290,6 +2290,70 @@ export async function applyDetectedConventionLocale(
   }
 }
 
+/**
+ * Save the admin-curated front-page majors strip: an ordered list of
+ * {label, series} slots. Admin only. An empty list clears the setting and
+ * returns the strip to its built-in name-matching defaults.
+ */
+export async function saveMajorsSlots(
+  slots: { id: string; label: string; seriesId: string }[]
+): Promise<{ success: boolean; error?: string }> {
+  "use server";
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, error: "Authentication required." };
+  const user = await db.user.findUnique({ where: { id: session.user.id } });
+  if (!(user?.roles.includes(Role.ADMIN) ?? false)) {
+    return { success: false, error: "Admin access required." };
+  }
+
+  const { MAJORS_SETTING_KEY, MAJORS_MAX_SLOTS } = await import("@/lib/majors");
+
+  try {
+    const cleaned = (Array.isArray(slots) ? slots : [])
+      .map((s) => ({
+        id: String(s?.id || "").trim(),
+        label: String(s?.label || "").trim(),
+        seriesId: String(s?.seriesId || "").trim(),
+      }))
+      .filter((s) => s.id && s.seriesId)
+      .slice(0, MAJORS_MAX_SLOTS);
+
+    // Every slot must point at a real series; a stale id would render a
+    // permanently empty card.
+    const seriesIds = cleaned.map((s) => s.seriesId);
+    const found = await db.conventionSeries.findMany({
+      where: { id: { in: seriesIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(found.map((s) => [s.id, s.name]));
+    if (found.length !== new Set(seriesIds).size) {
+      return { success: false, error: "One of the selected series no longer exists." };
+    }
+
+    // Blank label falls back to the series name so a card never renders empty.
+    const finalSlots = cleaned.map((s) => ({ ...s, label: s.label || nameById.get(s.seriesId) || "" }));
+
+    if (finalSlots.length === 0) {
+      await db.siteSetting.deleteMany({ where: { key: MAJORS_SETTING_KEY } });
+    } else {
+      const value = JSON.stringify(finalSlots);
+      await db.siteSetting.upsert({
+        where: { key: MAJORS_SETTING_KEY },
+        update: { value },
+        create: { key: MAJORS_SETTING_KEY, value },
+      });
+    }
+
+    revalidatePath("/");
+    revalidatePath("/admin/conventions");
+    return { success: true };
+  } catch (error) {
+    console.error("[saveMajorsSlots] Error:", error);
+    return { success: false, error: "Could not save the majors cards." };
+  }
+}
+
 export async function getConventionSettings(
   conventionId: string
 ): Promise<ConventionSettingData | null> {
