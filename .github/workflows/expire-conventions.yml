@@ -21,8 +21,11 @@ jobs:
     steps:
       - name: Call expire endpoint
         run: |
+          # Custom domain, NOT the .onrender.com URL — Render blocks the
+          # default subdomain for this service (x-render-routing:
+          # blocked-render-subdomain), which 404s every request.
           curl --fail-with-body -sS --max-time 120 --retry 3 --retry-delay 30 \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://convention-crasher.onrender.com/api/cron/expire-conventions"
+            "https://conventioncrasher.com/api/cron/expire-conventions"
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
