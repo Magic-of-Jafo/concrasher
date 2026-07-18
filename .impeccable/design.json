@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-02T00:00:00Z",
+  "title": "Design System: ConventionCrasher",
+  "extensions": {
+    "colorMeta": {
+      "blue-wash-deep": { "role": "primary", "displayName": "Blue Wash Deep", "canonical": "#01264b", "tonalRamp": ["oklch(15% 0.06 250)", "oklch(24% 0.07 250)", "oklch(33% 0.07 250)", "oklch(43% 0.07 250)", "oklch(54% 0.07 250)", "oklch(66% 0.06 250)", "oklch(80% 0.04 250)", "oklch(94% 0.02 250)"] },
+      "blue-wash": { "role": "primary", "displayName": "Blue Wash", "canonical": "#1a365d", "tonalRamp": ["oklch(16% 0.05 258)", "oklch(26% 0.06 258)", "oklch(35% 0.06 258)", "oklch(45% 0.06 258)", "oklch(56% 0.06 258)", "oklch(68% 0.05 258)", "oklch(81% 0.03 258)", "oklch(94% 0.015 258)"] },
+      "gold-spot": { "role": "secondary", "displayName": "Gold Spot", "canonical": "#ffd700", "tonalRamp": ["oklch(25% 0.07 95)", "oklch(38% 0.1 95)", "oklch(50% 0.13 95)", "oklch(62% 0.15 95)", "oklch(74% 0.17 95)", "oklch(86% 0.18 95)", "oklch(92% 0.14 95)", "oklch(97% 0.06 95)"] },
+      "gold-spot-warm": { "role": "secondary", "displayName": "Gold Spot Warm", "canonical": "#ffed4e", "tonalRamp": ["oklch(28% 0.06 100)", "oklch(42% 0.09 100)", "oklch(55% 0.12 100)", "oklch(67% 0.14 100)", "oklch(79% 0.16 100)", "oklch(90% 0.17 100)", "oklch(94% 0.12 100)", "oklch(98% 0.05 100)"] },
+      "house-cream": { "role": "neutral", "displayName": "House Cream", "canonical": "#f5f5dc", "tonalRamp": ["oklch(20% 0.02 105)", "oklch(35% 0.03 105)", "oklch(50% 0.035 105)", "oklch(63% 0.04 105)", "oklch(75% 0.04 105)", "oklch(85% 0.035 105)", "oklch(92% 0.03 105)", "oklch(97% 0.02 105)"] },
+      "deal-green": { "role": "tertiary", "displayName": "Deal Green", "canonical": "#0F6E56", "tonalRamp": ["oklch(18% 0.05 170)", "oklch(28% 0.07 170)", "oklch(38% 0.09 170)", "oklch(48% 0.1 170)", "oklch(60% 0.1 170)", "oklch(72% 0.09 170)", "oklch(84% 0.07 170)", "oklch(95% 0.03 170)"] },
+      "deal-green-tint": { "role": "tertiary", "displayName": "Deal Green Tint", "canonical": "#E1F5EE", "tonalRamp": ["oklch(20% 0.03 170)", "oklch(34% 0.04 170)", "oklch(48% 0.05 170)", "oklch(61% 0.05 170)", "oklch(73% 0.05 170)", "oklch(84% 0.04 170)", "oklch(91% 0.03 170)", "oklch(96% 0.02 170)"] },
+      "live-green": { "role": "tertiary", "displayName": "Live Green", "canonical": "#2E7D32", "tonalRamp": ["oklch(20% 0.07 145)", "oklch(30% 0.09 145)", "oklch(40% 0.11 145)", "oklch(51% 0.12 145)", "oklch(62% 0.12 145)", "oklch(74% 0.11 145)", "oklch(85% 0.08 145)", "oklch(95% 0.04 145)"] },
+      "countdown-blue": { "role": "tertiary", "displayName": "Countdown Blue", "canonical": "#004d7a", "tonalRamp": ["oklch(16% 0.06 240)", "oklch(26% 0.08 240)", "oklch(37% 0.09 240)", "oklch(47% 0.1 240)", "oklch(58% 0.09 240)", "oklch(70% 0.08 240)", "oklch(82% 0.05 240)", "oklch(94% 0.02 240)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "rgba(0, 0, 0, 0.87)", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(38% 0 0)", "oklch(50% 0 0)", "oklch(62% 0 0)", "oklch(74% 0 0)", "oklch(86% 0 0)", "oklch(96% 0 0)"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#ffffff", "tonalRamp": ["oklch(15% 0 0)", "oklch(30% 0 0)", "oklch(45% 0 0)", "oklch(60% 0 0)", "oklch(72% 0 0)", "oklch(84% 0 0)", "oklch(93% 0 0)", "oklch(100% 0 0)"] },
+      "surface-gray": { "role": "neutral", "displayName": "Surface Gray", "canonical": "#f5f5f5", "tonalRamp": ["oklch(18% 0 0)", "oklch(32% 0 0)", "oklch(46% 0 0)", "oklch(60% 0 0)", "oklch(72% 0 0)", "oklch(84% 0 0)", "oklch(92% 0 0)", "oklch(97% 0 0)"] },
+      "border-gray": { "role": "neutral", "displayName": "Border Gray", "canonical": "#e0e0e0", "tonalRamp": ["oklch(18% 0 0)", "oklch(32% 0 0)", "oklch(46% 0 0)", "oklch(60% 0 0)", "oklch(72% 0 0)", "oklch(83% 0 0)", "oklch(90% 0 0)", "oklch(96% 0 0)"] },
+      "legacy-mui-blue": { "role": "neutral", "displayName": "Legacy MUI Blue (placeholder — prohibited in new work)", "canonical": "#1976d2", "tonalRamp": ["oklch(20% 0.08 255)", "oklch(30% 0.1 255)", "oklch(40% 0.12 255)", "oklch(51% 0.14 255)", "oklch(62% 0.14 255)", "oklch(73% 0.11 255)", "oklch(84% 0.07 255)", "oklch(95% 0.03 255)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headlines only. Montserrat 800; House Cream or white when on Blue Wash." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles and major section headings." },
+      "title": { "displayName": "Title", "purpose": "Card titles (convention names), sub-section headings." },
+      "body": { "displayName": "Body", "purpose": "All running copy; 65–75ch max line length." },
+      "label": { "displayName": "Label", "purpose": "Metadata, chips, countdown labels, table headers." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0px 6px 21px -7px rgba(0, 0, 0, 0.25)", "purpose": "ConventionCard at rest (transitional; currently doubled with a 2px border, which violates The One Cue Rule)." },
+      { "name": "card-hover", "value": "0px 8px 25px -5px rgba(0, 0, 0, 0.35)", "purpose": "Hover deepening on interactive cards." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "MUI default easing; redesign will define its own exponential ease-out vocabulary." },
+      { "name": "duration-hover", "value": "0.2s", "purpose": "Card and button hover transitions currently in use." }
+    ],
+    "breakpoints": [
+      { "name": "xs", "value": "0px" },
+      { "name": "sm", "value": "600px" },
+      { "name": "md", "value": "900px" },
+      { "name": "lg", "value": "1200px" },
+      { "name": "xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Gold Spot CTA",
+      "kind": "button",
+      "refersTo": "button-cta",
+      "description": "The one spotlight action per screen — registration, See All. Gold on Blue Wash text.",
+      "html": "<button class=\"ds-btn-cta\">See All Conventions</button>",
+      "css": ".ds-btn-cta { background: #ffd700; color: #1a365d; font-family: Montserrat, system-ui, sans-serif; font-weight: 700; font-size: 1rem; padding: 12px 48px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-cta:hover { background: #ffed4e; transform: translateY(-1px); } .ds-btn-cta:focus-visible { outline: 3px solid #1a365d; outline-offset: 2px; } .ds-btn-cta:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Ghost Button on Navy",
+      "kind": "button",
+      "refersTo": "button-cta",
+      "description": "Secondary text action on the Blue Wash Deep app bar; gold hover per the nav precedent.",
+      "html": "<div class=\"ds-navy-stage\"><button class=\"ds-btn-ghost\">Advanced Search</button></div>",
+      "css": ".ds-navy-stage { background: #01264b; padding: 16px; border-radius: 4px; display: inline-block; } .ds-btn-ghost { background: transparent; color: #ffffff; font-family: Inter, system-ui, sans-serif; font-weight: 600; font-size: 0.9rem; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-ghost:hover { color: #ffd700; background: rgba(255, 255, 255, 0.06); } .ds-btn-ghost:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; }"
+    },
+    {
+      "name": "Convention Card",
+      "kind": "card",
+      "refersTo": "card-convention",
+      "description": "The signature listing card: image, title, location/dates, tags, countdown block.",
+      "html": "<a class=\"ds-con-card\" href=\"#\"><div class=\"ds-con-count\"><span class=\"ds-con-count-word\">IN</span><span class=\"ds-con-count-num\">14</span><span class=\"ds-con-count-word\">DAYS</span></div><div class=\"ds-con-img\" role=\"img\" aria-label=\"Convention cover\"></div><div class=\"ds-con-body\"><h3 class=\"ds-con-title\">Magic Live 2026</h3><p class=\"ds-con-meta\">Las Vegas, NV</p><p class=\"ds-con-meta\">Aug 2 – Aug 5, 2026</p><span class=\"ds-chip-tag\">Close-Up</span></div></a>",
+      "css": ".ds-con-card { display: flex; align-items: center; gap: 16px; background: #ffffff; border-radius: 12px; border: 2px solid rgba(0, 0, 0, 0.32); box-shadow: 0px 6px 21px -7px rgba(0, 0, 0, 0.25); padding: 16px; text-decoration: none; color: inherit; transition: box-shadow 0.2s; max-width: 480px; } .ds-con-card:hover { box-shadow: 0px 8px 25px -5px rgba(0, 0, 0, 0.35); } .ds-con-count { display: flex; flex-direction: column; align-items: center; width: 45px; flex-shrink: 0; text-align: center; } .ds-con-count-word { color: #212121; font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; line-height: 1.1; } .ds-con-count-num { color: #004d7a; font-family: Inter, system-ui, sans-serif; font-size: 1.5rem; font-weight: 600; line-height: 1.1; } .ds-con-img { width: 96px; height: 96px; border-radius: 12px; flex-shrink: 0; background: linear-gradient(135deg, #1a365d, #01264b); } .ds-con-body { min-width: 0; } .ds-con-title { font-family: Montserrat, system-ui, sans-serif; font-size: 1.25rem; font-weight: 700; margin: 0 0 4px; color: #212121; } .ds-con-meta { font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; color: rgba(0, 0, 0, 0.6); margin: 0 0 4px; } .ds-chip-tag { display: inline-block; font-family: Inter, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; color: #01264b; border: 1px solid #01264b; border-radius: 9999px; padding: 2px 10px; }",
+      "note": "Transitional: border + shadow doubling and countdown treatment reflect shipped code, not the redesign target."
+    },
+    {
+      "name": "Deal Chip",
+      "kind": "chip",
+      "refersTo": "chip-deal",
+      "description": "Price-anchoring 'Save $X' signal in pricing tables. Keeper pattern.",
+      "html": "<span class=\"ds-chip-deal\">Save $50</span>",
+      "css": ".ds-chip-deal { display: inline-flex; align-items: center; height: 22px; background: #E1F5EE; color: #0F6E56; font-family: Inter, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 600; border-radius: 9999px; padding: 0 8px; }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "chip-tag",
+      "description": "Category/tag pill on convention cards, mapped to Blue Wash (retiring Legacy MUI Blue).",
+      "html": "<span class=\"ds-chip-tag2\">Mentalism</span>",
+      "css": ".ds-chip-tag2 { display: inline-block; font-family: Inter, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; color: #01264b; border: 1px solid #01264b; border-radius: 9999px; padding: 2px 10px; }"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "button-cta",
+      "description": "Blue Wash Deep app bar: logo left, white text links right, gold hover.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-logo\">ConventionCrasher</span><div class=\"ds-nav-links\"><a class=\"ds-nav-link\" href=\"#\">Advanced Search</a><a class=\"ds-nav-link\" href=\"#\">Sign in / Sign Up</a></div></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; background: #01264b; padding: 14px 24px; border-radius: 4px; min-width: 360px; } .ds-nav-logo { font-family: Montserrat, system-ui, sans-serif; font-weight: 800; font-size: 1.1rem; color: #ffffff; } .ds-nav-links { display: flex; gap: 16px; } .ds-nav-link { font-family: Inter, system-ui, sans-serif; font-size: 0.9rem; font-weight: 600; color: #ffffff; text-decoration: none; transition: color 0.2s; } .ds-nav-link:hover { color: #ffd700; } .ds-nav-link:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "card-convention",
+      "description": "Outlined field, production-office room. Focus ring will follow the Legacy MUI Blue retirement.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Convention name</span><input class=\"ds-input\" type=\"text\" placeholder=\"e.g. Abracorndabra\" /></label>",
+      "css": ".ds-field { display: inline-flex; flex-direction: column; gap: 6px; font-family: Inter, system-ui, sans-serif; min-width: 260px; } .ds-field-label { font-size: 0.875rem; font-weight: 600; color: #212121; } .ds-input { font-family: Inter, system-ui, sans-serif; font-size: 1rem; color: #212121; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 4px; padding: 10px 12px; transition: border-color 0.2s, box-shadow 0.2s; } .ds-input::placeholder { color: rgba(0, 0, 0, 0.55); } .ds-input:hover { border-color: #212121; } .ds-input:focus { outline: none; border-color: #1a365d; box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.25); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "House Lights Down",
+    "overview": "The moment before the show starts. The auditorium is washed in deep blue, the audience settles, and a single warm spotlight is about to hit the stage. That is the emotional register of every public ConventionCrasher surface: anticipation, not noise. The Blue Wash carries the atmosphere; the Gold Spot is rare and always aimed at exactly one thing — the action we most want a visitor to take. This system sells attendance the way a good theater sells a show: by making you feel the room before you're in it. The currently shipped implementation is a placeholder, not the standard: the color tokens, typography direction, Named Rules, and Do's and Don'ts are normative; the current component treatments are descriptive only, recorded so agents understand what exists today.",
+    "keyCharacteristics": [
+      "Two rooms, one theater: public surfaces are the auditorium (Blue Wash, theatrical, persuasive); organizer/admin tools are the production office (light, calm, efficient).",
+      "Gold is a spotlight, not a paint bucket — one gold moment per screen.",
+      "Confident showmanship: bold weights, saturated CTAs, generous padding; the interface sells with a straight face.",
+      "Global dignity: a 60-person regional gathering gets the same visual treatment as a 2,000-person international convention.",
+      "WCAG 2.2 AA is mandatory: 4.5:1 body text, 3:1 large text and UI components, 44×44px touch targets, visible focus, reduced-motion alternatives."
+    ],
+    "rules": [
+      { "name": "The Gold Spot Rule", "body": "Gold is the spotlight: it hits one thing per screen, and that thing is the action we most want taken. Two gold elements on one screen means neither is the spotlight. Never use gold decoratively.", "section": "colors" },
+      { "name": "The Two Rooms Rule", "body": "Public, attendee-facing surfaces live in the auditorium: Blue Wash atmosphere, theatrical contrast, persuasive energy. Organizer, admin, and editor surfaces live in the production office: Paper backgrounds, Ink text, calm density. Never theatrical chrome on a form; never gray-SaaS minimalism on a listing.", "section": "colors" },
+      { "name": "The Loaded Font Rule", "body": "Only fonts registered via next/font in src/app/layout.tsx may be referenced in styles — currently Inter, Montserrat (400/700/800), and Roboto Mono. The current code references Poppins, Open Sans, and Montserrat 900 in sx props; none of these are loaded and all silently fall back to system fonts. Fix on sight. Never introduce a font reference without loading it.", "section": "typography" },
+      { "name": "The One Cue Rule", "body": "A surface signals depth with a border or a shadow, never both. (The current card violates this; do not copy it.)", "section": "elevation" }
+    ],
+    "dos": [
+      "Do aim the Gold Spot (#ffd700) at exactly one action per screen, with Blue Wash (#1a365d) text on it.",
+      "Do keep the two rooms distinct: Blue Wash theater for attendees, Paper-and-Ink calm for organizers.",
+      "Do preserve the sales psychology in components: deal prices bolder and larger than anchor prices, 'Save $X' Deal chips, honest countdown urgency ('Happening Now!', 'Starts Tomorrow').",
+      "Do verify contrast at WCAG 2.2 AA every time: 4.5:1 body, 3:1 large text and UI components; 44×44px touch targets; visible focus states; reduced-motion alternatives for every animation.",
+      "Do design for the world: layouts must tolerate longer translated strings, non-USD currencies, and any time zone without breaking.",
+      "Do fix Loaded Font Rule violations on sight (Poppins, Open Sans, Montserrat 900 references → Montserrat/Inter at loaded weights)."
+    ],
+    "donts": [
+      "Don't build anything that could pass for a 'typical magic-convention registration website' — dated layouts, walls of centered text, clashing colors, tiny photos, buried registration links, PayPal-button energy. If a magic con's webmaster would have done it, don't.",
+      "Don't drift into generic corporate-SaaS gray minimalism — the opposite failure: sterile and uninviting.",
+      "Don't use clip-art wands, top hats, rabbits, sparkle trails, or 'magical' display fonts. Theatrical energy comes from craft, not kitsch.",
+      "Don't use Legacy MUI Blue (#1976d2) or the MUI default pink (#dc004e) in any new work. They are unconfigured factory defaults, not brand.",
+      "Don't use gold on more than one element per screen, and never white text on gold.",
+      "Don't ship the purple gradient (#667eea → #764ba2) currently on public profile banners into anything new — it is the stock AI-default gradient and is slated for replacement.",
+      "Don't use background-clip: text gradient text, side-stripe borders (border-left > 1px as accent), decorative glassmorphism, or tiny uppercase tracked eyebrows above every section.",
+      "Don't double a border with a shadow on the same surface (The One Cue Rule).",
+      "Don't reference a font that isn't loaded via next/font (The Loaded Font Rule)."
+    ]
+  }
+}

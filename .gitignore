@@ -92,9 +92,10 @@ jspm_packages/
 .nuxt
 dist
 
-# Gatsby files
+# Gatsby files (public/ is NOT ignored: Next.js serves committed assets from
+# it, e.g. public/hero rotation images; only runtime uploads stay out)
 .cache/
-public
+public/uploads/
 
 # Storybook build outputs
 .out
@@ -132,6 +133,19 @@ temp/
 *-debug.png
 
 # Copy files
-copy.env.local 
+copy.env.local
 *storybook.log
 storybook-static
+
+# Claude Code: personal/local settings stay out; launch.json is shared
+.claude/settings.local.json
+.claude/*.tmp
+
+# Impeccable design tooling: session artifacts (config.json + design.json are shared)
+.impeccable/hook.cache.json
+.impeccable/critique/
+.impeccable/live/
+
+# Local data/outputs, not source
+scripts/enrichment-results/
+video/
