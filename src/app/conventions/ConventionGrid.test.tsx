@@ -45,6 +45,7 @@ describe('ConventionGrid', () => {
       registrationUrl: 'https://test.com/register',
       seriesId: null,
       status: ConventionStatus.PUBLISHED,
+      type: 'CONVENTION' as any,
       coverImageUrl: null,
       profileImageUrl: null,
       guestsStayAtPrimaryVenue: false,
@@ -73,6 +74,7 @@ describe('ConventionGrid', () => {
       registrationUrl: 'https://test2.com/register',
       seriesId: null,
       status: ConventionStatus.PUBLISHED,
+      type: 'CONVENTION' as any,
       coverImageUrl: null,
       profileImageUrl: null,
       guestsStayAtPrimaryVenue: false,
@@ -91,9 +93,8 @@ describe('ConventionGrid', () => {
 
   it('renders loading state', () => {
     renderWithProviders(<ConventionGrid conventions={[]} loading={true} />);
-    // Material-UI Skeleton components render as spans with specific styling
-    const skeletons = document.querySelectorAll('.MuiSkeleton-root');
-    expect(skeletons.length).toBeGreaterThanOrEqual(1);
+    // House Lights loading: pulsing panel placeholders inside a status region.
+    expect(screen.getByRole('status')).toBeTruthy();
   });
 
   it('renders empty state', () => {
@@ -105,14 +106,18 @@ describe('ConventionGrid', () => {
     renderWithProviders(<ConventionGrid conventions={mockConventions} loading={false} />);
     expect(screen.getByText('Test Convention 1')).toBeInTheDocument();
     expect(screen.getByText('Test Convention 2')).toBeInTheDocument();
-    expect(screen.getByText('San Francisco, CA')).toBeInTheDocument();
-    expect(screen.getByText('Los Angeles, CA')).toBeInTheDocument();
+    // Location and dates share one sub-line ("San Francisco, CA · Jan 1–3, 2024").
+    expect(screen.getByText(/San Francisco, CA/)).toBeInTheDocument();
+    expect(screen.getByText(/Los Angeles, CA/)).toBeInTheDocument();
   });
 
-  it('navigates to convention detail page when card is clicked', () => {
+  it('links each card to its convention detail page', () => {
     renderWithProviders(<ConventionGrid conventions={mockConventions} loading={false} />);
-    fireEvent.click(screen.getByText('Test Convention 1'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/conventions/test-convention-1');
+    // Cards are real anchors now (middle-click / keyboard friendly), not
+    // click-handler divs.
+    const link = screen.getByText('Test Convention 1').closest('a');
+    expect(link).toBeTruthy();
+    expect(link!.getAttribute('href')).toBe('/conventions/test-convention-1');
   });
 
   it('does not render pagination elements itself', () => {

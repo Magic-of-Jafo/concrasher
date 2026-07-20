@@ -234,6 +234,25 @@ export async function PUT(
     }
     // --- End Process Venue Promotion ---
 
+    // Location changed (or never geocoded)? Refresh coordinates for the
+    // distance sort. Done BEFORE the transaction: geocoding is an external
+    // call and must never hold a DB transaction open. Best-effort — a miss
+    // clears the coordinates rather than pointing at the old city.
+    let coords: { latitude: number | null; longitude: number | null } | {} = {};
+    if (city !== undefined || stateName !== undefined || country !== undefined) {
+      const current = await prisma.convention.findUnique({
+        where: { id: conventionId },
+        select: { city: true, stateName: true, country: true, latitude: true },
+      });
+      const locationChanged =
+        current?.city !== city || current?.stateName !== stateName || current?.country !== country;
+      if (locationChanged || (city && current?.latitude == null)) {
+        const { geocodePlace } = await import('@/lib/geocode');
+        const hit = await geocodePlace({ city, state: stateName || stateAbbreviation, country });
+        coords = { latitude: hit?.latitude ?? null, longitude: hit?.longitude ?? null };
+      }
+    }
+
     // --- Main Transaction ---
     const updatedConvention = await prisma.$transaction(async (tx) => {
 
@@ -257,6 +276,7 @@ export async function PUT(
 
       const conventionUpdatePayload: any = {
         name, slug, city, stateAbbreviation, stateName, country, status,
+        ...coords,
         descriptionShort, descriptionMain, isOneDayEvent, isTBD,
         websiteUrl, registrationUrl,
         guestsStayAtPrimaryVenue,

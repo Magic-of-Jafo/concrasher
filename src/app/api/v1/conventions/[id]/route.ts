@@ -255,6 +255,25 @@ export async function PATCH(
             changes.push({ field: 'guestsStayAtPrimaryVenue', from: convention.guestsStayAtPrimaryVenue, to: tier3.guestsStayAtPrimaryVenue, reason: 'tier3' });
         }
 
+        // Location enriched (or coords never set)? Geocode the effective
+        // location for distance sorting. Outside the transaction: external call.
+        {
+            const locTouched = 'city' in update || 'country' in update || 'stateName' in update || 'stateAbbreviation' in update;
+            const effCity = (update.city ?? convention.city) as string | null;
+            if ((locTouched || (effCity && convention.latitude == null)) && effCity) {
+                const { geocodePlace } = await import('@/lib/geocode');
+                const hit = await geocodePlace({
+                    city: effCity,
+                    state: (update.stateName ?? convention.stateName ?? update.stateAbbreviation ?? convention.stateAbbreviation) as string | null,
+                    country: (update.country ?? convention.country) as string | null,
+                });
+                if (hit) {
+                    update.latitude = hit.latitude;
+                    update.longitude = hit.longitude;
+                }
+            }
+        }
+
         await prisma.$transaction(async tx => {
             if (Object.keys(update).length > 0) {
                 await tx.convention.update({ where: { id: convention.id }, data: update });

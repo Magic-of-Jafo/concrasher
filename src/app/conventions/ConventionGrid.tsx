@@ -1,100 +1,70 @@
 "use client";
 
-import { Box, Typography, Card, CardContent, useTheme, useMediaQuery, Skeleton, Avatar } from "@mui/material";
+import { Box, Typography } from "@mui/material";
+import Link from "next/link";
 import { Convention } from "@prisma/client";
-import { useRouter } from "next/navigation";
 import { formatLocationForGrid } from '@/lib/location-utils';
+import { formatDateRange, getCountdown } from '@/components/home/home-types';
+import { DISPLAY, BODY } from '@/components/frontpage/FrontPage';
+import FrontThumb, { FlagCorner } from '@/components/frontpage/FrontThumb';
+
+// Browse results in the front page rail's card language: thumb, countdown
+// kicker, name, "location · dates" sub-line, corner flag. One recipe across
+// the site so a convention row always reads as the same object.
 
 interface ConventionGridProps {
-  conventions: Convention[];
+  conventions: (Convention & { distanceKm?: number | null })[];
   loading?: boolean;
+  /** Past view: the kicker becomes the edition's year instead of a countdown. */
+  showingPast?: boolean;
+  /** Set only when the nearest sort applied: cards then show "≈ N mi from home". */
+  distanceUnit?: 'mi' | 'km';
   totalPages?: number;
   currentPage?: number;
   onPageChange?: (page: number) => void;
 }
 
-// Helper function to format Date object to DD Mmm YY using UTC methods
-const formatDateToDDMonYY_UTC = (date: Date | string | null): string => {
-  if (!date) {
-    return "N/A";
-  }
-  const d = new Date(date);
-  if (isNaN(d.getTime())) {
-    return "N/A";
-  }
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const month = monthNames[d.getUTCMonth()];
-  const year = String(d.getUTCFullYear()).slice(-2);
-  return `${day} ${month} ${year}`;
-};
+/** API rows arrive JSON-serialized; normalize date-ish values to ISO strings
+ *  for the shared formatters. */
+const toIso = (d: Date | string | null | undefined): string | null =>
+  d ? new Date(d).toISOString() : null;
+
+/** Rounded display distance — proximity a reader can feel beats precision. */
+function displayDistance(km: number, unit: 'mi' | 'km'): string {
+  const value = unit === 'mi' ? km * 0.621371 : km;
+  const rounded = value < 10 ? Math.max(1, Math.round(value)) : Math.round(value / 5) * 5;
+  return rounded.toLocaleString();
+}
 
 export default function ConventionGrid({
   conventions = [],
   loading = false,
-  totalPages = 1,
-  currentPage = 1,
-  onPageChange
+  showingPast = false,
+  distanceUnit,
 }: ConventionGridProps) {
-  const router = useRouter();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  const getConventionStatusText = (startDate: Date | null, endDate: Date | null) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Compare dates only
-
-    if (!startDate) return "Date TBD";
-
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-
-    const end = endDate ? new Date(endDate) : new Date(startDate); // Assume single day if no end date
-    end.setHours(0, 0, 0, 0);
-
-
-    if (today >= start && today <= end) {
-      return "Happening Now!";
-    }
-
-    const diffTime = start.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) {
-      // This case should ideally be filtered out, but as a fallback:
-      return "Event Over";
-    } else if (diffDays === 0) {
-      // This means startDate is today, but it's not "Happening Now!" yet (e.g. event starts later today)
-      // Or if an event is single-day and already happened today but not marked as "Happening Now"
-      // Let's refine this: if it's today and not "Happening Now", it means it starts today.
-      return "Starts Today";
-    } else if (diffDays === 1) {
-      return "Starts Tomorrow";
-    } else {
-      return `In ${diffDays} Days`;
-    }
-  };
-
   if (loading) {
     return (
-      <Box sx={{ width: '100%' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {[...Array(3)].map((_, index) => (
-            <Card key={index}>
-              <CardContent>
-                <Skeleton variant="rectangular" width={'100%'} height={118} />
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }} role="status" aria-label="Loading conventions">
+        {[0, 1, 2].map((i) => (
+          <Box
+            key={i}
+            sx={{
+              height: 88,
+              borderRadius: '8px',
+              backgroundColor: 'var(--cc-panel)',
+              border: '1px solid var(--cc-hairline)',
+              opacity: 0.55,
+            }}
+          />
+        ))}
       </Box>
     );
   }
 
   if (!conventions || conventions.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="h6" color="text.secondary">
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography sx={{ fontFamily: BODY, fontSize: '0.95rem', color: 'var(--cc-muted)' }}>
           No conventions found
         </Typography>
       </Box>
@@ -102,74 +72,129 @@ export default function ConventionGrid({
   }
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {conventions.map((convention) => {
-          const daysText = getConventionStatusText(convention.startDate, convention.endDate);
-          const location = formatLocationForGrid(convention);
+    <Box component="ul" sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, listStyle: 'none', m: 0, p: 0 }}>
+      {conventions.map((convention) => {
+        const startIso = toIso(convention.startDate);
+        const endIso = toIso(convention.endDate);
+        const cd = getCountdown(startIso, endIso);
+        // The shared countdown has no "already over" branch (the front page
+        // never shows past events); in the Past view the year IS the story.
+        const kicker = showingPast
+          ? (startIso ? String(new Date(startIso).getUTCFullYear()) : 'Past event')
+          : (cd.kind === 'happening' ? '● Happening now' : cd.text);
+        // Muted (not soft): the year kicker is small bold text and soft gray
+        // sits under AA contrast on the dark panel.
+        const kickerColor = showingPast
+          ? 'var(--cc-muted)'
+          : cd.kind === 'happening' ? 'var(--cc-live)' : 'var(--cc-magenta)';
+        const location = formatLocationForGrid(convention);
+        const dates = formatDateRange(startIso, endIso);
 
-          return (
-            <Card
-              key={convention.id}
+        return (
+          <Box component="li" key={convention.id} sx={{ m: 0, p: 0 }}>
+            <Box
+              component={Link}
+              href={`/conventions/${convention.slug}`}
               sx={{
-                cursor: 'pointer',
-                '&:hover': {
-                  backgroundColor: 'action.hover'
-                }
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                textDecoration: 'none',
+                backgroundColor: 'var(--cc-panel)',
+                border: '1px solid var(--cc-panel-border)',
+                borderRadius: '8px',
+                p: 1.5,
+                transition: 'border-color 0.18s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                '@media (hover: hover)': {
+                  '&:hover': { borderColor: 'var(--cc-cyan)', transform: 'translateY(-2px)' },
+                },
+                '&:focus-visible': { outline: '3px solid var(--cc-cyan)', outlineOffset: '2px' },
+                '@media (prefers-reduced-motion: reduce)': {
+                  transition: 'border-color 0.18s',
+                  '@media (hover: hover)': { '&:hover': { transform: 'none' } },
+                },
               }}
-              onClick={() => router.push(`/conventions/${convention.slug}`)}
             >
-              <CardContent>
-                <Box sx={{
-                  display: 'flex',
-                  flexDirection: isMobile ? 'column' : 'row',
-                  gap: 2,
-                  alignItems: isMobile ? 'flex-start' : 'center'
-                }}>
-                  <Box sx={{
-                    width: isMobile ? '100%' : '16.66%',
-                    minWidth: isMobile ? 'auto' : '100px'
-                  }}>
-                    <Typography variant="subtitle1" color={daysText === "Happening Now!" ? "success.main" : "primary"}>
-                      {daysText}
-                    </Typography>
-                  </Box>
-                  <Box sx={{
-                    width: isMobile ? '100%' : '33.33%',
-                    minWidth: isMobile ? 'auto' : '200px',
+              <FrontThumb
+                convention={{
+                  name: convention.name,
+                  imageUrl: convention.profileImageUrl ?? convention.coverImageUrl ?? null,
+                } as any}
+                size={56}
+              />
+              <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.25, pr: 4 }}>
+                <Typography
+                  suppressHydrationWarning
+                  sx={{
+                    fontFamily: DISPLAY, fontSize: '0.68rem', fontWeight: 800,
+                    letterSpacing: '0.12em', textTransform: 'uppercase',
+                    color: kickerColor,
+                    textShadow: !showingPast && cd.kind === 'happening' ? 'var(--cc-glow-live)' : 'none',
+                  }}
+                >
+                  {kicker}
+                </Typography>
+                <Typography component="h3" sx={{ fontFamily: DISPLAY, fontSize: '1.02rem', fontWeight: 800, lineHeight: 1.25, color: 'var(--cc-ink)', m: 0 }}>
+                  {convention.name}
+                </Typography>
+                <Typography suppressHydrationWarning sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)' }}>
+                  {location} · {dates}
+                </Typography>
+              </Box>
+
+              {/* Nearest mode: distance is the headline number the eye should
+                  catch scanning the list ("that one's only 40 mi!"). Right-
+                  aligned, cyan signal color, clear of the corner flag. */}
+              {distanceUnit && convention.distanceKm != null && (
+                <Box
+                  sx={{
+                    ml: 'auto',
+                    flexShrink: 0,
+                    pr: 2,
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                  }}>
-                    <Avatar src={convention.profileImageUrl ?? undefined}>
-                      {!convention.profileImageUrl && convention.name.charAt(0)}
-                    </Avatar>
-                    <Typography component="h3" variant="h6">
-                      {convention.name}
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    lineHeight: 1,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.4 }}>
+                    <Typography
+                      component="span"
+                      sx={{
+                        fontFamily: DISPLAY, fontWeight: 800,
+                        fontSize: 'clamp(1.4rem, 5vw, 1.75rem)', lineHeight: 1,
+                        color: 'var(--cc-cyan)', textShadow: 'var(--cc-glow-cyan)',
+                      }}
+                    >
+                      {displayDistance(convention.distanceKm, distanceUnit)}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      sx={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: '0.82rem', color: 'var(--cc-cyan)' }}
+                    >
+                      {distanceUnit}
                     </Typography>
                   </Box>
-                  <Box sx={{
-                    width: isMobile ? '100%' : '25%',
-                    minWidth: isMobile ? 'auto' : '130px'
-                  }}>
-                    <Typography variant="body1">
-                      {formatDateToDDMonYY_UTC(convention.startDate)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{
-                    width: isMobile ? '100%' : '25%',
-                    minWidth: isMobile ? 'auto' : '200px'
-                  }}>
-                    <Typography variant="body1">
-                      {location}
-                    </Typography>
-                  </Box>
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontFamily: BODY, fontSize: '0.62rem', fontWeight: 600,
+                      letterSpacing: '0.1em', textTransform: 'uppercase',
+                      color: 'var(--cc-muted)', mt: 0.4, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    from home
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </Box>
+              )}
+
+              {/* Corner flag only when distance isn't claiming the right edge. */}
+              {!(distanceUnit && convention.distanceKm != null) && <FlagCorner country={convention.country} />}
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
-} 
+}

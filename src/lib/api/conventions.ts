@@ -1,16 +1,25 @@
 import { Convention } from '@prisma/client';
 import { ConventionSearchParams } from '../search';
 
+/** A browse row: the Convention plus, in nearest mode, its distance from the
+ *  viewer's home base (null when the convention has no coordinates). */
+export type BrowseConvention = Convention & { distanceKm?: number | null };
+
 interface PaginatedResponse {
-    items: Convention[];
+    items: BrowseConvention[];
     total: number;
     page: number;
     totalPages: number;
+    /** What the server actually sorted by, and why nearest fell back if it did. */
+    sortApplied?: 'soonest' | 'nearest';
+    reason?: 'signed-out' | 'no-home-base';
+    unit?: 'mi' | 'km';
 }
 
 export async function getConventions(params: ConventionSearchParams): Promise<PaginatedResponse> {
     const searchParams = new URLSearchParams();
 
+    if (params.sort) searchParams.set('sort', params.sort);
     if (params.query) searchParams.set('query', params.query);
     if (params.city) searchParams.set('city', params.city);
     if (params.state) searchParams.set('state', params.state);

@@ -10,6 +10,9 @@ export const ConventionSearchParamsSchema = z.object({
   state: z.string().optional(),
   city: z.string().optional(),
   status: z.array(z.nativeEnum(ConventionStatus)).optional(),
+  // 'soonest' (chronological, default) or 'nearest' (distance from the
+  // signed-in user's home base; the server falls back when ineligible).
+  sort: z.enum(['soonest', 'nearest']).optional(),
   minPrice: z.number().optional(),
   maxPrice: z.number().optional(),
   page: z.number().min(1).optional(),

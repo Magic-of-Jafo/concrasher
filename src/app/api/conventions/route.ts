@@ -123,6 +123,9 @@ export async function GET(request: NextRequest) {
       endDate: searchParams.get('endDate') || undefined,
       status: searchParams.get('status') || '', // Can be comma-separated
       view: searchParams.get('view') || '', // 'current' or empty
+      // 'soonest' (default) or 'nearest'. Nearest needs a signed-in user with
+      // a geocoded home base; otherwise we fall back and say so in meta.
+      sort: searchParams.get('sort') === 'nearest' ? 'nearest' as const : 'soonest' as const,
     };
 
     const where: Prisma.ConventionWhereInput = {};
@@ -194,9 +197,12 @@ export async function GET(request: NextRequest) {
       mainQueryWhere.AND = mainQueryAnd;
     }
 
-    const items = await prisma.convention.findMany({
+    // Upcoming reads soonest-first; the Past view reads most-recent-first
+    // (nobody scrolls to 2019 to find last month's convention).
+    const showingPast = !isAdmin && requestedStatuses.includes('PAST');
+    const rows = await prisma.convention.findMany({
       where: mainQueryWhere,
-      orderBy: { startDate: 'asc' },
+      orderBy: { startDate: showingPast ? 'desc' : 'asc' },
       select: {
         id: true,
         name: true,
@@ -206,11 +212,56 @@ export async function GET(request: NextRequest) {
         city: true,
         stateName: true,
         stateAbbreviation: true,
+        // Country drives the corner flag on browse cards and international
+        // location lines ("Blackpool, United Kingdom").
+        country: true,
+        latitude: true,
+        longitude: true,
         coverImageUrl: true,
         profileImageUrl: true,
         tags: true,
       },
     });
+
+    // Nearest sort: the viewer's home coordinates come from their session's
+    // user row, never from client params (no spoofing, no location in URLs).
+    // meta tells the client what actually happened so it can prompt the
+    // signed-out / no-home-base states instead of silently mis-sorting.
+    let items: any[] = rows;
+    let sortMeta: { sortApplied: 'soonest' | 'nearest'; reason?: 'signed-out' | 'no-home-base'; unit?: 'mi' | 'km' } =
+      { sortApplied: 'soonest' };
+    if (params.sort === 'nearest') {
+      if (!user?.id) {
+        sortMeta = { sortApplied: 'soonest', reason: 'signed-out' };
+      } else {
+        const home = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { homeLatitude: true, homeLongitude: true, homeCountry: true },
+        });
+        if (home?.homeLatitude == null || home?.homeLongitude == null) {
+          sortMeta = { sortApplied: 'soonest', reason: 'no-home-base' };
+        } else {
+          const { distanceKm } = await import('@/lib/geocode');
+          items = rows
+            .map((r) => ({
+              ...r,
+              distanceKm: r.latitude != null && r.longitude != null
+                ? distanceKm(home.homeLatitude!, home.homeLongitude!, r.latitude, r.longitude)
+                : null,
+            }))
+            .sort((a, b) => {
+              if (a.distanceKm == null && b.distanceKm == null) return 0;
+              if (a.distanceKm == null) return 1; // ungeocoded sink to the bottom
+              if (b.distanceKm == null) return -1;
+              return a.distanceKm - b.distanceKm;
+            });
+          sortMeta = {
+            sortApplied: 'nearest',
+            unit: /united states|usa/i.test(home.homeCountry || '') ? 'mi' : 'km',
+          };
+        }
+      }
+    }
 
     // --- Parallel queries to get match counts for each status ---
     let matchCounts: Record<ConventionStatus, number> = {
@@ -256,6 +307,7 @@ export async function GET(request: NextRequest) {
       items,
       total: items.length,
       matchCounts,
+      ...sortMeta,
     });
   } catch (error) {
     console.error('Error fetching conventions:', error);

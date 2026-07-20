@@ -183,6 +183,10 @@ model Convention {
   registrationUrl          String?
   timezoneId               String?
   keywords                 String[]
+  // Geocoded from city/state/country (Nominatim) for distance sorting on the
+  // browse page; null until geocoded or when geocoding found no match.
+  latitude                 Float?
+  longitude                Float?
   series                   ConventionSeries?        @relation(fields: [seriesId], references: [id])
   timezone                 Timezone?                @relation(fields: [timezoneId], references: [id])
   dealerLinks              ConventionDealerLink[]

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,7 @@ type LoginFormInputs = z.infer<typeof LoginSchema>;
 
 export default function LoginForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,8 +41,12 @@ export default function LoginForm() {
             if (result?.error) {
                 setError(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : result.error);
             } else if (result?.ok) {
-                // On successful login, redirect to the main page
-                router.push('/');
+                // Return to where the user came from (?from=/conventions) when
+                // it's a safe same-site path; otherwise the main page.
+                // "//host" would be protocol-relative and leave the site.
+                const from = searchParams.get('from');
+                const safeFrom = from && from.startsWith('/') && !from.startsWith('//') ? from : '/';
+                router.push(safeFrom);
                 router.refresh(); // Refresh the page to update session state in the layout/header
             }
         } catch (err) {

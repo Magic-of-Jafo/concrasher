@@ -326,6 +326,30 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
     // The prisma update query uses session.user.id in the where clause,
     // which inherently enforces this.
 
+    // Home base changed? Re-geocode so distance sorting stays truthful. The
+    // lookup is best-effort: a miss clears stale coordinates rather than
+    // leaving them pointing at the previous city.
+    const before = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { homeCity: true, homeStateName: true, homeStateAbbreviation: true, homeCountry: true, homeLatitude: true },
+    });
+    const d = validatedData.data;
+    const homeChanged =
+      before?.homeCity !== d.homeCity ||
+      before?.homeStateName !== d.homeStateName ||
+      before?.homeStateAbbreviation !== d.homeStateAbbreviation ||
+      before?.homeCountry !== d.homeCountry;
+    let homeCoords: { homeLatitude: number | null; homeLongitude: number | null } | {} = {};
+    if (homeChanged || (d.homeCity && before?.homeLatitude == null)) {
+      const { geocodePlace } = await import("@/lib/geocode");
+      const hit = await geocodePlace({
+        city: d.homeCity,
+        state: d.homeStateName || d.homeStateAbbreviation,
+        country: d.homeCountry,
+      });
+      homeCoords = { homeLatitude: hit?.latitude ?? null, homeLongitude: hit?.longitude ?? null };
+    }
+
     const user = await db.user.update({
       where: { id: session.user.id },
       data: {
@@ -338,6 +362,7 @@ export async function updateUserProfile(data: ProfileSchemaInput) {
         homeStateName: validatedData.data.homeStateName,
         homeStateAbbreviation: validatedData.data.homeStateAbbreviation,
         homeCountry: validatedData.data.homeCountry,
+        ...homeCoords,
       },
     });
 

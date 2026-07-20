@@ -107,6 +107,15 @@ export async function POST(request: NextRequest) {
             !!data.endDate &&
             data.startDate.getTime() === data.endDate.getTime();
 
+        // Geocode at import time so distance sorting covers agent-created
+        // rows from day one. Best-effort; null coords just sort last.
+        const { geocodePlace } = await import('@/lib/geocode');
+        const geo = await geocodePlace({
+            city: data.city,
+            state: stateName ?? stateAbbreviation,
+            country: data.country ?? 'United States',
+        });
+
         const convention = await prisma.convention.create({
             data: {
                 name: data.name,
@@ -119,6 +128,8 @@ export async function POST(request: NextRequest) {
                 stateName,
                 stateAbbreviation,
                 country: data.country ?? 'United States',
+                latitude: geo?.latitude ?? null,
+                longitude: geo?.longitude ?? null,
                 venueName: data.venueName,
                 websiteUrl: data.websiteUrl,
                 descriptionShort: data.descriptionShort,
