@@ -89,6 +89,21 @@ export async function POST(req: Request) {
       organizerUserId,
     };
 
+    // Geocode at creation when a location came along, so distance sorting
+    // covers this convention from day one. Best-effort.
+    if (conventionData.city) {
+      const { geocodePlace } = await import('@/lib/geocode');
+      const geo = await geocodePlace({
+        city: conventionData.city,
+        state: conventionData.stateName || conventionData.stateAbbreviation,
+        country: conventionData.country,
+      });
+      if (geo) {
+        (conventionData as any).latitude = geo.latitude;
+        (conventionData as any).longitude = geo.longitude;
+      }
+    }
+
     const newConvention = await prisma.convention.create({
       data: conventionData,
     });
