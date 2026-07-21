@@ -6,6 +6,7 @@ import MapIcon from '@mui/icons-material/Map';
 import { DISPLAY, BODY } from '@/lib/fonts';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { toAbsoluteUrl } from '@/lib/url';
+import { clarityEvent } from '@/lib/clarity';
 
 // House Lights reskin (2026-07-10): panel cards on the theme surface. All
 // booking/website/map links leave the site, so they open in a new tab.
@@ -138,7 +139,7 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
             )}
             <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
                 {hotel.bookingLink && (
-                    <Button href={toAbsoluteUrl(hotel.bookingLink)} target="_blank" rel="noopener noreferrer" size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
+                    <Button href={toAbsoluteUrl(hotel.bookingLink)} target="_blank" rel="noopener noreferrer" onClick={() => clarityEvent('book_room_click')} size={isCompact ? 'small' : 'medium'} sx={outlineButtonSx}>
                         Book Room ↗
                     </Button>
                 )}

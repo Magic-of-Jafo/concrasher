@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { ConventionStatus } from '@prisma/client';
 import Link from 'next/link';
+import { clarityEvent } from '@/lib/clarity';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EventIcon from '@mui/icons-material/Event';
 import WebIcon from '@mui/icons-material/Web';
@@ -110,6 +111,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                     target={hasRegistrationUrl ? "_blank" : undefined}
                     rel={hasRegistrationUrl ? "noopener noreferrer" : undefined}
                     disabled={!hasRegistrationUrl}
+                    onClick={hasRegistrationUrl ? () => clarityEvent('register_click') : undefined}
                     sx={{
                         width: '100%',
                         ...(hasRegistrationUrl ? {} : {
@@ -121,7 +123,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                         })
                     }}
                 >
-                    {hasRegistrationUrl ? 'Click here to Register' : 'Check back for register link'}
+                    {hasRegistrationUrl ? 'Register Here' : 'Check back for registration link'}
                 </Button>
             </Box>
 
@@ -291,6 +293,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                                 target={hasRegistrationUrl ? "_blank" : undefined}
                                 rel={hasRegistrationUrl ? "noopener noreferrer" : undefined}
                                 disabled={!hasRegistrationUrl}
+                                onClick={hasRegistrationUrl ? () => clarityEvent('register_click') : undefined}
                                 sx={{
                                     width: '100%',
                                     ...(hasRegistrationUrl ? {} : {
@@ -302,7 +305,7 @@ export default function BasicInfoSection({ convention }: BasicInfoSectionProps) 
                                     })
                                 }}
                             >
-                                {hasRegistrationUrl ? 'Click here to Register' : 'Check back for register link'}
+                                {hasRegistrationUrl ? 'Register Here' : 'Check back for registration link'}
                             </Button>
                         </Box>
 

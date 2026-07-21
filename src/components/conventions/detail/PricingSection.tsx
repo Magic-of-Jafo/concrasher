@@ -19,6 +19,7 @@ import {
 import { format } from 'date-fns';
 import { ConventionStatus } from '@prisma/client';
 import { DISPLAY, BODY } from '@/lib/fonts';
+import { clarityEvent } from '@/lib/clarity';
 import { SectionKicker } from './VenueSection';
 
 interface PricingSectionProps {
@@ -313,6 +314,7 @@ export default function PricingSection({ convention }: PricingSectionProps) {
                         href={convention.registrationUrl!}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => clarityEvent('register_click')}
                         sx={{
                             fontFamily: DISPLAY, fontWeight: 800, fontSize: '0.95rem', textTransform: 'none',
                             backgroundColor: 'var(--cc-cta)', color: 'var(--cc-cta-ink)',

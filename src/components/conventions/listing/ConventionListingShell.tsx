@@ -9,6 +9,7 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { getS3ImageUrl } from '@/lib/defaults';
+import { clarityEvent } from '@/lib/clarity';
 import { formatDateRange } from '@/components/home/home-types';
 import ScheduleSection from '@/components/conventions/detail/ScheduleSection';
 import FestivalSchedule from '@/components/conventions/detail/FestivalSchedule';
@@ -89,6 +90,7 @@ function RegisterButton({ href, label, compact = false }: { href: string; label:
             target="_blank"
             rel="noopener noreferrer"
             fullWidth={!compact}
+            onClick={() => clarityEvent('register_click')}
             sx={{
                 backgroundColor: 'var(--cc-cta)',
                 color: 'var(--cc-cta-ink)',
@@ -615,7 +617,9 @@ export default function ConventionListingShell({ convention, canEdit = false, in
         : convention.registrationUrl || convention.websiteUrl || null;
     // No price on the button: the cheapest tier is usually an add-on (spouse,
     // youth, workshop), so "from $X" undersells full registration.
-    const registerLabel = 'Register';
+    // "Register Here" is the ONE label for registration CTAs site-wide (also
+    // keeps Clarity's register_click event tied to a single wording).
+    const registerLabel = 'Register Here';
 
     const pane = () => {
         switch (tab) {

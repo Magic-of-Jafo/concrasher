@@ -6,6 +6,7 @@ import Grid from '@mui/material/Grid';
 import MapIcon from '@mui/icons-material/Map';
 import { getS3ImageUrl } from '@/lib/defaults';
 import { toAbsoluteUrl } from '@/lib/url';
+import { clarityEvent } from '@/lib/clarity';
 import { DISPLAY, BODY } from '@/lib/fonts';
 
 // House Lights reskin (2026-07-10): panel cards on the theme surface, one
@@ -146,6 +147,7 @@ export default function VenueSection({ convention }: { convention: any }) {
             {(primaryVenue?.bookingLink || primaryVenue?.websiteUrl) && (
                 <Button
                     href={toAbsoluteUrl(primaryVenue.bookingLink || primaryVenue.websiteUrl)}
+                    onClick={() => { if (convention.guestsStayAtPrimaryVenue) clarityEvent('book_room_click'); }}
                     target="_blank"
                     rel="noopener noreferrer"
                     sx={{ ...outlineButtonSx, mb: 2 }}
