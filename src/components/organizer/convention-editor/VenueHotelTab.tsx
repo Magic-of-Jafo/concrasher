@@ -363,7 +363,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
           />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             {value.guestsStayAtPrimaryVenue
-              ? "✓ Hotel forms are hidden because guests stay at the primary venue"
+              ? "✓ The venue holds the host room block, so there is no separate primary hotel. Overflow hotels can still be added below."
               : "Hotel forms are shown below"}
           </Typography>
         </Paper>
@@ -403,9 +403,15 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                 )}
               </AccordionDetails>
             </Accordion>
+          </>
+        )}
 
-            {/* Additional Hotels Section */}
-            {additionalHotels.map((hotel, index) => {
+        {/* Additional Hotels — ALWAYS visible. Overflow hotels are valid even
+            when guests stay at the venue (the public page lists them under
+            the venue-as-hotel); only the separate primary-hotel form is
+            replaced by the stay-at-venue room block. This gating bug is what
+            made helper-applied secondary hotels look like they vanished. */}
+        {additionalHotels.map((hotel, index) => {
               // Identify the row by object reference, not id: freshly-scraped
               // (unsaved) hotels all share id === undefined, so an id-based
               // findIndex collides them onto one slot and photo/field edits
@@ -422,20 +428,24 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                       <Typography sx={{ fontWeight: 'medium', mr: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(hotel.hotelName || '').trim() || `Additional Hotel ${index + 1}`}
                       </Typography>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={hotel.markedForPrimaryPromotion || false}
-                            onChange={(event) => {
-                              const updatedHotel = { ...hotel, markedForPrimaryPromotion: event.target.checked };
-                              handleHotelChange(actualIndex, updatedHotel);
-                            }}
-                            disabled={disabled}
-                          />
-                        }
-                        label="Make Primary Hotel"
-                        onClick={(e) => e.stopPropagation()}
-                      />
+                      {/* Promotion targets the separate primary-hotel form,
+                          which stay-at-venue replaces — hide it there. */}
+                      {!value.guestsStayAtPrimaryVenue && (
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={hotel.markedForPrimaryPromotion || false}
+                              onChange={(event) => {
+                                const updatedHotel = { ...hotel, markedForPrimaryPromotion: event.target.checked };
+                                handleHotelChange(actualIndex, updatedHotel);
+                              }}
+                              disabled={disabled}
+                            />
+                          }
+                          label="Make Primary Hotel"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
@@ -460,11 +470,9 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
               );
             })}
 
-            <Button startIcon={<AddIcon />} onClick={handleAddHotel} sx={{ mt: 2 }} disabled={disabled}>
-              Add Another Hotel
-            </Button>
-          </>
-        )}
+        <Button startIcon={<AddIcon />} onClick={handleAddHotel} sx={{ mt: 2 }} disabled={disabled}>
+          Add Another Hotel
+        </Button>
       </Box>
     );
   };
