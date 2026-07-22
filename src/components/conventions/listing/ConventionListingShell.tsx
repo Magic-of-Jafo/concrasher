@@ -358,12 +358,14 @@ export default function ConventionListingShell({ convention, canEdit = false, in
     const tabs = useMemo<ListingTab[]>(
         () =>
             LISTING_TABS.filter((t) => {
-                // When guests stay at the primary venue, its lodging details
-                // live in the Venue tab. Hide Hotels even if an older hotel
-                // record remains attached to the convention.
+                // Hotels tab shows whenever hotel records exist. Stay-at-venue
+                // no longer hides it: overflow hotels are valid alongside the
+                // venue's own room block (HotelSection presents the venue as
+                // the host lodging and the records as additional hotels).
                 if (t.key === 'hotels') {
-                    return !convention.guestsStayAtPrimaryVenue
-                        && (convention.hotels?.length ?? 0) > 0;
+                    return (convention.hotels?.length ?? 0) > 0
+                        || (convention.guestsStayAtPrimaryVenue
+                            && convention.venues?.some((v: any) => v.isPrimaryVenue && (v.groupPrice || v.bookingLink || v.groupRateOrBookingCode)));
                 }
                 if (t.key === 'dealers') return (convention.dealerLinks?.length ?? 0) > 0;
                 if (t.key === 'media') return (convention.media?.length ?? 0) > 0;

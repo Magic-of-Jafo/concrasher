@@ -165,12 +165,15 @@ const HotelCard = ({ hotel, isCompact = false }: { hotel: any; isCompact?: boole
 };
 
 export default function HotelSection({ convention }: { convention: any }) {
-    // Prefer real hotel records (they carry group rates/booking info); fall
-    // back to presenting the venue as the hotel when the organizer set the
-    // guests-stay-at-venue flag without adding a hotel record.
+    // Stay-at-venue: the venue IS the host lodging, so it takes the primary
+    // card (unless a hotel is explicitly flagged primary) and every hotel
+    // record presents as an overflow hotel. Otherwise the flagged primary,
+    // or failing that the first record, leads.
     const isVenueAlsoHotel = convention.guestsStayAtPrimaryVenue;
     const primaryVenue = convention.venues?.find((v: any) => v.isPrimaryVenue);
-    const hotelRecordPrimary = convention.hotels?.find((h: any) => h.isPrimaryHotel) || convention.hotels?.[0];
+    const explicitPrimary = convention.hotels?.find((h: any) => h.isPrimaryHotel) ?? null;
+    const hotelRecordPrimary = explicitPrimary
+        ?? (isVenueAlsoHotel ? null : (convention.hotels?.[0] ?? null));
     const primaryHotel = hotelRecordPrimary
         ?? (isVenueAlsoHotel && primaryVenue
             ? { ...primaryVenue, hotelName: primaryVenue.venueName } // Adapt venue to look like a hotel
@@ -182,7 +185,7 @@ export default function HotelSection({ convention }: { convention: any }) {
     // section titles read as siblings.
     const headingSx = { fontFamily: DISPLAY, fontWeight: 800, fontSize: '1.05rem', color: 'var(--cc-ink)', mb: 1.5 } as const;
 
-    if (!primaryHotel) {
+    if (!primaryHotel && otherHotels.length === 0) {
         return (
             <Box sx={{ py: 1 }}>
                 <Typography component="h2" sx={headingSx}>Primary Hotel</Typography>
@@ -195,12 +198,20 @@ export default function HotelSection({ convention }: { convention: any }) {
 
     return (
         <Box sx={{ py: 1 }}>
-            <Typography component="h2" sx={headingSx}>Primary Hotel</Typography>
-            {primaryHotel && <HotelCard hotel={primaryHotel} isCompact={false} />}
+            {primaryHotel && (
+                <>
+                    <Typography component="h2" sx={headingSx}>Primary Hotel</Typography>
+                    <HotelCard hotel={primaryHotel} isCompact={false} />
+                </>
+            )}
             {otherHotels.length > 0 && (
-                <Box sx={{ mt: 4 }}>
-                    <Typography component="h3" sx={headingSx}>
-                        {otherHotels.length > 1 ? 'Additional Hotels' : 'Additional Hotel'}
+                <Box sx={{ mt: primaryHotel ? 4 : 0 }}>
+                    {/* Without a primary card the group heading is just "Hotels" —
+                        "Additional" would beg the question: additional to what? */}
+                    <Typography component={primaryHotel ? 'h3' : 'h2'} sx={headingSx}>
+                        {primaryHotel
+                            ? (otherHotels.length > 1 ? 'Additional Hotels' : 'Additional Hotel')
+                            : 'Hotels'}
                     </Typography>
                     <Stack spacing={2}>
                         {otherHotels.map((hotel: any) => (
