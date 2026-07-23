@@ -9,7 +9,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import VenueHotelTab from '@/components/organizer/convention-editor/VenueHotelTab';
-import { createDefaultVenueHotelTabData, createDefaultHotel, VenueHotelTabData } from '@/lib/validators';
+import { createDefaultVenueHotelTabData, createDefaultHotel, createDefaultVenue, VenueHotelTabData } from '@/lib/validators';
 
 // Mock the helper dialog: clicking "MOCK APPLY" fires onApplied with the exact
 // scenario from the bug report — first place skipped, three secondary hotels.
@@ -40,13 +40,16 @@ jest.mock('@/components/organizer/convention-editor/VenueHotelHelperDialog', () 
 const theme = createTheme();
 
 // Harness mimicking ConventionEditorTabs' wiring: value state fed back via onChange.
-function Harness({ report, stayAtVenue = false }: { report: (d: any) => void; stayAtVenue?: boolean }) {
+function Harness({ report, stayAtVenue = false, withSecondaryVenue = false }: { report: (d: any) => void; stayAtVenue?: boolean; withSecondaryVenue?: boolean }) {
   const [value, setValue] = useState<VenueHotelTabData>(() => {
     const base = createDefaultVenueHotelTabData();
     const primary = { ...createDefaultHotel(true), hotelName: 'Existing Primary Hotel', id: 'h1' };
+    const secondaries = withSecondaryVenue
+      ? [{ ...createDefaultVenue(false), venueName: 'Spare Venue', city: 'Orlando' }]
+      : [];
     return stayAtVenue
-      ? ({ ...base, hotels: [], guestsStayAtPrimaryVenue: true } as any)
-      : ({ ...base, hotels: [primary], guestsStayAtPrimaryVenue: false } as any);
+      ? ({ ...base, secondaryVenues: secondaries, hotels: [], guestsStayAtPrimaryVenue: true } as any)
+      : ({ ...base, secondaryVenues: secondaries, hotels: [primary], guestsStayAtPrimaryVenue: false } as any);
   });
   const onChange = useCallback((data: any) => { setValue(data); report(data); }, [report]);
   return (
@@ -99,4 +102,31 @@ test('stay-at-venue ON: applied secondary hotels still render (regression)', () 
   expect(screen.getByText('Hotel Four')).toBeInTheDocument();
   // The separate primary-hotel form stays hidden in this mode.
   expect(screen.queryByText(/Primary Hotel \(/)).not.toBeInTheDocument();
+});
+
+test('Make Primary on an additional hotel promotes it and clears stay-at-venue', () => {
+  const reports: any[] = [];
+  render(<Harness stayAtVenue report={(d) => reports.push(d)} />);
+  fireEvent.click(screen.getByText('MOCK APPLY'));
+
+  fireEvent.click(screen.getByLabelText('Make Hotel Three the primary hotel'));
+
+  const last = reports[reports.length - 1];
+  const primary = (last.hotels || []).find((h: any) => h.isPrimaryHotel);
+  expect(primary?.hotelName).toBe('Hotel Three');
+  expect(last.guestsStayAtPrimaryVenue).toBe(false);
+  // The primary-hotel form appears, showing the promoted hotel.
+  expect(screen.getByText(/Primary Hotel \(Hotel Three\)/)).toBeInTheDocument();
+});
+
+test('Make Primary on a secondary venue promotes it; blank placeholder primary is dropped', () => {
+  const reports: any[] = [];
+  render(<Harness withSecondaryVenue report={(d) => reports.push(d)} />);
+
+  fireEvent.click(screen.getByLabelText('Make Spare Venue the primary venue'));
+
+  const last = reports[reports.length - 1];
+  expect(last.primaryVenue?.venueName ?? last.venues?.find((v: any) => v.isPrimaryVenue)?.venueName).toBe('Spare Venue');
+  const secondaries = last.secondaryVenues ?? last.venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
+  expect(secondaries.length).toBe(0);
 });

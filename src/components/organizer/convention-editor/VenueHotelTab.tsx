@@ -204,6 +204,39 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels });
   };
 
+  // Promote a secondary venue to primary, immediately and explicitly. The
+  // current primary steps down to a secondary when it holds anything (a saved
+  // record or typed content); a blank placeholder primary is simply dropped.
+  const handlePromoteVenue = (index: number) => {
+    const target = secondaryVenues[index];
+    if (!target) return;
+    const rest = secondaryVenues.filter((_, i) => i !== index);
+    const old: any = primaryVenue;
+    const oldHasContent = !!(old?.id || (old?.venueName || '').trim() || (old?.streetAddress || '').trim() || (old?.city || '').trim());
+    const newSecondaries = oldHasContent
+      ? [...rest, { ...old, isPrimaryVenue: false, markedForPrimaryPromotion: false }]
+      : rest;
+    validateAndNotify({
+      ...value,
+      primaryVenue: { ...target, isPrimaryVenue: true, markedForPrimaryPromotion: false },
+      secondaryVenues: newSecondaries,
+    });
+    setExpandedAccordion('primaryVenue');
+  };
+
+  // Promote a hotel to primary; any current primary steps down to an
+  // additional hotel (nothing is lost). An explicit primary hotel and
+  // "guests stay at the venue" are mutually exclusive, so promoting also
+  // turns that toggle off and reveals the primary-hotel form.
+  const handlePromoteHotel = (actualIndex: number) => {
+    const hotels = (value.hotels || []).map((h, i) => ({
+      ...h,
+      isPrimaryHotel: i === actualIndex,
+      markedForPrimaryPromotion: false,
+    }));
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: false, hotels });
+  };
+
   const handleGuestsStayAtPrimaryVenueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const guestsStayAtPrimaryVenue = event.target.checked;
     let hotels = [...(value.hotels || [])];
@@ -306,9 +339,21 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
         {secondaryVenues.map((venue, index) => (
           <Accordion key={venue.id || `venue-${index}`} expanded={expandedAccordion === `venue-${index}`} onChange={handleAccordionChange(`venue-${index}`)}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography sx={{ flexShrink: 0, fontWeight: 'medium' }}>
-                {`Secondary Venue ${index + 1}`}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                <Typography sx={{ fontWeight: 'medium', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {(venue.venueName || '').trim() || `Secondary Venue ${index + 1}`}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={(e) => { e.stopPropagation(); handlePromoteVenue(index); }}
+                  disabled={disabled}
+                  aria-label={`Make ${(venue.venueName || '').trim() || `secondary venue ${index + 1}`} the primary venue`}
+                  sx={{ flexShrink: 0, mr: 1 }}
+                >
+                  Make Primary
+                </Button>
+              </Box>
             </AccordionSummary>
             <AccordionDetails>
               <PrimaryVenueForm
@@ -428,24 +473,19 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                       <Typography sx={{ fontWeight: 'medium', mr: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(hotel.hotelName || '').trim() || `Additional Hotel ${index + 1}`}
                       </Typography>
-                      {/* Promotion targets the separate primary-hotel form,
-                          which stay-at-venue replaces — hide it there. */}
-                      {!value.guestsStayAtPrimaryVenue && (
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={hotel.markedForPrimaryPromotion || false}
-                              onChange={(event) => {
-                                const updatedHotel = { ...hotel, markedForPrimaryPromotion: event.target.checked };
-                                handleHotelChange(actualIndex, updatedHotel);
-                              }}
-                              disabled={disabled}
-                            />
-                          }
-                          label="Make Primary Hotel"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      )}
+                      {/* Explicit, immediate promotion — always available. In
+                          stay-at-venue mode promoting also turns that toggle
+                          off (a separate primary hotel supersedes it). */}
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => { e.stopPropagation(); handlePromoteHotel(actualIndex); }}
+                        disabled={disabled}
+                        aria-label={`Make ${(hotel.hotelName || '').trim() || `additional hotel ${index + 1}`} the primary hotel`}
+                        sx={{ flexShrink: 0, mr: 1 }}
+                      >
+                        Make Primary
+                      </Button>
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
