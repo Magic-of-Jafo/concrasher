@@ -64,7 +64,11 @@ export const authOptions: AuthOptions = {
           return authorizedUser;
         } catch (error) {
           console.error('[Authorize] Error:', error);
-          return null;
+          // Returning null here reports "invalid password" for what is really
+          // an outage (unreachable DB etc.) — it once sent a user hunting a
+          // password ghost. Throwing surfaces a distinct error code that the
+          // login form maps to an honest "try again shortly" message.
+          throw new Error('service_unavailable');
         }
       },
     }),

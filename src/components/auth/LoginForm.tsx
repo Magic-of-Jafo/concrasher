@@ -39,7 +39,16 @@ export default function LoginForm() {
             });
 
             if (result?.error) {
-                setError(result.error === 'CredentialsSignin' ? 'Invalid email or password.' : result.error);
+                // 'CredentialsSignin' = the credentials really were wrong.
+                // 'service_unavailable' = we could not check them (DB outage);
+                // never blame the user's password for that.
+                setError(
+                    result.error === 'CredentialsSignin'
+                        ? 'Invalid email or password.'
+                        : result.error === 'service_unavailable'
+                            ? 'We are having trouble signing you in right now. Your password is fine; please try again in a minute.'
+                            : result.error,
+                );
             } else if (result?.ok) {
                 // Return to where the user came from (?from=/conventions) when
                 // it's a safe same-site path; otherwise the main page.
