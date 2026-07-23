@@ -31,6 +31,10 @@ export async function getConventionDetailsByIdWithRelations(id: string) {
         // Basic relationships
         series: true,
 
+        // The venue's timezone: names the zone on the public schedule and
+        // anchors its "today" auto-selection to the venue's calendar day.
+        timezone: { select: { ianaId: true, value: true } },
+
         // Pricing information
         priceTiers: {
           orderBy: {

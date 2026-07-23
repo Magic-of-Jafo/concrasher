@@ -11,6 +11,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import NextLink from 'next/link';
 import ScheduleSection from './ScheduleSection';
 import { conventionDayDate, formatConventionDay } from '@/lib/scheduleDates';
+import { timezoneLabel } from '@/lib/timezone-display';
 
 interface Performance {
     id: string;
@@ -198,6 +199,14 @@ export default function FestivalSchedule({ convention }: { convention: FestivalC
         <Box sx={{ width: '100%', pb: 4 }}>
             <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 3, md: 4 }, pb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, justifyContent: 'space-between' }}>
                 <SectionKicker>Shows</SectionKicker>
+                {(() => {
+                    const tz = timezoneLabel((convention as any).timezone?.ianaId, (convention as any).timezone?.value);
+                    return tz ? (
+                        <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)', mt: -1, mb: 1.5 }}>
+                            All times are local to the venue ({tz}).
+                        </Typography>
+                    ) : null;
+                })()}
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
                     {view === 'cards' && venues.length > 1 && (
                         <FormControl size="small" sx={{ minWidth: 170 }}>

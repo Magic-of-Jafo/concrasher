@@ -8,6 +8,7 @@ import { keyframes } from '@mui/system';
 import Link from '@mui/material/Link';
 import NextLink from 'next/link';
 import { conventionDayDate, formatConventionDay } from '@/lib/scheduleDates';
+import { timezoneLabel, todayKeyInZone } from '@/lib/timezone-display';
 import { getEventTypeColor } from '@/lib/eventTypes';
 
 interface TalentLink {
@@ -39,7 +40,7 @@ interface ScheduleSectionProps {
         startDate: string;
         endDate: string;
         scheduleDays: ScheduleDay[];
-        timezone?: { ianaId: string } | null;
+        timezone?: { ianaId: string; value?: string | null } | null;
     };
 }
 
@@ -121,15 +122,14 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
 
     // Auto-select today's day if the convention is currently running, so an
     // attendee opening the schedule lands on the right day with zero taps.
-    // "Today" is the viewer's LOCAL calendar date (an attendee is in the
-    // venue's timezone): UTC components would flip a US viewer to tomorrow
-    // during the evening shows.
+    // "Today" is the VENUE's calendar day when the convention has a timezone
+    // (right answer for attendees and remote viewers alike); otherwise the
+    // viewer's local date approximates it.
     const initialIndex = useMemo(() => {
-        const now = new Date();
-        const todayKey = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayKey = todayKeyInZone(convention.timezone?.ianaId);
         const idx = sortedDays.findIndex(d => conventionDayDate(convention.startDate, d.dayOffset).getTime() === todayKey);
         return idx >= 0 ? idx : 0;
-    }, [sortedDays, convention.startDate]);
+    }, [sortedDays, convention.startDate, convention.timezone?.ianaId]);
 
     const [selected, setSelected] = useState(initialIndex);
     const activeIndex = Math.min(selected, Math.max(0, sortedDays.length - 1));
@@ -160,6 +160,14 @@ export default function ScheduleSection({ convention }: ScheduleSectionProps) {
                 <Typography component="h2" sx={{ fontFamily: DISPLAY, fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--cc-magenta)', textShadow: 'var(--cc-glow-magenta)' }}>
                     Schedule
                 </Typography>
+                {(() => {
+                    const tz = timezoneLabel(convention.timezone?.ianaId, convention.timezone?.value);
+                    return tz ? (
+                        <Typography sx={{ fontFamily: BODY, fontSize: '0.8rem', color: 'var(--cc-muted)', mt: 0.5 }}>
+                            All times are local to the venue ({tz}).
+                        </Typography>
+                    ) : null;
+                })()}
             </Box>
 
             {/* Sticky day tabs — stay pinned while scrolling a day's events on mobile. */}
