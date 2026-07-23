@@ -237,7 +237,7 @@ export default function VenueHotelHelperDialog({
                 {!assignments ? (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Point the helper at the event&apos;s venue / travel / hotel page — paste a link, or upload a PDF or a screenshot — and it&apos;ll pull out each place it finds. In the preview you decide what each one is, and nothing you&apos;ve already entered gets overwritten.
+                            Point the helper at the event&apos;s venue / travel / hotel page, or at the venue&apos;s or hotel&apos;s own website — paste a link, or upload a PDF or a screenshot — and it&apos;ll pull out each place it finds. In the preview you decide what each one is, and nothing you&apos;ve already entered gets overwritten.
                         </Typography>
 
                         <ToggleButtonGroup exclusive fullWidth size="small" value={sourceType} onChange={(_, v) => v && setSourceType(v)} sx={{ mb: 2 }}>

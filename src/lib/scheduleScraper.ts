@@ -929,6 +929,8 @@ function venueHotelSystemPrompt(): string {
 
 A convention has a VENUE where events take place, and lodging where attendees stay. VERY OFTEN the convention is held AT a hotel and attendees stay in that same hotel (sameLocation true). Sometimes events are at a separate venue and attendees stay at a different host hotel (sameLocation false).
 
+The source is not always the convention's own page. It may be the VENUE'S or HOTEL'S OWN WEBSITE (a theatre, conference centre, resort, or hotel site that never mentions the convention). In that case the establishment the site belongs to IS the place: extract its name, address, contact details, parking and travel info — addresses and phone numbers often live in the page footer or a contact section. Put a hotel/resort in "hotels"; any other kind of establishment in "venue". Never return an empty result just because no convention is mentioned.
+
 Respond ONLY as JSON with exactly these keys:
 {"sameLocation":true,"venue":{place},"hotels":[],"timezone":"America/New_York","currency":"USD"}
 
@@ -943,6 +945,7 @@ Rules:
 - Booking fields (on whichever place is the lodging): "groupPrice" = nightly rate as written (e.g. "$129/night"); "groupRateOrBookingCode" = the code/phrase to mention for the convention rate (e.g. "MAGIC26"); "bookingLink" = the direct booking URL; "bookingCutoffDate" = last day to book at that rate (YYYY-MM-DD).
 - "googleMapsUrl": only if an explicit Google Maps link is present in the source; otherwise null (we build one from the address).
 - "amenities": a short list if stated, else [].
+- "country": infer from clear context when not written out — postal code style ("FY1 1HU" is a UK postcode), phone country code, the site's domain (.co.uk). Write the full name ("United Kingdom", not "UK").
 - "timezone": the IANA timezone id for the venue's location, inferred from its city/state/country. Use the region's MAJOR id ("America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London"), not a niche one like "America/Indiana/Indianapolis". null only if the location is genuinely unknown.
 - "currency": the ISO 4217 code of the local currency at the venue's location, inferred from its country (e.g. "USD", "GBP", "EUR", "CAD", "AUD"). null only if the location is genuinely unknown.
 - If the source is in another language, translate descriptions/amenities into natural English; keep proper names, addresses, and codes. Use null or "" for anything not present. Do not invent details.`;
