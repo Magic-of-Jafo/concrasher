@@ -281,7 +281,10 @@ export async function PUT(
         websiteUrl, registrationUrl,
         guestsStayAtPrimaryVenue,
         keywords,
-        tags: { set: tagIds }, // Use the collected IDs to set the relationship
+        // Only touch tags when the request actually sent them: a partial PUT
+        // (wizard steps, in-place promotions) would otherwise wipe every tag
+        // via set: [].
+        ...(incomingTags !== undefined ? { tags: { set: tagIds } } : {}),
         updatedAt: new Date(),
       };
 

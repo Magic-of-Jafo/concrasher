@@ -41,6 +41,9 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
   const [venueToDelete, setVenueToDelete] = useState<{ originalIndex: number, displayIndex: number } | null>(null);
   const [confirmDeletePrimary, setConfirmDeletePrimary] = useState(false);
   const [helperOpen, setHelperOpen] = useState(false);
+  // Make Primary clicks save immediately; these track that in-flight save.
+  const [promotionSaving, setPromotionSaving] = useState(false);
+  const [promotionError, setPromotionError] = useState<string | null>(null);
 
   const { primaryVenue, secondaryVenues } = useMemo(() => {
     const pVenue = value.primaryVenue ?? value.venues?.find((v: VenueData) => v.isPrimaryVenue) ?? createDefaultVenue(true);
@@ -204,6 +207,52 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels });
   };
 
+  // Persist a promotion the moment it happens: promotions are decisions, not
+  // drafts. Sends only the places (partial PUT; the wizard uses the same
+  // shape) and adopts the returned rows so fresh records get their real ids.
+  // On a new, not-yet-created convention there is nothing to PUT — the swap
+  // stays local and rides the normal create/save.
+  const persistPromotion = async (next: {
+    primaryVenue: VenueData;
+    secondaryVenues: VenueData[];
+    hotels: HotelData[];
+    guestsStayAtPrimaryVenue?: boolean;
+  }) => {
+    if (!conventionId) return;
+    setPromotionSaving(true);
+    setPromotionError(null);
+    try {
+      const clean = (o: any) => { const { tempId, markedForPrimaryPromotion, ...rest } = o || {}; return rest; };
+      const res = await fetch(`/api/organizer/conventions/${conventionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venues: [next.primaryVenue, ...next.secondaryVenues].filter(Boolean).map(clean),
+          hotels: next.hotels.map(clean),
+          ...(next.guestsStayAtPrimaryVenue !== undefined ? { guestsStayAtPrimaryVenue: next.guestsStayAtPrimaryVenue } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save.');
+      }
+      const saved = await res.json();
+      if (Array.isArray(saved.venues) && Array.isArray(saved.hotels)) {
+        validateAndNotify({
+          ...value,
+          primaryVenue: saved.venues.find((v: any) => v.isPrimaryVenue) ?? createDefaultVenue(true),
+          secondaryVenues: saved.venues.filter((v: any) => !v.isPrimaryVenue),
+          ...(next.guestsStayAtPrimaryVenue !== undefined ? { guestsStayAtPrimaryVenue: next.guestsStayAtPrimaryVenue } : {}),
+          hotels: saved.hotels,
+        });
+      }
+    } catch (e: any) {
+      setPromotionError(`The change is on screen but not saved yet (${e?.message || 'network error'}). Use Save Convention to retry.`);
+    } finally {
+      setPromotionSaving(false);
+    }
+  };
+
   // Promote a secondary venue to primary, immediately and explicitly. The
   // current primary steps down to a secondary when it holds anything (a saved
   // record or typed content); a blank placeholder primary is simply dropped.
@@ -213,15 +262,16 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     const rest = secondaryVenues.filter((_, i) => i !== index);
     const old: any = primaryVenue;
     const oldHasContent = !!(old?.id || (old?.venueName || '').trim() || (old?.streetAddress || '').trim() || (old?.city || '').trim());
-    const newSecondaries = oldHasContent
-      ? [...rest, { ...old, isPrimaryVenue: false, markedForPrimaryPromotion: false }]
-      : rest;
-    validateAndNotify({
-      ...value,
-      primaryVenue: { ...target, isPrimaryVenue: true, markedForPrimaryPromotion: false },
-      secondaryVenues: newSecondaries,
-    });
+    const next = {
+      primaryVenue: { ...target, isPrimaryVenue: true, markedForPrimaryPromotion: false } as VenueData,
+      secondaryVenues: oldHasContent
+        ? [...rest, { ...old, isPrimaryVenue: false, markedForPrimaryPromotion: false }]
+        : rest,
+      hotels: value.hotels || [],
+    };
+    validateAndNotify({ ...value, primaryVenue: next.primaryVenue, secondaryVenues: next.secondaryVenues });
     setExpandedAccordion('primaryVenue');
+    void persistPromotion(next);
   };
 
   // Promote a hotel to primary; any current primary steps down to an
@@ -235,6 +285,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
       markedForPrimaryPromotion: false,
     }));
     validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: false, hotels });
+    void persistPromotion({ primaryVenue, secondaryVenues, hotels, guestsStayAtPrimaryVenue: false });
   };
 
   const handleGuestsStayAtPrimaryVenueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,7 +398,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                   size="small"
                   variant="outlined"
                   onClick={(e) => { e.stopPropagation(); handlePromoteVenue(index); }}
-                  disabled={disabled}
+                  disabled={disabled || promotionSaving}
                   aria-label={`Make ${(venue.venueName || '').trim() || `secondary venue ${index + 1}`} the primary venue`}
                   sx={{ flexShrink: 0, mr: 1 }}
                 >
@@ -480,7 +531,7 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                         size="small"
                         variant="outlined"
                         onClick={(e) => { e.stopPropagation(); handlePromoteHotel(actualIndex); }}
-                        disabled={disabled}
+                        disabled={disabled || promotionSaving}
                         aria-label={`Make ${(hotel.hotelName || '').trim() || `additional hotel ${index + 1}`} the primary hotel`}
                         sx={{ flexShrink: 0, mr: 1 }}
                       >
@@ -519,6 +570,11 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
 
   return (
     <Box>
+      {promotionError && (
+        <Alert severity="warning" onClose={() => setPromotionError(null)} sx={{ mb: 2 }}>
+          {promotionError}
+        </Alert>
+      )}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h5">Venue Information</Typography>
         {conventionId && (

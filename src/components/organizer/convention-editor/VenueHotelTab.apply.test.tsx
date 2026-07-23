@@ -39,6 +39,11 @@ jest.mock('@/components/organizer/convention-editor/VenueHotelHelperDialog', () 
 
 const theme = createTheme();
 
+// Promotions PUT immediately; keep that network call inert and observable.
+beforeEach(() => {
+  (global as any).fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+});
+
 // Harness mimicking ConventionEditorTabs' wiring: value state fed back via onChange.
 function Harness({ report, stayAtVenue = false, withSecondaryVenue = false }: { report: (d: any) => void; stayAtVenue?: boolean; withSecondaryVenue?: boolean }) {
   const [value, setValue] = useState<VenueHotelTabData>(() => {
@@ -115,6 +120,15 @@ test('Make Primary on an additional hotel promotes it and clears stay-at-venue',
   const primary = (last.hotels || []).find((h: any) => h.isPrimaryHotel);
   expect(primary?.hotelName).toBe('Hotel Three');
   expect(last.guestsStayAtPrimaryVenue).toBe(false);
+
+  // The promotion persists immediately: a PUT fires without pressing Save.
+  expect(global.fetch).toHaveBeenCalledWith(
+    '/api/organizer/conventions/conv1',
+    expect.objectContaining({ method: 'PUT' }),
+  );
+  const body = JSON.parse((global.fetch as jest.Mock).mock.calls.find((c: any[]) => c[0].includes('conv1'))![1].body);
+  expect(body.guestsStayAtPrimaryVenue).toBe(false);
+  expect(body.hotels.find((h: any) => h.isPrimaryHotel)?.hotelName).toBe('Hotel Three');
   // The primary-hotel form appears, showing the promoted hotel.
   expect(screen.getByText(/Primary Hotel \(Hotel Three\)/)).toBeInTheDocument();
 });
