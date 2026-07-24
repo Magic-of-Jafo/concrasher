@@ -9,7 +9,7 @@ import {
   createDefaultVenue,
   createDefaultHotel,
 } from '@/lib/validators';
-import { Button, Box, Typography, Checkbox, FormControlLabel, Paper, Divider, Accordion, AccordionSummary, AccordionDetails, Alert, IconButton, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { Button, Box, Typography, Checkbox, FormControlLabel, Paper, Divider, Accordion, AccordionSummary, AccordionDetails, Alert, IconButton, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Select, MenuItem } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HotelForm from './HotelForm';
 import AddIcon from '@mui/icons-material/Add';
@@ -253,39 +253,84 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
     }
   };
 
-  // Promote a secondary venue to primary, immediately and explicitly. The
-  // current primary steps down to a secondary when it holds anything (a saved
-  // record or typed content); a blank placeholder primary is simply dropped.
-  const handlePromoteVenue = (index: number) => {
-    const target = secondaryVenues[index];
-    if (!target) return;
-    const rest = secondaryVenues.filter((_, i) => i !== index);
-    const old: any = primaryVenue;
-    const oldHasContent = !!(old?.id || (old?.venueName || '').trim() || (old?.streetAddress || '').trim() || (old?.city || '').trim());
-    const next = {
-      primaryVenue: { ...target, isPrimaryVenue: true, markedForPrimaryPromotion: false } as VenueData,
-      secondaryVenues: oldHasContent
-        ? [...rest, { ...old, isPrimaryVenue: false, markedForPrimaryPromotion: false }]
-        : rest,
-      hotels: value.hotels || [],
-    };
-    validateAndNotify({ ...value, primaryVenue: next.primaryVenue, secondaryVenues: next.secondaryVenues });
-    setExpandedAccordion('primaryVenue');
-    void persistPromotion(next);
+  // ── Role assignment: any non-primary venue/hotel can become any of the four
+  // roles, including across families (an imported "hotel" that is really the
+  // event hall becomes a venue, and vice versa). Cross-family moves map the
+  // shared fields, carry photos, and drop the old record id so the server
+  // creates the record under its new type (the old one delete-syncs away).
+  type AssignableRole = 'primaryVenue' | 'secondaryVenue' | 'primaryHotel' | 'secondaryHotel';
+
+  const crossFields = [
+    'websiteUrl', 'googleMapsUrl', 'streetAddress', 'city', 'stateRegion', 'postalCode',
+    'country', 'contactEmail', 'contactPhone', 'description', 'amenities', 'parkingInfo',
+    'publicTransportInfo', 'groupPrice', 'groupRateOrBookingCode', 'bookingLink', 'bookingCutoffDate',
+  ] as const;
+
+  const convertItem = (item: any, from: 'venue' | 'hotel', to: 'venue' | 'hotel'): any => {
+    if (from === to) return { ...item, markedForPrimaryPromotion: false };
+    const base: any = to === 'venue' ? createDefaultVenue(false) : createDefaultHotel(false);
+    for (const f of crossFields) if (item[f] != null) base[f] = item[f];
+    const name = from === 'venue' ? item.venueName : item.hotelName;
+    if (to === 'venue') base.venueName = name || ''; else base.hotelName = name || '';
+    base.photos = (item.photos || []).map((p: any) => ({ url: p.url, caption: p.caption ?? '' }));
+    return base; // fresh tempId from the factory; no id — the server creates it anew
   };
 
-  // Promote a hotel to primary; any current primary steps down to an
-  // additional hotel (nothing is lost). An explicit primary hotel and
-  // "guests stay at the venue" are mutually exclusive, so promoting also
-  // turns that toggle off and reveals the primary-hotel form.
-  const handlePromoteHotel = (actualIndex: number) => {
-    const hotels = (value.hotels || []).map((h, i) => ({
-      ...h,
-      isPrimaryHotel: i === actualIndex,
-      markedForPrimaryPromotion: false,
-    }));
-    validateAndNotify({ ...value, primaryVenue, secondaryVenues, guestsStayAtPrimaryVenue: false, hotels });
-    void persistPromotion({ primaryVenue, secondaryVenues, hotels, guestsStayAtPrimaryVenue: false });
+  const handleAssignRole = (source: { kind: 'venue' | 'hotel'; index: number }, role: AssignableRole) => {
+    const item: any = source.kind === 'venue' ? secondaryVenues[source.index] : (value.hotels || []).filter(h => !h.isPrimaryHotel)[source.index];
+    if (!item) return;
+    const currentRole: AssignableRole = source.kind === 'venue' ? 'secondaryVenue' : 'secondaryHotel';
+    if (role === currentRole) return;
+
+    // Remove the item from where it lives now.
+    let nextSecondaryVenues = source.kind === 'venue' ? secondaryVenues.filter((v) => v !== item) : [...secondaryVenues];
+    let nextHotels = source.kind === 'hotel' ? (value.hotels || []).filter((h) => h !== item) : [...(value.hotels || [])];
+    let nextPrimaryVenue: VenueData = primaryVenue;
+    let guests: boolean | undefined;
+
+    const targetKind = role === 'primaryVenue' || role === 'secondaryVenue' ? 'venue' : 'hotel';
+    const converted = convertItem(item, source.kind, targetKind);
+
+    if (role === 'primaryVenue') {
+      const old: any = nextPrimaryVenue;
+      const oldHasContent = !!(old?.id || (old?.venueName || '').trim() || (old?.streetAddress || '').trim() || (old?.city || '').trim());
+      if (oldHasContent) nextSecondaryVenues = [...nextSecondaryVenues, { ...old, isPrimaryVenue: false, markedForPrimaryPromotion: false }];
+      nextPrimaryVenue = { ...converted, isPrimaryVenue: true };
+      setExpandedAccordion('primaryVenue');
+    } else if (role === 'secondaryVenue') {
+      nextSecondaryVenues = [...nextSecondaryVenues, { ...converted, isPrimaryVenue: false }];
+    } else if (role === 'primaryHotel') {
+      // An explicit primary hotel supersedes "guests stay at the venue".
+      nextHotels = [
+        { ...converted, isPrimaryHotel: true },
+        ...nextHotels.map((h) => ({ ...h, isPrimaryHotel: false, markedForPrimaryPromotion: false })),
+      ];
+      guests = false;
+    } else {
+      nextHotels = [...nextHotels, { ...converted, isPrimaryHotel: false }];
+    }
+
+    validateAndNotify({
+      ...value,
+      primaryVenue: nextPrimaryVenue,
+      secondaryVenues: nextSecondaryVenues,
+      hotels: nextHotels,
+      ...(guests !== undefined ? { guestsStayAtPrimaryVenue: guests } : {}),
+    });
+    void persistPromotion({
+      primaryVenue: nextPrimaryVenue,
+      secondaryVenues: nextSecondaryVenues,
+      hotels: nextHotels,
+      ...(guests !== undefined ? { guestsStayAtPrimaryVenue: guests } : {}),
+    });
+  };
+
+  // Header delete: hotels remove immediately (and persist); venues keep their
+  // confirm dialog, wired from the header trash icon.
+  const handleDeleteHotelNow = (hotel: HotelData) => {
+    const hotels = (value.hotels || []).filter((h) => h !== hotel);
+    validateAndNotify({ ...value, primaryVenue, secondaryVenues, hotels });
+    void persistPromotion({ primaryVenue, secondaryVenues, hotels });
   };
 
   const handleGuestsStayAtPrimaryVenueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -394,16 +439,32 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                 <Typography sx={{ fontWeight: 'medium', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {(venue.venueName || '').trim() || `Secondary Venue ${index + 1}`}
                 </Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={(e) => { e.stopPropagation(); handlePromoteVenue(index); }}
-                  disabled={disabled || promotionSaving}
-                  aria-label={`Make ${(venue.venueName || '').trim() || `secondary venue ${index + 1}`} the primary venue`}
-                  sx={{ flexShrink: 0, mr: 1 }}
-                >
-                  Make Primary
-                </Button>
+                {/* Role + delete live in the header so a long imported list can
+                    be triaged without expanding each row. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, mr: 1 }} onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    size="small"
+                    value="secondaryVenue"
+                    onChange={(e) => handleAssignRole({ kind: 'venue', index }, e.target.value as any)}
+                    disabled={disabled || promotionSaving}
+                    SelectDisplayProps={{ 'aria-label': `Role for ${(venue.venueName || '').trim() || `secondary venue ${index + 1}`}` }}
+                    sx={{ minWidth: 168, fontSize: '0.85rem' }}
+                  >
+                    <MenuItem value="primaryVenue">Primary venue</MenuItem>
+                    <MenuItem value="secondaryVenue">Secondary venue</MenuItem>
+                    <MenuItem value="primaryHotel">Primary hotel</MenuItem>
+                    <MenuItem value="secondaryHotel">Secondary hotel</MenuItem>
+                  </Select>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
+                    disabled={disabled || promotionSaving}
+                    aria-label={`Delete ${(venue.venueName || '').trim() || `secondary venue ${index + 1}`}`}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </Box>
             </AccordionSummary>
             <AccordionDetails>
@@ -416,17 +477,6 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                 isNew={!venue.id}
                 isPrimary={false}
               />
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                <Button
-                  startIcon={<DeleteIcon />}
-                  onClick={() => setVenueToDelete({ originalIndex: index, displayIndex: index + 1 })}
-                  color="error"
-                  disabled={disabled}
-                  aria-label={`Delete Secondary Venue ${index + 1}`}
-                >
-                  Delete Secondary Venue
-                </Button>
-              </Box>
             </AccordionDetails>
           </Accordion>
         ))}
@@ -524,19 +574,34 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                       <Typography sx={{ fontWeight: 'medium', mr: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(hotel.hotelName || '').trim() || `Additional Hotel ${index + 1}`}
                       </Typography>
-                      {/* Explicit, immediate promotion — always available. In
-                          stay-at-venue mode promoting also turns that toggle
-                          off (a separate primary hotel supersedes it). */}
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => { e.stopPropagation(); handlePromoteHotel(actualIndex); }}
-                        disabled={disabled || promotionSaving}
-                        aria-label={`Make ${(hotel.hotelName || '').trim() || `additional hotel ${index + 1}`} the primary hotel`}
-                        sx={{ flexShrink: 0, mr: 1 }}
-                      >
-                        Make Primary
-                      </Button>
+                      {/* Role + delete in the header: assign this record to any
+                          rank (venue roles included) or drop it, without
+                          expanding. Assigning primary hotel also turns off
+                          stay-at-venue (a separate primary supersedes it). */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, mr: 1 }} onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          size="small"
+                          value="secondaryHotel"
+                          onChange={(e) => handleAssignRole({ kind: 'hotel', index }, e.target.value as any)}
+                          disabled={disabled || promotionSaving}
+                          SelectDisplayProps={{ 'aria-label': `Role for ${(hotel.hotelName || '').trim() || `additional hotel ${index + 1}`}` }}
+                          sx={{ minWidth: 168, fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="primaryVenue">Primary venue</MenuItem>
+                          <MenuItem value="secondaryVenue">Secondary venue</MenuItem>
+                          <MenuItem value="primaryHotel">Primary hotel</MenuItem>
+                          <MenuItem value="secondaryHotel">Secondary hotel</MenuItem>
+                        </Select>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteHotelNow(hotel)}
+                          disabled={disabled || promotionSaving}
+                          aria-label={`Delete ${(hotel.hotelName || '').trim() || `additional hotel ${index + 1}`}`}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
@@ -547,15 +612,6 @@ const VenueHotelTab: React.FC<VenueHotelTabProps> = ({ conventionId, value, onCh
                       disabled={disabled}
                       errors={structuredErrors.hotels?.[actualIndex]}
                     />
-                    <Button
-                      startIcon={<DeleteIcon />}
-                      onClick={() => handleRemoveHotel(actualIndex)}
-                      color="error"
-                      sx={{ mt: 1 }}
-                      disabled={disabled}
-                    >
-                      Remove Hotel
-                    </Button>
                   </AccordionDetails>
                 </Accordion>
               );

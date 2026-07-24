@@ -178,17 +178,20 @@ const SignupAnalyticsDashboard: React.FC = () => {
         if (!signupData) return [];
 
         return signupData.map(item => {
-            // Handle both date formats: "2025-07-23" and "2025-07-23T03:08:32.544Z"
-            const dateStr = item.date.includes('T') ? item.date.split('T')[0] : item.date;
-            const date = new Date(dateStr + 'T00:00:00');
+            // The API sends dates ALREADY formatted ("Jul 25, 2025"); older
+            // shapes were ISO ("2025-07-23" / full timestamps). Appending
+            // T00:00:00 to the formatted kind produced Invalid Date on every
+            // axis label — parse each shape the way it actually arrives.
+            const raw = item.date;
+            const isIso = /^\d{4}-\d{2}-\d{2}/.test(raw);
+            const date = isIso ? new Date(raw.split('T')[0] + 'T00:00:00') : new Date(raw);
+            const valid = !isNaN(date.getTime());
 
             return {
                 ...item,
-                date: dateStr, // Ensure consistent date format
-                formattedDate: date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                })
+                formattedDate: valid
+                    ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : raw, // never show "Invalid Date"; the raw string beats it
             };
         });
     }, [signupData]);

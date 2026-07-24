@@ -114,7 +114,8 @@ test('Make Primary on an additional hotel promotes it and clears stay-at-venue',
   render(<Harness stayAtVenue report={(d) => reports.push(d)} />);
   fireEvent.click(screen.getByText('MOCK APPLY'));
 
-  fireEvent.click(screen.getByLabelText('Make Hotel Three the primary hotel'));
+  fireEvent.mouseDown(screen.getByLabelText('Role for Hotel Three'));
+  fireEvent.click(screen.getByRole('option', { name: 'Primary hotel' }));
 
   const last = reports[reports.length - 1];
   const primary = (last.hotels || []).find((h: any) => h.isPrimaryHotel);
@@ -137,10 +138,44 @@ test('Make Primary on a secondary venue promotes it; blank placeholder primary i
   const reports: any[] = [];
   render(<Harness withSecondaryVenue report={(d) => reports.push(d)} />);
 
-  fireEvent.click(screen.getByLabelText('Make Spare Venue the primary venue'));
+  fireEvent.mouseDown(screen.getByLabelText('Role for Spare Venue'));
+  fireEvent.click(screen.getByRole('option', { name: 'Primary venue' }));
 
   const last = reports[reports.length - 1];
   expect(last.primaryVenue?.venueName ?? last.venues?.find((v: any) => v.isPrimaryVenue)?.venueName).toBe('Spare Venue');
   const secondaries = last.secondaryVenues ?? last.venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
   expect(secondaries.length).toBe(0);
+});
+
+test('cross-family role change: a hotel becomes a secondary venue', () => {
+  const reports: any[] = [];
+  render(<Harness report={(d) => reports.push(d)} />);
+  fireEvent.click(screen.getByText('MOCK APPLY'));
+
+  fireEvent.mouseDown(screen.getByLabelText('Role for Hotel Four'));
+  fireEvent.click(screen.getByRole('option', { name: 'Secondary venue' }));
+
+  const last = reports[reports.length - 1];
+  const hotelNames = (last.hotels || []).map((h: any) => h.hotelName);
+  expect(hotelNames).not.toContain('Hotel Four');
+  const venues = last.secondaryVenues ?? last.venues?.filter((v: any) => !v.isPrimaryVenue) ?? [];
+  const moved = venues.find((v: any) => v.venueName === 'Hotel Four');
+  expect(moved).toBeTruthy();
+  expect(moved.city).toBe('Orlando'); // shared fields carried across
+});
+
+test('header trash deletes a hotel immediately and persists', () => {
+  const reports: any[] = [];
+  render(<Harness report={(d) => reports.push(d)} />);
+  fireEvent.click(screen.getByText('MOCK APPLY'));
+  (global.fetch as jest.Mock).mockClear();
+
+  fireEvent.click(screen.getByLabelText('Delete Hotel Two'));
+
+  const last = reports[reports.length - 1];
+  expect((last.hotels || []).map((h: any) => h.hotelName)).not.toContain('Hotel Two');
+  expect(global.fetch).toHaveBeenCalledWith(
+    '/api/organizer/conventions/conv1',
+    expect.objectContaining({ method: 'PUT' }),
+  );
 });
