@@ -28,6 +28,16 @@ interface SignupData {
     count: number;
 }
 
+// The analytics API has sent dates as "Jul 25, 2025", "2025-07-23", and full
+// ISO timestamps over its lifetime. Parse whichever shape arrives; null only
+// when nothing is parseable (callers then show the raw string, never
+// "Invalid Date").
+function parseSignupDate(raw: string): Date | null {
+    const isIso = /^\d{4}-\d{2}-\d{2}/.test(raw);
+    const date = isIso ? new Date(raw.split('T')[0] + 'T00:00:00') : new Date(raw);
+    return isNaN(date.getTime()) ? null : date;
+}
+
 type DateRange = 'last7days' | 'last30days' | 'monthToDate' | 'lastMonth';
 
 const SignupAnalyticsDashboard: React.FC = () => {
@@ -178,20 +188,12 @@ const SignupAnalyticsDashboard: React.FC = () => {
         if (!signupData) return [];
 
         return signupData.map(item => {
-            // The API sends dates ALREADY formatted ("Jul 25, 2025"); older
-            // shapes were ISO ("2025-07-23" / full timestamps). Appending
-            // T00:00:00 to the formatted kind produced Invalid Date on every
-            // axis label — parse each shape the way it actually arrives.
-            const raw = item.date;
-            const isIso = /^\d{4}-\d{2}-\d{2}/.test(raw);
-            const date = isIso ? new Date(raw.split('T')[0] + 'T00:00:00') : new Date(raw);
-            const valid = !isNaN(date.getTime());
-
+            const date = parseSignupDate(item.date);
             return {
                 ...item,
-                formattedDate: valid
+                formattedDate: date
                     ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : raw, // never show "Invalid Date"; the raw string beats it
+                    : item.date,
             };
         });
     }, [signupData]);
@@ -355,15 +357,17 @@ const SignupAnalyticsDashboard: React.FC = () => {
                                     itemStyle={{ color: chartColors.tipInk }}
                                     cursor={{ stroke: chartColors.line, strokeOpacity: 0.3 }}
                                     labelFormatter={(label, payload) => {
-                                        if (payload && payload[0]) {
-                                            const originalDate = payload[0].payload.date;
-                                            const dateStr = originalDate.includes('T') ? originalDate.split('T')[0] : originalDate;
-                                            return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
-                                                weekday: 'long',
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            });
+                                        const raw = payload?.[0]?.payload?.date;
+                                        if (raw) {
+                                            const date = parseSignupDate(raw);
+                                            return date
+                                                ? date.toLocaleDateString('en-US', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                })
+                                                : raw;
                                         }
                                         return label;
                                     }}
