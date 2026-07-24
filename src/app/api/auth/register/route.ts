@@ -3,6 +3,7 @@ import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { RegistrationSchema } from '../../../../lib/validators'; // Adjusted path
+import { canonicalizeEmail } from '../../../../lib/email-normalize';
 import { sendEmail } from '../../../../lib/email';
 import EmailVerificationEmail from '../../../../../emails/EmailVerificationEmail';
 import { sendCapiEvent } from '../../../../lib/meta-events';
@@ -22,13 +23,17 @@ export async function POST(request: NextRequest) {
 
     const { email, password, eventId } = validation.data; // ✅ Extract eventId from request
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    // Match on the canonical inbox, not just the literal string, so Gmail
+    // dot/plus variants of an existing account can't mint a second one.
+    const canonicalEmail = canonicalizeEmail(email);
+    const existingUser = await prisma.user.findFirst({
+      where: { OR: [{ email }, { canonicalEmail }] },
     });
 
     if (existingUser) {
       // If user exists but is not verified, we could resend the verification email.
-      // For now, we'll just return an error to keep it simple.
+      // For now, we'll just return an error to keep it simple. Same message
+      // whether the collision was literal or canonical — don't reveal which.
       return NextResponse.json({ message: 'Email already exists' }, { status: 409 });
     }
 
@@ -37,6 +42,7 @@ export async function POST(request: NextRequest) {
     const newUser = await prisma.user.create({
       data: {
         email,
+        canonicalEmail,
         hashedPassword,
         roles: [Role.USER], // Assuming Role.USER is correctly defined in your Prisma schema
       },

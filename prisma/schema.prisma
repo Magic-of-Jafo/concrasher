@@ -26,6 +26,11 @@ model Timezone {
 model User {
   id               String             @id @default(cuid())
   email            String             @unique
+  // Canonical inbox key (dots/+tags stripped, googlemail folded) used to block
+  // duplicate accounts from Gmail dot/plus variants. Match key only; `email`
+  // stays the address the user typed. Nullable until backfilled; a unique
+  // index follows once existing collisions are resolved.
+  canonicalEmail   String?
   emailVerified    DateTime?
   image            String?
   hashedPassword   String?
